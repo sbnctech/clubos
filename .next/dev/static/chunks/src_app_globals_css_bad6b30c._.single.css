@@ -309,12 +309,20 @@
 @layer components;
 
 @layer utilities {
+  .collapse {
+    visibility: collapse;
+  }
+
   .visible {
     visibility: visible;
   }
 
   .flex {
     display: flex;
+  }
+
+  .table {
+    display: table;
   }
 
   .h-12 {
@@ -479,6 +487,10 @@
 
   .text-zinc-950 {
     color: var(--color-zinc-950);
+  }
+
+  .italic {
+    font-style: italic;
   }
 
   .antialiased {
