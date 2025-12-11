@@ -12,8 +12,15 @@ type EventItem = {
   startTime: string;
 };
 
+type RegistrationItem = {
+  id: string;
+  memberId: string;
+  eventId: string;
+  status: string;
+};
+
 async function getMembers(): Promise<Member[]> {
-  const res = await fetch("http://localhost:3000/api/members", {
+  const res = await fetch("/api/members", {
     cache: "no-store",
   });
 
@@ -27,7 +34,7 @@ async function getMembers(): Promise<Member[]> {
 }
 
 async function getEvents(): Promise<EventItem[]> {
-  const res = await fetch("http://localhost:3000/api/events", {
+  const res = await fetch("/api/events", {
     cache: "no-store",
   });
 
@@ -40,8 +47,39 @@ async function getEvents(): Promise<EventItem[]> {
   return data.events ?? [];
 }
 
+function resolveMemberName(memberId: string, members: Member[]): string {
+  const member = members.find((m) => m.id === memberId);
+  if (!member) return memberId;
+  return `${member.firstName} ${member.lastName}`;
+}
+
+function resolveEventTitle(eventId: string, events: EventItem[]): string {
+  const event = events.find((e) => e.id === eventId);
+  if (!event) return eventId;
+  return event.title;
+}
+
 export default async function AdminPage() {
-  const [members, events] = await Promise.all([getMembers(), getEvents()]);
+  const [members, events] = await Promise.all([
+    getMembers(),
+    getEvents(),
+  ]);
+
+  // Temporary hard-coded registrations, joined in memory with members and events
+  const registrations: RegistrationItem[] = [
+    {
+      id: "r1",
+      memberId: "m1",
+      eventId: "e1",
+      status: "REGISTERED",
+    },
+    {
+      id: "r2",
+      memberId: "m2",
+      eventId: "e2",
+      status: "WAITLISTED",
+    },
+  ];
 
   return (
     <div data-test-id="admin-root" style={{ padding: "20px" }}>
@@ -52,6 +90,7 @@ export default async function AdminPage() {
         Admin
       </header>
 
+      {/* Members section */}
       <section style={{ marginBottom: "24px" }}>
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>
           Members overview
@@ -109,6 +148,7 @@ export default async function AdminPage() {
         </table>
       </section>
 
+      {/* Events section */}
       <section style={{ marginBottom: "24px" }}>
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>
           Events overview
@@ -119,7 +159,7 @@ export default async function AdminPage() {
         </p>
       </section>
 
-      <section>
+      <section style={{ marginBottom: "32px" }}>
         <table
           data-test-id="admin-events-table"
           style={{
@@ -165,6 +205,71 @@ export default async function AdminPage() {
                   style={{ padding: "8px", fontStyle: "italic", color: "#666" }}
                 >
                   No events found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </section>
+
+      {/* Registrations section */}
+      <section style={{ marginBottom: "24px" }}>
+        <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>
+          Registrations overview
+        </h2>
+        <p style={{ marginBottom: "12px" }}>
+          This table is currently backed by in-memory mock registrations joined
+          with members and events. In the next phase, this will be replaced with
+          a database-backed query.
+        </p>
+      </section>
+
+      <section>
+        <table
+          data-test-id="admin-registrations-table"
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            maxWidth: "800px",
+          }}
+        >
+          <thead>
+            <tr>
+              <th style={{ borderBottom: "1px solid #ccc", textAlign: "left", padding: "8px" }}>
+                Member
+              </th>
+              <th style={{ borderBottom: "1px solid #ccc", textAlign: "left", padding: "8px" }}>
+                Event
+              </th>
+              <th style={{ borderBottom: "1px solid #ccc", textAlign: "left", padding: "8px" }}>
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {registrations.map((registration) => (
+              <tr
+                key={registration.id}
+                data-test-id="admin-registrations-row"
+              >
+                <td style={{ borderBottom: "1px solid #eee", padding: "8px" }}>
+                  {resolveMemberName(registration.memberId, members)}
+                </td>
+                <td style={{ borderBottom: "1px solid #eee", padding: "8px" }}>
+                  {resolveEventTitle(registration.eventId, events)}
+                </td>
+                <td style={{ borderBottom: "1px solid #eee", padding: "8px" }}>
+                  {registration.status}
+                </td>
+              </tr>
+            ))}
+            {registrations.length === 0 && (
+              <tr data-test-id="admin-registrations-empty-state">
+                <td
+                  colSpan={3}
+                  style={{ padding: "8px", fontStyle: "italic", color: "#666" }}
+                >
+                  No registrations found.
                 </td>
               </tr>
             )}
