@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MembershipStatus {
+  ACTIVE
+  INACTIVE
+  LAPSED
+}
+
+enum RegistrationStatus {
+  REGISTERED
+  CANCELLED
+  WAITLISTED
+}
+
+enum SmsDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum SmsStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+}
+
+model Member {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  firstName       String
+  lastName        String
+  email           String           @unique
+  phone           String?
+  membershipLevel String
+  status          MembershipStatus @default(ACTIVE)
+  smsOptIn        Boolean          @default(false)
+
+  registrations Registration[]
+  smsMessages   SmsMessageLog[]
+}
+
+model Event {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  title       String
+  category    String
+  description String
+  startTime   DateTime
+  endTime     DateTime
+  location    String
+  capacity    Int
+  createdBy   String
+
+  registrations Registration[]
+  smsMessages   SmsMessageLog[]
+}
+
+model Registration {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  eventId  String
+  memberId String
+  status   RegistrationStatus @default(REGISTERED)
+
+  event  Event  @relation(fields: [eventId], references: [id])
+  member Member @relation(fields: [memberId], references: [id])
+}
+
+model SmsMessageLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  memberId          String?
+  eventId           String?
+  phone             String
+  direction         SmsDirection
+  status            SmsStatus    @default(PENDING)
+  body              String
+  providerMessageId String?
+
+  member Member? @relation(fields: [memberId], references: [id])
+  event  Event?  @relation(fields: [eventId], references: [id])
+}
