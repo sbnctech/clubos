@@ -1,16 +1,27 @@
 import { test, expect } from "@playwright/test";
 
-// Respect PW_BASE_URL when provided, otherwise default to http://localhost:3000
-const BASE = process.env.PW_BASE_URL ?? "http://localhost:3000";
-
 test("email test endpoint sends a mock email", async ({ request }) => {
-  const response = await request.post(`${BASE}/api/email/test`, {
+  const response = await request.post("/api/email/test", {
     data: { to: "recipient@example.com" },
   });
 
-  expect(response.ok()).toBeTruthy();
+  const status = response.status();
+  const text = await response.text();
 
-  const data = await response.json();
+  console.log("EMAIL TEST STATUS:", status);
+  console.log("EMAIL TEST BODY:", text);
+
+  // Assert on status explicitly so we see it if it fails
+  expect(status).toBe(200);
+
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    console.error("Failed to parse JSON:", err);
+    throw err;
+  }
+
   expect(data.ok).toBe(true);
   expect(data.to).toBe("recipient@example.com");
   expect(typeof data.messageId).toBe("string");

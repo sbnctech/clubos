@@ -269,3 +269,239 @@ Placeholder modules for future expansion:
 ----------------------------------------------------------------------
 
 END OF SYSTEM SPEC
+
+--------------------------------------------------
+Requirements update 2025-12-10: Contacts and memberships
+--------------------------------------------------
+
+Data model
+
+- The system MUST treat Contact as the canonical person record.
+- Each Contact MAY have zero or more Membership records over time.
+- The system MUST support at least the following membership statuses:
+  - ACTIVE
+  - LAPSED
+  - ALUMNI
+  - PROSPECT
+- The system MUST support at least the following membership levels, which can be mapped to SBNC usage:
+  - NEWBIE
+  - NEWCOMER
+  - EXTENDED
+  - BOARD
+  - ALUMNI_LEVEL
+  - OTHER
+- The Members view in the admin UI MUST be defined as:
+  - Contacts with at least one Membership where status = ACTIVE.
+- Event registrations MUST reference Contact and Event by id.
+- SmsMessageLog entries MAY reference Contact and Event, but SMS behavior beyond basic logging is a later phase.
+
+Email and SMS scope for early milestones
+
+- The system MUST provide a mock email provider:
+  - Writes outbound messages to a local log file.
+  - Exposes a test endpoint for use in automated tests.
+  - Supports an admin Email Activity panel to inspect recently logged messages.
+- The system SHOULD be designed so that a real email provider (for example SES or Postmark) can be plugged in later without breaking the admin UI.
+- The system MUST NOT depend on a real SMS provider for the initial milestones.
+- Two way SMS is explicitly treated as a later phase and is out of scope for the first working demo.
+## Domain model (authoritative v0.2)
+
+This project treats Contact as the primary identity record. All other person- or event-related records hang off Contacts.
+
+Entities:
+
+- Contact
+  - One row per real-world person (member, spouse, guest, admin, etc.).
+  - Stores stable identifiers, names, primary email and phone, and basic profile fields.
+  - Represents both current and former members, guests, and other contacts.
+
+- Membership
+  - Time-bounded snapshots representing the relationship between a Contact and the club.
+  - Examples of states: Newbie, Newcomer, Extended Newcomer, Alumni, Lapsed, Admin.
+  - Multiple rows per Contact over time, allowing a full membership history.
+  - Encodes start and end timestamps plus membership level and any relevant flags.
+
+- Event
+  - A scheduled activity with title, description, category, start and end timestamps, and any access rules.
+  - Used by both the public/member-facing calendar and internal admin tools.
+
+- Registration
+  - A link table between Contact and Event.
+  - Represents a single contact's relationship to a specific event (Registered, Waitlisted, Cancelled, No-Show, etc.).
+  - Designed to support full history of changes, not just the current status.
+
+- SmsMessageLog
+  - Tracks SMS messages related to Contacts and Events.
+  - Stores direction (outbound, inbound), status (pending, sent, failed, delivered), body text, phone number, optional contactId and eventId, and an optional providerMessageId.
+  - Intended for compliance, debugging, and operational visibility.
+
+### Terminology and "members" as a derived concept
+
+The database no longer has a top-level Member entity.
+
+- "Member" in the UI is a derived concept:
+  - A Contact with at least one active Membership row in a "member-like" state (for example: Newcomer, Extended Newcomer, or Alumni depending on business rules).
+  - Different screens may filter by different membership states, but they all start from Contact plus Membership.
+
+- This means:
+  - All membership state logic lives in the Membership model and the queries that interpret it.
+  - Admin tools should think in terms of Contacts and Memberships, even if the UI labels still say "Members" for now to keep things familiar.
+
+### Persistence technology
+
+- Database: PostgreSQL 16, running locally for development.
+- Schema management: Prisma Migrate with a migration history checked into prisma/migrations.
+- Application access: Prisma Client v7, generated from prisma/schema.prisma.
+
+These choices are now considered part of the core system specification.
+
+## Email subsystem specification (updated)
+
+### 1. Test email endpoint
+
+Current behavior:
+
+- Route: POST /api/email/test
+- Sends a mock email via mockEmailSend helper
+- Returns:
+  {
+    ok: true,
+    to,
+    messageId
+  }
+- Used for system testing and as a placeholder until real provider integration.
+
+Design constraints:
+
+- Must behave consistently in all environments.
+- Must not require a real provider for tests or local development.
+- API contract is now considered stable.
+
+Future expansion:
+
+- Add provider adapter layer:
+  - mock (default for test)
+  - resend
+  - ses
+  - smtp
+- Add retry and failure logging.
+
+---
+
+### 2. Email log endpoint
+
+Current behavior (Phase 1):
+
+- Route: POST /api/email/log
+  - Generates an id, captures subject, body, timestamp.
+  - Stores entry in in-memory array emailLog.
+  - Responds with {
+      ok: true,
+      id,
+      subject
+    }
+
+- Route: GET /api/email/log
+  - Returns { emails: emailLog }
+
+- Behavior is validated with Playwright tests.
+- In-memory data resets when the dev server restarts.
+
+Reasoning for current design:
+
+- Locks down the API contract while deferring database wiring.
+- Allows front-end and admin tooling to progress without waiting for persistence.
+- Avoids blocking progress on Prisma (which is still being stabilized).
+
+---
+
+### 3. Planned final implementation (not yet completed)
+
+Database-backed EmailMessageLog:
+
+- Prisma model (to be added):
+  - id (string)
+  - memberId (nullable)
+  - to (string)
+  - subject (string)
+  - body (text)
+  - providerMessageId (string nullable)
+  - status (enum: SENT, FAILED, PENDING)
+  - createdAt (datetime)
+
+- Repository interface:
+  - createEmailLog(entry)
+  - listRecent(limit)
+
+- Route updates:
+  - POST /api/email/test: persists log after sending
+  - POST /api/email/log: writes to database
+  - GET /api/email/log: queries last 20 items
+
+Testing:
+
+- Continue using Playwright for contract tests.
+- Add Prisma integration tests only after model and migrations exist.
+
+---
+
+### 4. Architectural guarantees
+
+- The API shape for test email and email log endpoints is now fixed.
+- Persistence layer is intentionally deferred.
+- Mock behavior must remain fully functional and testable until persistence is added.
+- Code written by agents must not assume that Prisma persistence is already wired.
+
+
+## Development Stages Checklist
+
+This section tracks implementation stages for ClubOS at the system level.
+It should stay consistent with PROJECT_PLAN.md.
+
+Stage 0: Repo and tooling baseline
+- Status: Done
+- Next.js App Router project scaffolded.
+- TypeScript, ESLint, and basic formatting in place.
+- Playwright test runner configured and working against PW_BASE_URL.
+- Prisma client generated and prisma.ts helper file created, but not yet used by production endpoints.
+
+Stage 1: Minimal app shell
+- Status: Partial
+- Default layout and basic app chrome in place.
+- Healthcheck style endpoints can be added without touching core domain logic.
+- No persistent data model relied upon yet for production features.
+
+Stage 2: Email primitives and dev/test endpoints
+- Status: Done
+- /api/email/test POST endpoint implemented.
+  - Accepts JSON body with optional "to", "subject", and "body".
+  - Uses server/mock-email.ts mockEmailSend helper to simulate sending and returns a messageId.
+  - Has a Playwright test (tests/api/email-test.spec.ts) that asserts HTTP 200 and basic response shape.
+- /api/email/log POST + GET implemented with in-memory storage only.
+  - POST: accepts minimal subject/body, writes to an in-memory array, and returns a generated id.
+  - GET: returns the current in-memory log array with id, subject, body, and createdAt ISO timestamp.
+  - Covered by tests/api/email-log.spec.ts, which posts a log entry and then verifies it appears in the list.
+- Prisma is not yet used by these endpoints.
+  - Earlier attempts to wire Prisma into /api/email/log ran into PrismaClient initialization issues that need to be solved before production persistence is enabled.
+  - The current behavior is explicitly dev-friendly and safe but not durable.
+
+Stage 3: Email and notification subsystem v1 (persistent)
+- Status: Not started
+- Define Prisma model for EmailMessageLog (or equivalent) in prisma/schema.prisma.
+- Resolve Prisma configuration so that new PrismaClient() can be constructed safely in server/prisma.ts using DATABASE_URL from the environment.
+- Migrate the /api/email/log implementation from in-memory storage to Prisma-backed storage while keeping tests green.
+- Ensure schema and endpoint can support future notification features:
+  - Recipient address.
+  - Subject.
+  - Body or serialized payload.
+  - Timestamps and basic status fields for sent messages.
+
+Stage 4: Member and admin facing UX
+- Status: Not started
+- Build minimal authenticated admin view for recent email logs.
+- Add simple filters (by recipient or time range) to verify that the log is usable for debugging.
+- Wire this into the broader ClubOS admin shell as it comes online.
+
+Notes
+- The current implementation intentionally favors simplicity and green tests over early database complexity.
+- When Prisma configuration is stable, we will update this checklist to mark Stage 3 as in progress and move the email log from memory to the database.

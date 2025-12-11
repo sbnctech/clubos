@@ -1,19 +1,34 @@
-import { NextResponse } from "next/server";
-import { sendEmail } from "@/lib/email";
+import { NextRequest, NextResponse } from "next/server";
+import { mockEmailSend } from "../../../../../server/mock-email";
 
-export async function POST(request: Request) {
-  const body = await request.json().catch(() => ({}));
-  const to = body.to ?? "recipient@example.com";
+export async function POST(req: NextRequest) {
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch (err) {
+    // If the body is not JSON, fall back to an empty object.
+    body = {};
+  }
 
-  const result = await sendEmail({
+  const to =
+    typeof body.to === "string" && body.to.length > 0
+      ? body.to
+      : "test@example.com";
+
+  const { messageId } = await mockEmailSend({
     to,
-    subject: "ClubOS test email",
-    text: "This is a mock test email from ClubOS.",
+    subject: body.subject ?? "Test email from ClubOS",
+    body: body.body ?? "This is a test email placeholder body.",
   });
 
   return NextResponse.json({
     ok: true,
     to,
-    messageId: result.messageId,
+    messageId,
   });
+}
+
+export async function GET() {
+  // Stubbed for now; we will wire real EmailMessageLog queries later.
+  return NextResponse.json({ emails: [] });
 }

@@ -18,3 +18,14 @@ Summary:
 - Added inbound webhook model.
 - Added admin SMS inbox requirements.
 - Added RSVP automation rules (Y=confirm, N=cancel/promote).
+
+--------------------------------------------------
+2025-12-10: Data model pivot to contacts + memberships
+--------------------------------------------------
+
+- Introduced Contact as the primary person entity in the system.
+- Defined Membership as the relationship between a Contact and the club over time.
+- Members in the admin UI are now defined as Contacts who have at least one ACTIVE Membership.
+- Event registrations now link to Contact and Event, not to a standalone Member record.
+- SmsMessageLog is linked to Contact and Event where applicable, but deeper SMS behavior is deferred.
+- Email delivery is implemented as a mock provider with file based logging to support early admin UI development.

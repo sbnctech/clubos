@@ -1,8 +1,9 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
+  "/admin-frame/page": "app/admin-frame/page.js",
   "/admin/page": "app/admin/page.js",
+  "/api/email/log/route": "app/api/email/log/route.js",
   "/api/email/test/route": "app/api/email/test/route.js",
-  "/api/events/route": "app/api/events/route.js",
-  "/api/members/route": "app/api/members/route.js",
-  "/api/registrations/route": "app/api/registrations/route.js"
+  "/api/health/route": "app/api/health/route.js",
+  "/api/sms/test/route": "app/api/sms/test/route.js"
 }

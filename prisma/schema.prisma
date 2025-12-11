@@ -8,14 +8,25 @@ datasource db {
 
 enum MembershipStatus {
   ACTIVE
-  INACTIVE
   LAPSED
+  ALUMNI
+  PROSPECT
+}
+
+enum MembershipLevel {
+  NEWBIE
+  NEWCOMER
+  EXTENDED
+  BOARD
+  ALUMNI_LEVEL
+  OTHER
 }
 
 enum RegistrationStatus {
   REGISTERED
-  CANCELLED
   WAITLISTED
+  CANCELLED
+  NO_SHOW
 }
 
 enum SmsDirection {
@@ -28,61 +39,66 @@ enum SmsStatus {
   SENT
   DELIVERED
   FAILED
+  RECEIVED
 }
 
-model Member {
+model Contact {
   id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String   @unique
+  phone     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  firstName       String
-  lastName        String
-  email           String           @unique
-  phone           String?
-  membershipLevel String
-  status          MembershipStatus @default(ACTIVE)
-  smsOptIn        Boolean          @default(false)
-
+  memberships   Membership[]
   registrations Registration[]
   smsMessages   SmsMessageLog[]
+  invoices      Invoice[]
+  emailMessages EmailMessageLog[]
+}
+
+model Membership {
+  id        String           @id @default(cuid())
+  contactId String
+  status    MembershipStatus
+  level     MembershipLevel
+  startedAt DateTime         @default(now())
+  expiresAt DateTime?
+  endedAt   DateTime?
+
+  contact Contact @relation(fields: [contactId], references: [id])
 }
 
 model Event {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  title       String
-  category    String
-  description String
-  startTime   DateTime
-  endTime     DateTime
-  location    String
-  capacity    Int
-  createdBy   String
+  id        String    @id @default(cuid())
+  title     String
+  category  String
+  startTime DateTime
+  endTime   DateTime?
+  createdAt DateTime  @default(now())
 
   registrations Registration[]
   smsMessages   SmsMessageLog[]
+  emailMessages EmailMessageLog[]
 }
 
 model Registration {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String             @id @default(cuid())
+  createdAt DateTime           @default(now())
+  eventId   String
+  contactId String
+  status    RegistrationStatus @default(REGISTERED)
 
-  eventId  String
-  memberId String
-  status   RegistrationStatus @default(REGISTERED)
-
-  event  Event  @relation(fields: [eventId], references: [id])
-  member Member @relation(fields: [memberId], references: [id])
+  event    Event     @relation(fields: [eventId], references: [id])
+  contact  Contact   @relation(fields: [contactId], references: [id])
+  invoices Invoice[]
 }
 
 model SmsMessageLog {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  memberId          String?
+  id                String       @id @default(cuid())
+  createdAt         DateTime     @default(now())
+  contactId         String?
   eventId           String?
   phone             String
   direction         SmsDirection
@@ -90,6 +106,109 @@ model SmsMessageLog {
   body              String
   providerMessageId String?
 
-  member Member? @relation(fields: [memberId], references: [id])
-  event  Event?  @relation(fields: [eventId], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id])
+  event   Event?   @relation(fields: [eventId], references: [id])
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  PAID
+  VOID
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD
+  ACH
+  CASH
+  CHECK
+  OTHER
+}
+
+enum PaymentGateway {
+  STRIPE
+  SQUARE
+  PAYPAL
+  OTHER
+}
+
+model Invoice {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id])
+
+  registrationId String?
+  registration   Registration? @relation(fields: [registrationId], references: [id])
+
+  status     InvoiceStatus @default(DRAFT)
+  currency   String        @default("USD")
+  totalCents Int
+
+  gateway          PaymentGateway?
+  gatewayInvoiceId String?
+  metadata         Json?
+
+  payments Payment[]
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+
+  amountCents Int
+  currency    String @default("USD")
+
+  status             PaymentStatus   @default(PENDING)
+  method             PaymentMethod
+  gateway            PaymentGateway?
+  gatewayPaymentId   String?
+  rawProviderPayload Json?
+}
+
+enum EmailDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  SUPPRESSED
+}
+
+model EmailMessageLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  contactId String?
+  eventId   String?
+
+  email     String
+  direction EmailDirection
+  status    EmailStatus    @default(PENDING)
+
+  subject            String?
+  body               String
+  providerMessageId  String?
+  rawProviderPayload Json?
+
+  contact Contact? @relation(fields: [contactId], references: [id])
+  event   Event?   @relation(fields: [eventId], references: [id])
 }

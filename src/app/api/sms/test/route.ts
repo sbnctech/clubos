@@ -1,15 +1,50 @@
-import { NextResponse } from "next/server";
-import { sendSmsMock } from "@/lib/sms/mockClient";
+import { NextRequest, NextResponse } from "next/server";
 
-export async function GET() {
-  const { providerMessageId } = await sendSmsMock({
-    to: "+15555550123",
-    body: "Test SMS from ClubOS mock client",
-    direction: "OUTBOUND",
+type MockSmsRequest = {
+  to: string;
+  body?: string;
+};
+
+type MockSmsResult = {
+  messageId: string;
+};
+
+let smsCounter = 0;
+
+async function mockSmsSend(input: MockSmsRequest): Promise<MockSmsResult> {
+  const messageId = `mock-sms-${Date.now()}-${smsCounter++}`;
+  console.log("[mock-sms] sent", { ...input, messageId });
+  return { messageId };
+}
+
+export async function POST(req: NextRequest) {
+  let body: any = {};
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+
+  const to =
+    typeof body.to === "string" && body.to.length > 0
+      ? body.to
+      : "test@example.com";
+
+  const { messageId } = await mockSmsSend({
+    to,
+    body: body.body ?? "This is a test SMS placeholder body.",
   });
 
   return NextResponse.json({
-    status: "ok",
-    providerMessageId,
+    ok: true,
+    to,
+    messageId,
+  });
+}
+
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    message: "SMS test endpoint is alive",
   });
 }
