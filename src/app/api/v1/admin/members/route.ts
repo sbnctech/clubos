@@ -1,23 +1,115 @@
-import { NextRequest } from "next/server";
-import { errors } from "@/lib/api";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+type AdminMemberListItem = {
+  id: string;
+  name: string;
+  email: string;
+  status: string;
+  phone: string | null;
+  joinedAt: string;
+  registrationCount: number;
+  waitlistedCount: number;
+};
 
 /**
  * GET /api/v1/admin/members
  *
  * Admin endpoint to list all members with full details and metrics.
  *
- * Query params: page, limit, status, search, sort, order
+ * Query params: page, pageSize
  *
- * Response: MemberListResponse (see docs/api/dtos/member.md)
+ * Response: Paginated list of members with registration counts
  */
 export async function GET(request: NextRequest) {
-  // TODO: Wire - Implement admin member list
-  // 1. Validate access token and require globalRole === 'admin'
-  // 2. Parse query params (page, limit, status, search, sort, order)
-  // 3. Query members with aggregated metrics (registrationCount, waitlistedCount)
-  // 4. Return MemberListResponse with pagination
+  const { searchParams } = new URL(request.url);
 
-  void request; // Suppress unused variable warning
+  // Parse pagination params with defaults
+  const pageParam = searchParams.get("page");
+  const pageSizeParam = searchParams.get("pageSize");
 
-  return errors.internal("GET /api/v1/admin/members not implemented");
+  let page = 1;
+  let pageSize = 20;
+
+  if (pageParam !== null) {
+    const parsed = parseInt(pageParam, 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      page = parsed;
+    }
+  }
+
+  if (pageSizeParam !== null) {
+    const parsed = parseInt(pageSizeParam, 10);
+    if (!isNaN(parsed) && parsed >= 1) {
+      pageSize = Math.min(parsed, 100);
+    }
+  }
+
+  // Get total count for pagination
+  const totalItems = await prisma.member.count({
+    where: {
+      membershipStatus: {
+        isActive: true,
+      },
+    },
+  });
+
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const skip = (page - 1) * pageSize;
+
+  // Fetch members with related data
+  const members = await prisma.member.findMany({
+    where: {
+      membershipStatus: {
+        isActive: true,
+      },
+    },
+    include: {
+      membershipStatus: true,
+      _count: {
+        select: {
+          eventRegistrations: true,
+        },
+      },
+    },
+    orderBy: {
+      lastName: "asc",
+    },
+    skip,
+    take: pageSize,
+  });
+
+  // Get waitlisted counts for these members
+  const memberIds = members.map((m) => m.id);
+  const waitlistedCounts = await prisma.eventRegistration.groupBy({
+    by: ["memberId"],
+    where: {
+      memberId: { in: memberIds },
+      status: "WAITLISTED",
+    },
+    _count: true,
+  });
+
+  const waitlistedMap = new Map(
+    waitlistedCounts.map((w) => [w.memberId, w._count])
+  );
+
+  const items: AdminMemberListItem[] = members.map((m) => ({
+    id: m.id,
+    name: `${m.firstName} ${m.lastName}`,
+    email: m.email,
+    status: m.membershipStatus.code,
+    phone: m.phone,
+    joinedAt: m.joinedAt.toISOString(),
+    registrationCount: m._count.eventRegistrations,
+    waitlistedCount: waitlistedMap.get(m.id) ?? 0,
+  }));
+
+  return NextResponse.json({
+    items,
+    page,
+    pageSize,
+    totalItems,
+    totalPages,
+  });
 }
