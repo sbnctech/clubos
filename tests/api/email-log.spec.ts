@@ -18,7 +18,7 @@ test("email log endpoint stores and lists an email", async ({ request }) => {
 
   expect(status).toBe(200);
 
-  let data: any;
+  let data: Record<string, unknown>;
   try {
     data = JSON.parse(text);
   } catch (err) {
@@ -38,7 +38,7 @@ test("email log endpoint stores and lists an email", async ({ request }) => {
 
   expect(listStatus).toBe(200);
 
-  let listData: any;
+  let listData: { emails?: Array<{ id: string }> };
   try {
     listData = JSON.parse(listText);
   } catch (err) {
@@ -47,6 +47,6 @@ test("email log endpoint stores and lists an email", async ({ request }) => {
   }
 
   expect(Array.isArray(listData.emails)).toBe(true);
-  const found = listData.emails.some((e: any) => e.id === data.id);
+  const found = listData.emails?.some((e) => e.id === data.id);
   expect(found).toBe(true);
 });

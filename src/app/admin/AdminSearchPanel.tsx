@@ -151,7 +151,7 @@ export default function AdminSearchPanel() {
         <div style={{ flex: 1 }}>
           {noMatches && (
             <div data-test-id="admin-search-no-results" style={{ color: "#666", fontStyle: "italic" }}>
-              No results found for "{query.trim()}"
+              No results found for &quot;{query.trim()}&quot;
             </div>
           )}
 

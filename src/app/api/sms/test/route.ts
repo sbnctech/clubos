@@ -18,7 +18,7 @@ async function mockSmsSend(input: MockSmsRequest): Promise<MockSmsResult> {
 }
 
 export async function POST(req: NextRequest) {
-  let body: any = {};
+  let body: Record<string, unknown> = {};
   try {
     body = await req.json();
   } catch {

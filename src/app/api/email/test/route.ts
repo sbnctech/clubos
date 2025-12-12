@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
-  let body: any = {};
+  let body: Record<string, unknown> = {};
   try {
     body = await req.json();
-  } catch (err) {
+  } catch {
     // If the body is not JSON, fall back to an empty object.
     body = {};
   }

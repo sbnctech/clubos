@@ -14,7 +14,7 @@ test("email test endpoint sends a mock email", async ({ request }) => {
   // Assert on status explicitly so we see it if it fails
   expect(status).toBe(200);
 
-  let data: any;
+  let data: Record<string, unknown>;
   try {
     data = JSON.parse(text);
   } catch (err) {
