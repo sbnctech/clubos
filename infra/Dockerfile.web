@@ -1,0 +1,28 @@
+# ClubOS Web Application
+# Node.js / Next.js development container
+#
+# This Dockerfile builds the web application for local development.
+# It runs in development mode with hot-reload enabled.
+
+FROM node:20-alpine
+
+# Set working directory inside the container
+WORKDIR /app
+
+# Copy package files first (for better Docker layer caching)
+COPY package.json package-lock.json* ./
+
+# Install dependencies
+RUN npm install
+
+# Copy the rest of the application source code
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Expose the Next.js development server port
+EXPOSE 3000
+
+# Start the development server
+CMD ["npm", "run", "dev"]

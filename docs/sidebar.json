@@ -1,0 +1,35 @@
+{
+  "sections": [
+    {
+      "title": "Getting Started",
+      "items": [
+        { "title": "Developer Onboarding", "path": "ONBOARDING.md" },
+        { "title": "Development Workflow", "path": "DEVELOPMENT_WORKFLOW.md" }
+      ]
+    },
+    {
+      "title": "Architecture",
+      "items": [
+        { "title": "Admin Architecture Map", "path": "ADMIN_ARCHITECTURE_MAP.md" },
+        { "title": "API Surface", "path": "API_SURFACE.md" }
+      ]
+    },
+    {
+      "title": "Admin Features",
+      "items": [
+        { "title": "Admin Dashboard Overview", "path": "ADMIN_DASHBOARD_OVERVIEW.md" },
+        { "title": "Admin Members UI", "path": "ADMIN_MEMBERS_UI.md" },
+        { "title": "Admin Events UI", "path": "ADMIN_EVENTS_UI.md" },
+        { "title": "Admin Registrations UI", "path": "ADMIN_REGISTRATIONS_UI.md" },
+        { "title": "Admin Activity UI", "path": "ADMIN_ACTIVITY_UI.md" }
+      ]
+    },
+    {
+      "title": "Testing and Tooling",
+      "items": [
+        { "title": "Docs Index", "path": "INDEX.md" },
+        { "title": "Docs Navigation", "path": "NAV.md" }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 46, "column": 0}, "map": {"version":3,"sources":["file:///Users/edf/clubos/src/app/api/members/route.ts"],"sourcesContent":["import { NextResponse } from \"next/server\";\n\nexport async function GET() {\n  const members = [\n    { id: \"m1\", firstName: \"Alice\", lastName: \"Johnson\", email: \"alice@example.com\" },\n    { id: \"m2\", firstName: \"Bob\", lastName: \"Smith\", email: \"bob@example.com\" }\n  ];\n\n  return NextResponse.json({ members });\n}\n"],"names":[],"mappings":";;;;AAAA;;AAEO,eAAe;IACpB,MAAM,UAAU;QACd;YAAE,IAAI;YAAM,WAAW;YAAS,UAAU;YAAW,OAAO;QAAoB;QAChF;YAAE,IAAI;YAAM,WAAW;YAAO,UAAU;YAAS,OAAO;QAAkB;KAC3E;IAED,OAAO,gJAAY,CAAC,IAAI,CAAC;QAAE;IAAQ;AACrC"}}]
-}

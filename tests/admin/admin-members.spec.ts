@@ -1,14 +1,20 @@
 import { test, expect } from "@playwright/test";
-import { waitForAdminFrame } from "../helpers/waitForAdminFrame";
 
-test("Admin members table renders mock members", async ({ page }) => {
-  await page.goto("/admin-frame");
+const BASE = process.env.PW_BASE_URL ?? "http://localhost:3000";
 
-  const frame = await waitForAdminFrame(page);
+test("GET /api/members returns active members with expected fields", async ({ request }) => {
+  const response = await request.get(`${BASE}/api/members`);
 
-  const rows = frame.locator('[data-test-id="admin-members-row"]');
-  await expect(rows).toHaveCount(2);
+  expect(response.status()).toBe(200);
 
-  await expect(rows.nth(0)).toContainText("Alice Johnson");
-  await expect(rows.nth(1)).toContainText("Bob Smith");
+  const data = await response.json();
+  expect(Array.isArray(data.members)).toBe(true);
+
+  for (const member of data.members) {
+    expect(typeof member.id).toBe("string");
+    expect(typeof member.firstName).toBe("string");
+    expect(typeof member.lastName).toBe("string");
+    expect(typeof member.email).toBe("string");
+    expect(member.status).toBe("ACTIVE");
+  }
 });

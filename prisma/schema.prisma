@@ -6,209 +6,231 @@ datasource db {
   provider = "postgresql"
 }
 
-enum MembershipStatus {
-  ACTIVE
-  LAPSED
-  ALUMNI
-  PROSPECT
-}
-
-enum MembershipLevel {
-  NEWBIE
-  NEWCOMER
-  EXTENDED
-  BOARD
-  ALUMNI_LEVEL
-  OTHER
-}
+// Enums
 
 enum RegistrationStatus {
-  REGISTERED
+  PENDING
+  CONFIRMED
   WAITLISTED
   CANCELLED
   NO_SHOW
 }
 
-enum SmsDirection {
-  OUTBOUND
-  INBOUND
-}
-
-enum SmsStatus {
-  PENDING
+enum EmailStatus {
+  QUEUED
   SENT
   DELIVERED
+  BOUNCED
   FAILED
-  RECEIVED
 }
 
-model Contact {
-  id        String   @id @default(cuid())
-  firstName String
-  lastName  String
-  email     String   @unique
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// Core Models
 
-  memberships   Membership[]
-  registrations Registration[]
-  smsMessages   SmsMessageLog[]
-  invoices      Invoice[]
-  emailMessages EmailMessageLog[]
+model Member {
+  id                 String             @id @default(uuid()) @db.Uuid
+  firstName          String
+  lastName           String
+  email              String             @unique
+  phone              String?
+  joinedAt           DateTime
+  membershipStatusId String             @db.Uuid
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  membershipStatus   MembershipStatus   @relation(fields: [membershipStatusId], references: [id])
+  roleAssignments    RoleAssignment[]
+  eventRegistrations EventRegistration[]
+  userAccount        UserAccount?
+  photos             Photo[]
+  emailLogs          EmailLog[]
+
+  @@index([membershipStatusId])
 }
 
-model Membership {
-  id        String           @id @default(cuid())
-  contactId String
-  status    MembershipStatus
-  level     MembershipLevel
-  startedAt DateTime         @default(now())
-  expiresAt DateTime?
-  endedAt   DateTime?
+model MembershipStatus {
+  id                   String   @id @default(uuid()) @db.Uuid
+  code                 String   @unique
+  label                String
+  description          String?
+  isActive             Boolean  @default(true)
+  isEligibleForRenewal Boolean  @default(false)
+  isBoardEligible      Boolean  @default(false)
+  sortOrder            Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  contact Contact @relation(fields: [contactId], references: [id])
+  members              Member[]
+}
+
+model Committee {
+  id          String           @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String           @unique
+  description String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  roleAssignments RoleAssignment[]
+  committeeRoles  CommitteeRole[]
+
+  @@index([isActive])
+}
+
+model CommitteeRole {
+  id          String          @id @default(uuid()) @db.Uuid
+  committeeId String          @db.Uuid
+  name        String
+  slug        String
+  description String?
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  committee   Committee       @relation(fields: [committeeId], references: [id])
+  assignments RoleAssignment[]
+
+  @@index([committeeId])
+  @@unique([committeeId, slug])
+}
+
+model Term {
+  id        String           @id @default(uuid()) @db.Uuid
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  roleAssignments RoleAssignment[]
+}
+
+model RoleAssignment {
+  id              String        @id @default(uuid()) @db.Uuid
+  memberId        String        @db.Uuid
+  committeeId     String        @db.Uuid
+  committeeRoleId String        @db.Uuid
+  termId          String        @db.Uuid
+  startDate       DateTime
+  endDate         DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  member          Member        @relation(fields: [memberId], references: [id])
+  committee       Committee     @relation(fields: [committeeId], references: [id])
+  committeeRole   CommitteeRole @relation(fields: [committeeRoleId], references: [id])
+  term            Term          @relation(fields: [termId], references: [id])
+
+  @@index([memberId])
+  @@index([committeeId])
+  @@index([committeeRoleId])
+  @@index([termId])
+  @@index([termId, committeeId])
+}
+
+model UserAccount {
+  id           String   @id @default(uuid()) @db.Uuid
+  memberId     String   @unique @db.Uuid
+  email        String   @unique
+  passwordHash String
+  lastLoginAt  DateTime?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  member       Member   @relation(fields: [memberId], references: [id])
 }
 
 model Event {
-  id        String    @id @default(cuid())
-  title     String
-  category  String
-  startTime DateTime
-  endTime   DateTime?
-  createdAt DateTime  @default(now())
+  id          String              @id @default(uuid()) @db.Uuid
+  title       String
+  description String?
+  category    String?
+  location    String?
+  startTime   DateTime
+  endTime     DateTime?
+  capacity    Int?
+  isPublished Boolean             @default(false)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
 
-  registrations Registration[]
-  smsMessages   SmsMessageLog[]
-  emailMessages EmailMessageLog[]
+  registrations EventRegistration[]
+  photoAlbum    PhotoAlbum?
+
+  @@index([startTime])
+  @@index([category])
 }
 
-model Registration {
-  id        String             @id @default(cuid())
-  createdAt DateTime           @default(now())
-  eventId   String
-  contactId String
-  status    RegistrationStatus @default(REGISTERED)
+model EventRegistration {
+  id               String             @id @default(uuid()) @db.Uuid
+  eventId          String             @db.Uuid
+  memberId         String             @db.Uuid
+  status           RegistrationStatus @default(PENDING)
+  waitlistPosition Int?
+  registeredAt     DateTime
+  cancelledAt      DateTime?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 
-  event    Event     @relation(fields: [eventId], references: [id])
-  contact  Contact   @relation(fields: [contactId], references: [id])
-  invoices Invoice[]
+  event            Event              @relation(fields: [eventId], references: [id])
+  member           Member             @relation(fields: [memberId], references: [id])
+
+  @@index([eventId])
+  @@index([memberId])
+  @@index([eventId, status, waitlistPosition])
+  @@index([memberId, eventId])
+  @@unique([eventId, memberId])
 }
 
-model SmsMessageLog {
-  id                String       @id @default(cuid())
-  createdAt         DateTime     @default(now())
-  contactId         String?
-  eventId           String?
-  phone             String
-  direction         SmsDirection
-  status            SmsStatus    @default(PENDING)
-  body              String
-  providerMessageId String?
+model Photo {
+  id         String     @id @default(uuid()) @db.Uuid
+  albumId    String     @db.Uuid
+  uploaderId String     @db.Uuid
+  filename   String
+  url        String
+  caption    String?
+  takenAt    DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
 
-  contact Contact? @relation(fields: [contactId], references: [id])
-  event   Event?   @relation(fields: [eventId], references: [id])
+  album         PhotoAlbum  @relation(fields: [albumId], references: [id])
+  uploader      Member      @relation(fields: [uploaderId], references: [id])
+  coverForAlbum PhotoAlbum? @relation("CoverPhoto")
+
+  @@index([albumId])
+  @@index([uploaderId])
 }
 
-enum InvoiceStatus {
-  DRAFT
-  PENDING
-  PAID
-  VOID
-  REFUNDED
+model PhotoAlbum {
+  id           String   @id @default(uuid()) @db.Uuid
+  eventId      String?  @unique @db.Uuid
+  title        String
+  description  String?
+  coverPhotoId String?  @unique @db.Uuid
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  event      Event?      @relation(fields: [eventId], references: [id])
+  photos     Photo[]
+  coverPhoto Photo?      @relation("CoverPhoto", fields: [coverPhotoId], references: [id])
 }
 
-enum PaymentStatus {
-  PENDING
-  SUCCEEDED
-  FAILED
-  REFUNDED
-}
+model EmailLog {
+  id             String      @id @default(uuid()) @db.Uuid
+  memberId       String?     @db.Uuid
+  recipientEmail String
+  subject        String
+  bodyPreview    String?
+  sentAt         DateTime
+  channel        String
+  templateKey    String?
+  status         EmailStatus @default(QUEUED)
+  createdAt      DateTime    @default(now())
 
-enum PaymentMethod {
-  CARD
-  ACH
-  CASH
-  CHECK
-  OTHER
-}
+  member         Member?     @relation(fields: [memberId], references: [id])
 
-enum PaymentGateway {
-  STRIPE
-  SQUARE
-  PAYPAL
-  OTHER
-}
-
-model Invoice {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  contactId String
-  contact   Contact @relation(fields: [contactId], references: [id])
-
-  registrationId String?
-  registration   Registration? @relation(fields: [registrationId], references: [id])
-
-  status     InvoiceStatus @default(DRAFT)
-  currency   String        @default("USD")
-  totalCents Int
-
-  gateway          PaymentGateway?
-  gatewayInvoiceId String?
-  metadata         Json?
-
-  payments Payment[]
-}
-
-model Payment {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id])
-
-  amountCents Int
-  currency    String @default("USD")
-
-  status             PaymentStatus   @default(PENDING)
-  method             PaymentMethod
-  gateway            PaymentGateway?
-  gatewayPaymentId   String?
-  rawProviderPayload Json?
-}
-
-enum EmailDirection {
-  OUTBOUND
-  INBOUND
-}
-
-enum EmailStatus {
-  PENDING
-  SENT
-  DELIVERED
-  FAILED
-  SUPPRESSED
-}
-
-model EmailMessageLog {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-
-  contactId String?
-  eventId   String?
-
-  email     String
-  direction EmailDirection
-  status    EmailStatus    @default(PENDING)
-
-  subject            String?
-  body               String
-  providerMessageId  String?
-  rawProviderPayload Json?
-
-  contact Contact? @relation(fields: [contactId], references: [id])
-  event   Event?   @relation(fields: [eventId], references: [id])
+  @@index([memberId])
+  @@index([sentAt])
+  @@index([status])
 }

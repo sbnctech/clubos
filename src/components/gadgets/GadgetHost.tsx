@@ -1,0 +1,114 @@
+/**
+ * GadgetHost - Container component that renders gadgets.
+ *
+ * This component acts as the "slot" where gadgets live.
+ * It maps gadgetId values to actual gadget components using a registry.
+ *
+ * For implemented gadgets, it renders the real component.
+ * For unimplemented gadgets, it renders placeholder content.
+ *
+ * Props:
+ *   gadgetId - Unique identifier for the gadget to render
+ *   slot     - Optional layout slot name (for styling/positioning hints)
+ */
+
+import UpcomingEventsGadget from "./UpcomingEventsGadget";
+import MyRegistrationsGadget from "./MyRegistrationsGadget";
+import { GadgetProps } from "./types";
+
+type GadgetHostProps = {
+  gadgetId: string;
+  slot?: string;
+};
+
+/**
+ * GADGET REGISTRY
+ *
+ * Maps gadgetId strings to their implementing components.
+ * Add new gadgets here as they are implemented.
+ *
+ * null = gadget ID is reserved but not yet implemented
+ */
+const GADGET_REGISTRY: Record<
+  string,
+  React.ComponentType<GadgetProps> | null
+> = {
+  "upcoming-events": UpcomingEventsGadget,
+  "my-registrations": MyRegistrationsGadget,
+  // Future gadgets (not yet implemented):
+  announcements: null,
+  "presidents-message": null,
+  "recent-photos": null,
+  tasks: null,
+  "quick-actions": null,
+};
+
+/**
+ * GADGET TITLES
+ *
+ * Display titles for each gadget, used in the card header.
+ * Every gadget ID should have a corresponding title.
+ */
+const GADGET_TITLES: Record<string, string> = {
+  "upcoming-events": "Upcoming Events",
+  "my-registrations": "My Registrations",
+  announcements: "Announcements",
+  "presidents-message": "President's Message",
+  "recent-photos": "Recent Photos",
+  tasks: "My Tasks",
+  "quick-actions": "Quick Actions",
+};
+
+export default function GadgetHost({ gadgetId, slot }: GadgetHostProps) {
+  // Look up the gadget component and title
+  const GadgetComponent = GADGET_REGISTRY[gadgetId];
+  const title = GADGET_TITLES[gadgetId] || "Unknown Gadget";
+  const isUnknown = !(gadgetId in GADGET_REGISTRY);
+
+  return (
+    <div
+      data-test-id={`gadget-host-${gadgetId}`}
+      data-gadget-id={gadgetId}
+      data-slot={slot}
+      style={{
+        backgroundColor: "#ffffff",
+        border: isUnknown ? "2px dashed #ef4444" : "1px solid #e5e7eb",
+        borderRadius: "8px",
+        padding: "20px",
+      }}
+    >
+      {/* Gadget title */}
+      <h3
+        data-test-id={`gadget-title-${gadgetId}`}
+        style={{
+          fontSize: "18px",
+          fontWeight: 600,
+          marginTop: 0,
+          marginBottom: "12px",
+          color: isUnknown ? "#ef4444" : "#1f2937",
+        }}
+      >
+        {title}
+      </h3>
+
+      {/* Gadget content area */}
+      <div data-test-id={`gadget-content-${gadgetId}`}>
+        {GadgetComponent ? (
+          // Render the actual gadget component
+          <GadgetComponent slot={slot} />
+        ) : (
+          // Render placeholder for unknown or unimplemented gadgets
+          <p
+            style={{
+              color: isUnknown ? "#ef4444" : "#6b7280",
+              fontStyle: "italic",
+              margin: 0,
+            }}
+          >
+            {isUnknown ? `Unknown gadget: ${gadgetId}` : "Coming soon..."}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}

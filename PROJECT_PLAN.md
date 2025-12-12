@@ -320,3 +320,111 @@ As of this stage, the following API tests are passing:
 Notes
 
 - The SMS test timeout remains a pre-existing issue and is not related to the recent email and email-log work.
+
+Development Stages Checklist (Status Snapshot)
+
+- Stage 1: Baseline health endpoint
+  - Status: Complete
+  - /api/health implemented and covered by tests/api/health.spec.ts.
+
+- Stage 2: Core data model and Prisma scaffolding
+  - Status: In progress
+  - Prisma schema and initial migrations created for contacts, memberships, invoices, payments, and email_message_log.
+  - Prisma Client generates successfully via "npx prisma generate".
+  - Application endpoints do not yet depend on Prisma for email or SMS flows.
+
+- Stage 3: Communication primitives (email, SMS, log)
+  - Status: Complete (mocked implementation)
+  - /api/email/test:
+    - Uses a mock email sender in server/mock-email.ts.
+    - Returns a JSON payload with ok, to, and messageId fields.
+    - Covered by tests/api/email-test.spec.ts.
+  - /api/sms/test:
+    - Uses a mockSmsSend helper.
+    - Returns a JSON payload with ok, to, and messageId fields.
+    - Covered by tests/api/sms-test.spec.ts.
+  - /api/email/log:
+    - Uses an in-memory emailLog array to store recent entries during a process lifetime.
+    - Provides a POST endpoint that stores id, subject, body, createdAt.
+    - Provides a GET endpoint that returns the most recent entries.
+    - Covered by tests/api/email-log.spec.ts and tests/api/email-log-store.spec.ts.
+  - All tests under tests/api are currently green.
+
+- Stage 4: Admin-facing shell and basic monitoring UX
+  - Status: Not started
+  - Goal:
+    - Implement /admin-frame as a simple wrapper page that hosts an iframe.
+    - Implement /admin as a minimal admin shell with:
+      - Email activity table (data-test-id="admin-email-table").
+      - Events table (data-test-id="admin-events-table").
+      - Members table (data-test-id="admin-members-table").
+      - Registrations table (data-test-id="admin-registrations-table").
+    - Normalize admin Playwright tests so they use PW_BASE_URL (defaulting to http://localhost:3000) instead of hardcoded ports.
+  - Current state:
+    - Admin-related tests in tests/admin/ are red.
+    - No committed implementation yet for /admin or /admin-frame that satisfies the tests.
+  - Next action:
+    - Implement minimal /admin and /admin-frame pages plus supporting mocks so that all tests in tests/admin pass against the mocked data.
+
+Notes
+- The communication endpoints and email log are intentionally implemented against in-memory stores for now.
+- Once the Prisma configuration is stable in real environments, the plan is to move the email log off of memory and into the email_message_log table, and update the tests and documentation accordingly.
+
+## Update: Email and Admin Infrastructure (2025-12-11)
+
+### Completed
+- Fixed admin test environment mismatch by updating tests/admin/admin-registrations.spec.ts  
+  (hardcoded http://localhost:3002/admin replaced with PW_BASE_URL ?? "http://localhost:3000").
+- Updated src/app/api/email/test/route.ts to use sendEmail from @/lib/email, ensuring admin Email Activity reflects sent test emails.
+- Corrected getBaseUrl.ts so server-side code respects process.env.BASE_URL instead of hardcoding port 3002.
+- All admin and API tests now pass:
+  - 5/5 admin tests
+  - 10/10 API tests
+
+### Follow-up Tasks
+- Replace mock API routes (/api/members, /api/events, /api/registrations) with Prisma-backed implementations once schema is stabilized.
+- Introduce authentication and role-based access control for admin routes.
+- Add filtering (search, date range, status) to admin tables.
+- Consolidate email logging mechanisms into a unified library.
+- Add `.env.example` documenting BASE_URL, DATABASE_URL, PW_BASE_URL, and MAIL_LOG_PATH.
+
+
+## 2025-12-11: Member API and Partner Delegation Notes
+
+Member API alignment
+
+- Confirmed definition:
+  - "Members" = Contacts with at least one ACTIVE Membership.
+- Plan:
+  - Keep the current mock-backed /api/members implementation and tests stable while Prisma configuration is still being hardened.
+  - Later stage:
+    - Switch the members endpoint to Prisma-backed queries.
+    - Either:
+      - Seed test fixtures for members, or
+      - Loosen tests to assert shape and semantics (fields, status logic) instead of specific names.
+
+Partner event-registration delegation
+
+- New requirement:
+  - Support a delegation mechanism so that one member can register another member for events.
+  - Primary scenario:
+    - Couples or partners who are both members and want either one to handle registrations for both.
+- Roadmap placement:
+  - Short term:
+    - Keep requirement documented only (no production code yet).
+    - Avoid blocking current communications and admin shell work.
+  - Medium term:
+    - Add Delegation model and basic API support as part of the broader "event registrations and permissions" stage.
+  - Long term:
+    - Integrate into the full permissions and auditing system so that:
+      - Audit logs can distinguish between "who is attending" and "who performed the action".
+      - UI surfaces delegated rights in a clear and predictable way.
+
+Coordination with engineering workflow
+
+- Until Prisma initialization is fully resolved:
+  - Continue using mock stores and in-memory implementations (like the email log) where it keeps tests green and behavior observable.
+  - Mark any new Prisma-dependent work as blocked and staged for later refactor.
+- This plan allows:
+  - ClaudeCode and other agents to continue evolving admin views, tests, and communication flows.
+  - Minimal churn in core data-model code until the database layer is stable.
