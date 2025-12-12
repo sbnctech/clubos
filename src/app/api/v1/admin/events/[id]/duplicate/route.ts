@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { errors, apiCreated } from "@/lib/api";
+import { errors } from "@/lib/api";
 
 interface RouteParams {
   params: Promise<{ id: string }>;

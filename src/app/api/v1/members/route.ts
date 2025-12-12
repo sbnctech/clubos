@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { errors, apiSuccess } from "@/lib/api";
+import { errors } from "@/lib/api";
 
 /**
  * GET /api/v1/members
