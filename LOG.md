@@ -17,3 +17,13 @@
 - Ran: prisma migrate resolve --applied 00000000000000_init
 - Safety: no migrations executed, no data changed
 
+
+[Day 2 | DB Migration Baselining (Local Dev)]
+
+- Confirmed DB tables existed but _prisma_migrations did not (likely db push)
+- Archived prior migration folders under prisma/migrations_archive/
+- Kept only baseline migration: prisma/migrations/00000000000000_init
+- Marked baseline as applied (no schema changes)
+- Verified _prisma_migrations contains exactly one row:
+  - 00000000000000_init with finished_at set
+
