@@ -71,50 +71,49 @@ Once ClubOS knows who you are, it checks what you're allowed to do.
 
 ## Understanding Roles
 
-### Global Roles (Everyone Has One)
+### The Four Global Roles
 
-| Role | What It Means | Example People |
-|------|---------------|----------------|
-| **Admin** | Full access to everything | Tech Chair, Board Members |
-| **Member** | Basic access to own data | Regular club members |
+ClubOS currently uses four global roles (defined in `src/lib/auth.ts`):
 
-### Committee Roles (Some People Have These)
+| Role | Slug | What It Means | Example People |
+|------|------|---------------|----------------|
+| **Admin** | `admin` | Full access to everything | Tech Chair, Board Members |
+| **VP of Activities** | `vp-activities` | Can view/edit/publish all events | Sarah Martinez, John Kim |
+| **Event Chair** | `event-chair` | Manages events (scoping planned) | Alice (Hiking), Bob (Social) |
+| **Member** | `member` | Basic access, published events only | Regular club members |
 
-| Role | What It Means | Example People |
-|------|---------------|----------------|
-| **VP of Activities** | Oversees event chairs, can publish events | Sarah Martinez, John Kim |
-| **Event Chair** | Manages events for one activity group | Alice (Hiking), Bob (Social) |
+> **Note**: Committee-based scoping (where VPs only see their supervised groups) is planned but not yet implemented. Currently, VPs can see and edit ALL events.
 
 ---
 
 ## What Each Role Can Do
 
-### Quick Reference Card
+### Quick Reference Card (Current Implementation)
 
 ```
 +------------------+------------------------------------------+
 |      ADMIN       |                                          |
-|                  |  - See everything                        |
-|                  |  - Edit everything                       |
-|                  |  - Delete events                         |
-|                  |  - Manage users and committees           |
+|                  |  - See ALL events (including drafts)     |
+|                  |  - Edit ALL events                       |
+|                  |  - DELETE events (only role that can)    |
+|                  |  - Publish events                        |
 |                  |  - Export all data                       |
 +------------------+------------------------------------------+
 
 +------------------+------------------------------------------+
 | VP OF ACTIVITIES |                                          |
-|                  |  - See events in supervised groups       |
-|                  |  - Edit events in supervised groups      |
-|                  |  - PUBLISH events (key privilege)        |
-|                  |  - Export supervised group data          |
-|                  |  - Cannot delete events                  |
+|                  |  - See ALL events (including drafts)     |
+|                  |  - Edit ALL events                       |
+|                  |  - PUBLISH events                        |
+|                  |  - CANNOT delete events                  |
+|                  |  (Scoped access is planned for future)   |
 +------------------+------------------------------------------+
 
 +------------------+------------------------------------------+
 |   EVENT CHAIR    |                                          |
-|                  |  - See events in own group only          |
-|                  |  - Create/edit events in own group       |
-|                  |  - Cannot publish (VP does that)         |
+|                  |  - (Scoped access planned for future)    |
+|                  |  - Currently same as Member              |
+|                  |  - Cannot publish events                 |
 |                  |  - Cannot delete events                  |
 +------------------+------------------------------------------+
 
@@ -123,9 +122,18 @@ Once ClubOS knows who you are, it checks what you're allowed to do.
 |                  |  - See published events only             |
 |                  |  - See own profile and registrations     |
 |                  |  - Register for events                   |
-|                  |  - Cannot see other members' data        |
+|                  |  - Cannot see draft events               |
 +------------------+------------------------------------------+
 ```
+
+### Permission Matrix (from code)
+
+| Permission | Admin | VP | Chair | Member |
+|------------|:-----:|:--:|:-----:|:------:|
+| View all events (incl. drafts) | Yes | Yes | No | No |
+| Edit any event | Yes | Yes | No | No |
+| Publish events | Yes | Yes | No | No |
+| Delete events | **Yes** | No | No | No |
 
 ---
 
@@ -182,12 +190,10 @@ User Request: "Show me the events"
 
 **What it means**: You're not logged in, or your session expired.
 
-```
+```json
 {
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "Missing Authorization header"
-  }
+  "error": "Unauthorized",
+  "message": "Missing or invalid authorization header"
 }
 ```
 
@@ -197,12 +203,10 @@ User Request: "Show me the events"
 
 **What it means**: You're logged in, but don't have permission.
 
-```
+```json
 {
-  "error": {
-    "code": "FORBIDDEN",
-    "message": "Admin access required"
-  }
+  "error": "Forbidden",
+  "message": "Admin access required"
 }
 ```
 
@@ -220,9 +224,9 @@ A: Members only see **published** events. Draft events are only visible to Event
 
 A: Publishing is a VP privilege. This creates a review workflow where VPs approve events before they go public. Ask your VP to publish when ready.
 
-### Q: I'm a VP. Why can't I see some events?
+### Q: I'm a VP. Can I see all events?
 
-A: VPs only see events in committees they supervise. If you need access to other committees, contact an Admin.
+A: **Yes, currently.** In the current implementation, VPs can see and edit ALL events. Committee-based scoping (where VPs only see their supervised groups) is planned for a future release.
 
 ### Q: Can someone have multiple roles?
 
@@ -243,8 +247,34 @@ See these technical documents:
 
 ### Key Implementation Files
 
-- `src/lib/auth.ts` - Authentication helpers
-- `src/lib/eventScope.ts` - Authorization scope logic (future)
+- `src/lib/auth.ts` - Authentication and authorization helpers
+
+### Test Tokens (Development Only)
+
+Use these tokens in the `Authorization: Bearer <token>` header:
+
+| Role | Token Format | Example |
+|------|--------------|---------|
+| Admin | `test-admin-{id}` | `test-admin-123` |
+| VP | `test-vp-{id}` | `test-vp-456` |
+| Chair | `test-chair-{id}` | `test-chair-789` |
+| Member | `test-member-{id}` | `test-member-abc` |
+
+Legacy tokens also work: `admin-token`, `vp-token`, `chair-token`, `member-token`
+
+### Key Auth Functions
+
+```typescript
+// From src/lib/auth.ts
+requireAuth(req)        // Returns 401 if not authenticated
+requireAdmin(req)       // Returns 403 if not admin
+requireRole(req, roles) // Returns 403 if role not in list
+
+canViewAllEvents(role)  // admin, vp-activities can
+canEditAnyEvent(role)   // admin, vp-activities can
+canPublishEvents(role)  // admin, vp-activities can
+canDeleteEvents(role)   // admin only
+```
 
 ---
 

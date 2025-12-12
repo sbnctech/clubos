@@ -13,14 +13,15 @@ SBNC activities are organized in a hierarchy:
                          ADMIN
                     (Tech Chair, Board)
                            |
-                           | full control
+                           | full control (including delete)
                            |
            +---------------+---------------+
            |                               |
     VP of Activities              VP of Activities
       (Sarah M.)                    (John K.)
            |                               |
-           | supervises                    | supervises
+           | can view/edit/publish         | can view/edit/publish
+           | ALL events                    | ALL events
            |                               |
      +-----+-----+                   +-----+-----+
      |           |                   |           |
@@ -30,6 +31,56 @@ SBNC activities are organized in a hierarchy:
      |           |                   |           |
      v           v                   v           v
   Events      Events              Events      Events
+```
+
+> **Current Implementation Note**: In the current version, VPs can access ALL events, not just their supervised groups. Committee-based scoping is planned for a future release.
+
+---
+
+## Current vs Future Implementation
+
+```
++==================================================================+
+|                    CURRENT IMPLEMENTATION                         |
++==================================================================+
+
+                          ADMIN
+                            |
+            can view/edit/delete ALL events
+                            |
+            +---------------+---------------+
+            |                               |
+     VP of Activities              VP of Activities
+            |                               |
+      can view/edit/publish           can view/edit/publish
+         ALL events                      ALL events
+            |                               |
+            +---------------+---------------+
+                            |
+                      ALL EVENTS
+                    (no scoping)
+
+
++==================================================================+
+|                    FUTURE IMPLEMENTATION                          |
++==================================================================+
+
+                          ADMIN
+                            |
+            can view/edit/delete ALL events
+                            |
+            +---------------+---------------+
+            |                               |
+     VP of Activities              VP of Activities
+      (Sarah M.)                     (John K.)
+            |                               |
+      supervises                      supervises
+      Hiking, Social                  Wine, Book Club
+            |                               |
+    +-------+-------+             +---------+---------+
+    |               |             |                   |
+  Hiking         Social         Wine              Book Club
+  Events         Events         Events            Events
 ```
 
 ---
@@ -81,44 +132,44 @@ This model works because:
 
 ### VP of Activities
 
-**Who has this role**: Two VPs, each supervising different activity groups
+**Who has this role**: VPs responsible for club activities
 
-**What they can do**:
+**What they can do (current implementation)**:
 
 | Action | Allowed? | Notes |
 |--------|----------|-------|
-| View events in supervised groups | Yes | Includes drafts |
-| Edit events in supervised groups | Yes | Direct edit, no approval needed |
-| Create events in supervised groups | Yes | Can create on behalf of Chair |
+| View ALL events | Yes | Includes drafts from all committees |
+| Edit ALL events | Yes | Direct edit, no approval needed |
+| Create events | Yes | Can create in any committee |
 | **Publish events** | **Yes** | Key privilege - makes events public |
-| Unpublish events | Yes | Can pull back if needed |
-| Delete events | No | Admin only |
-| View registrations | Yes | For supervised events |
-| Export data | Yes | For supervised groups |
+| Delete events | **No** | Admin only |
+| View registrations | Yes | For all events |
+| Export data | Yes | All data |
 
 **What they cannot do**:
-- See events in other VP's groups
-- Delete any events
-- Change committee assignments
-- Add or remove users
+- Delete any events (Admin only)
+- Change committee assignments (Admin only)
+- Add or remove users (Admin only)
+
+> **Future**: Committee-based scoping will limit VPs to their supervised groups.
 
 ### Event Chair
 
 **Who has this role**: Activity group leaders (Hiking Chair, Social Chair, etc.)
 
-**What they can do**:
+**Current implementation**: Event Chair role exists but scoped access is not yet implemented. Currently behaves like Member role.
+
+**Planned capabilities** (future release):
 
 | Action | Allowed? | Notes |
 |--------|----------|-------|
-| View events in own group | Yes | Includes their drafts |
+| View events in own group | Yes | Will include their drafts |
 | Edit events in own group | Yes | Full edit capability |
 | Create events in own group | Yes | Primary responsibility |
 | Publish events | No | VP must publish |
 | Delete events | No | Admin only |
-| View registrations | Yes | For own events |
-| Export data | Yes | For own group |
 
-**What they cannot do**:
+**What they will not be able to do**:
 - See events in other groups
 - Publish their own events (VP does this)
 - Delete events
@@ -180,80 +231,92 @@ If both VPs are unavailable and an event urgently needs publishing:
 
 ## Supervision Model
 
-### How VP Supervision Works
+### Current State: No Scoping
 
-Each VP supervises specific committees:
+In the current implementation, **all VPs can see and edit all events**. There is no committee-based restriction.
+
+### Planned: Committee-Based Scoping
+
+The planned model will assign each VP to supervise specific committees:
 
 ```
 Sarah Martinez (VP)           John Kim (VP)
         |                            |
-        | supervises                 | supervises
+        | will supervise             | will supervise
         |                            |
    +----+----+                  +----+----+
    |         |                  |         |
  Hiking   Social             Wine     Book Club
 ```
 
-### Scope Rules
+### Planned Scope Rules (Future)
 
-| Scenario | Sarah Can... | John Can... |
-|----------|--------------|-------------|
+| Scenario | Sarah Will... | John Will... |
+|----------|---------------|--------------|
 | Hiking event | View, Edit, Publish | No access |
 | Social event | View, Edit, Publish | No access |
 | Wine event | No access | View, Edit, Publish |
 | Book Club event | No access | View, Edit, Publish |
 | Unassigned event | No access | No access |
 
-### Why Strict Scope?
+### Why Strict Scope? (Future Benefits)
 
 - Prevents accidental changes to wrong events
 - Clear accountability for each activity area
 - VPs don't get overwhelmed with irrelevant events
 - Security: limits blast radius of any mistakes
 
+> **Implementation Status**: Committee-based scoping requires schema changes (adding `committeeId` to events) and is tracked in the VP_ACTIVITIES_SCOPE.md document.
+
 ---
 
 ## Common Scenarios
 
-### Scenario 1: Event Chair Creates a Hike
+### Scenario 1: VP Publishes an Event (Current)
 
 ```
-1. Alice (Hiking Chair) creates "Sunset Trail Hike"
-2. Alice fills in details, adds photo
-3. Alice marks "Ready for review"
-4. Sarah (VP) sees notification
-5. Sarah reviews and clicks "Publish"
-6. Event appears on public calendar
+1. Admin or VP creates "Sunset Trail Hike" event
+2. Details are filled in
+3. VP reviews and clicks "Publish"
+4. Event appears on public calendar (visible to members)
 ```
 
-### Scenario 2: VP Fixes a Typo
+### Scenario 2: VP Fixes a Typo (Current)
 
 ```
-1. Alice published event says "Satruday" (typo)
-2. Sarah (VP) notices the error
-3. Sarah edits directly, fixes to "Saturday"
-4. System logs: "Event modified by Sarah Martinez"
-5. (Optional) Alice gets email notification
-6. No approval needed - fixed immediately
+1. Published event says "Satruday" (typo)
+2. Any VP notices the error
+3. VP edits directly, fixes to "Saturday"
+4. No approval needed - fixed immediately
 ```
 
-### Scenario 3: Event Chair Is Sick
+### Scenario 3: Member Tries Admin Action
 
 ```
-1. Bob (Social Chair) is hospitalized
-2. Social mixer needs last-minute changes
-3. Sarah (VP) can edit Bob's event directly
-4. Sarah can also publish if Bob hadn't yet
-5. Club operations continue without interruption
+1. Member tries to access /api/admin/events
+2. System checks: Is user admin or VP?
+3. Answer: No (member role)
+4. Member sees: 403 Forbidden - "Admin access required"
 ```
 
-### Scenario 4: Wrong VP Tries to Access
+### Scenario 4: VP Tries to Delete (Current)
 
 ```
-1. John (VP Wine/Book) tries to view Hiking event
-2. System checks: Is John's VP scope include Hiking?
+1. VP tries to delete an event
+2. System checks: Can VP delete? (canDeleteEvents)
+3. Answer: No (only admin can delete)
+4. VP sees: 403 Forbidden
+5. VP must ask Admin to delete if needed
+```
+
+### Future Scenario: Committee-Scoped Access
+
+```
+(After scoping is implemented)
+1. Sarah (VP Hiking/Social) tries to view Wine event
+2. System checks: Is event in Sarah's supervised committees?
 3. Answer: No
-4. John sees: 403 Forbidden - "Event not in your scope"
+4. Sarah sees: 403 Forbidden - "Event not in your scope"
 ```
 
 ---
@@ -341,26 +404,38 @@ Step 3: Scope Check
 
 ## Key Takeaways
 
-### For Event Chairs
+### For VPs (Current)
 
-1. You have full control over your group's events
-2. You cannot publish - ask your VP when ready
-3. Your VP can edit your events (that's okay, it's by design)
-4. If you see unexpected changes, check the audit log
+1. You can see and edit **ALL events** (no scoping yet)
+2. You can publish events - this is your key privilege
+3. You **cannot** delete events - ask Admin if needed
+4. Use your edit power responsibly
 
-### For VPs
+### For Event Chairs (Current)
 
-1. You can see and edit all events in your supervised groups
-2. You are the gatekeeper for publication
-3. Use your edit power responsibly - notify Chairs of changes
-4. You cannot see events outside your scope (by design)
+1. Event Chair role exists but behaves like Member currently
+2. Committee-scoped access is planned for future release
+3. Once implemented, you'll have full control over your group's events
 
 ### For Tech Chair / Admins
 
 1. You have full access to everything
-2. Use Admin sparingly - prefer VP/Chair for day-to-day
-3. You're the only one who can delete events
+2. You're the **only** role that can delete events
+3. Use Admin sparingly - prefer VP for day-to-day event management
 4. You manage role assignments
+
+### Quick Permission Summary (Current)
+
+```
++----------------+--------+-----+-------+--------+
+|   Permission   | Admin  | VP  | Chair | Member |
++----------------+--------+-----+-------+--------+
+| View drafts    |  Yes   | Yes |  No   |   No   |
+| Edit events    |  Yes   | Yes |  No   |   No   |
+| Publish        |  Yes   | Yes |  No   |   No   |
+| DELETE         |  YES   | No  |  No   |   No   |
++----------------+--------+-----+-------+--------+
+```
 
 ---
 
