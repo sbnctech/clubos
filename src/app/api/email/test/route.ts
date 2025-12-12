@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mockEmailSend } from "../../../../../server/mock-email";
+import { sendEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   let body: any = {};
@@ -15,10 +15,13 @@ export async function POST(req: NextRequest) {
       ? body.to
       : "test@example.com";
 
-  const { messageId } = await mockEmailSend({
+  const subject = body.subject ?? "Test email from ClubOS";
+  const text = body.body ?? "This is a test email placeholder body.";
+
+  const { messageId } = await sendEmail({
     to,
-    subject: body.subject ?? "Test email from ClubOS",
-    body: body.body ?? "This is a test email placeholder body.",
+    subject,
+    text,
   });
 
   return NextResponse.json({

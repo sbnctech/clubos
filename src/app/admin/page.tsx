@@ -1,6 +1,8 @@
 import { getBaseUrl } from "@/lib/getBaseUrl";
 import { listMockEmails, MockEmailEntry } from "@/lib/email";
 import SystemCommsPanel from "./SystemCommsPanel";
+import AdminSectionNav from "./AdminSectionNav";
+import AdminSearchPanel from "./AdminSearchPanel";
 
 type Member = {
   id: string;
@@ -28,6 +30,22 @@ type JoinedRegistration = {
   memberName: string;
   eventTitle: string;
   status: string;
+};
+
+type AdminSummary = {
+  totalActiveMembers: number;
+  totalEvents: number;
+  totalRegistrations: number;
+  totalWaitlistedRegistrations: number;
+};
+
+type ActivityItem = {
+  id: string;
+  type: string;
+  memberName: string;
+  eventTitle: string;
+  status: string;
+  registeredAt: string;
 };
 
 async function getMembers(): Promise<Member[]> {
@@ -69,6 +87,40 @@ async function getRegistrations(): Promise<Registration[]> {
   return data.registrations ?? [];
 }
 
+async function getAdminSummary(): Promise<AdminSummary | null> {
+  const base = getBaseUrl();
+  try {
+    const res = await fetch(`${base}/api/admin/summary`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.summary ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function getActivity(): Promise<ActivityItem[]> {
+  const base = getBaseUrl();
+  try {
+    const res = await fetch(`${base}/api/admin/activity`, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.activity ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function formatActivityTime(isoString: string): string {
+  const date = new Date(isoString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
 function joinRegistrations(
   registrations: Registration[],
   members: Member[],
@@ -97,14 +149,17 @@ function joinRegistrations(
 }
 
 export default async function AdminPage() {
-  const [members, events, registrations, emails] = await Promise.all([
+  const [members, events, registrations, emails, summary, activity] = await Promise.all([
     getMembers(),
     getEvents(),
     getRegistrations(),
     listMockEmails(20),
+    getAdminSummary(),
+    getActivity(),
   ]);
 
   const joinedRegistrations = joinRegistrations(registrations, members, events);
+  const recentActivity = activity.slice(0, 10);
 
   return (
     <div data-test-id="admin-root" style={{ padding: "20px" }}>
@@ -115,7 +170,79 @@ export default async function AdminPage() {
         Admin
       </header>
 
-      <section style={{ marginBottom: "24px" }}>
+      <AdminSectionNav />
+
+      <section
+        id="admin-search-section"
+        data-test-id="admin-search-section"
+        style={{ marginBottom: "32px" }}
+      >
+        <h2 style={{ fontSize: "18px", marginBottom: "12px" }}>Search</h2>
+        <AdminSearchPanel />
+      </section>
+
+      <section
+        id="admin-summary-section"
+        data-test-id="admin-summary-section"
+        style={{ marginBottom: "32px" }}
+      >
+        <h2 style={{ fontSize: "18px", marginBottom: "12px" }}>
+          Dashboard summary
+        </h2>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "16px",
+          }}
+        >
+          <div style={{ minWidth: "180px" }}>
+            <div style={{ fontSize: "14px", color: "#888" }}>Active members</div>
+            <div
+              data-test-id="admin-summary-members"
+              style={{ fontSize: "20px", fontWeight: 600 }}
+            >
+              {summary ? summary.totalActiveMembers : "-"}
+            </div>
+          </div>
+
+          <div style={{ minWidth: "180px" }}>
+            <div style={{ fontSize: "14px", color: "#888" }}>Events</div>
+            <div
+              data-test-id="admin-summary-events"
+              style={{ fontSize: "20px", fontWeight: 600 }}
+            >
+              {summary ? summary.totalEvents : "-"}
+            </div>
+          </div>
+
+          <div style={{ minWidth: "180px" }}>
+            <div style={{ fontSize: "14px", color: "#888" }}>Registrations</div>
+            <div
+              data-test-id="admin-summary-registrations"
+              style={{ fontSize: "20px", fontWeight: 600 }}
+            >
+              {summary ? summary.totalRegistrations : "-"}
+            </div>
+          </div>
+
+          <div style={{ minWidth: "180px" }}>
+            <div style={{ fontSize: "14px", color: "#888" }}>Waitlisted</div>
+            <div
+              data-test-id="admin-summary-waitlisted"
+              style={{ fontSize: "20px", fontWeight: 600 }}
+            >
+              {summary ? summary.totalWaitlistedRegistrations : "-"}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="admin-members-section"
+        data-test-id="admin-members-section"
+        style={{ marginBottom: "32px" }}
+      >
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>
           Members overview
         </h2>
@@ -123,9 +250,6 @@ export default async function AdminPage() {
           This table is backed by the /api/members endpoint. Data is currently
           mocked and will later be replaced with database-backed queries.
         </p>
-      </section>
-
-      <section style={{ marginBottom: "32px" }}>
         <table
           data-test-id="admin-members-table"
           style={{
@@ -195,7 +319,11 @@ export default async function AdminPage() {
         </table>
       </section>
 
-      <section style={{ marginBottom: "24px" }}>
+      <section
+        id="admin-events-section"
+        data-test-id="admin-events-section"
+        style={{ marginBottom: "32px" }}
+      >
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>
           Events overview
         </h2>
@@ -203,9 +331,6 @@ export default async function AdminPage() {
           This table is backed by the /api/events endpoint. Data is currently
           mocked and will later be replaced with database-backed queries.
         </p>
-      </section>
-
-      <section style={{ marginBottom: "32px" }}>
         <table
           data-test-id="admin-events-table"
           style={{
@@ -292,7 +417,11 @@ export default async function AdminPage() {
         </table>
       </section>
 
-      <section style={{ marginBottom: "24px" }}>
+      <section
+        id="admin-registrations-section"
+        data-test-id="admin-registrations-section"
+        style={{ marginBottom: "32px" }}
+      >
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>
           Registrations overview
         </h2>
@@ -300,9 +429,6 @@ export default async function AdminPage() {
           This table joins /api/registrations with members and events to show
           who is registered for what.
         </p>
-      </section>
-
-      <section style={{ marginBottom: "32px" }}>
         <table
           data-test-id="admin-registrations-table"
           style={{
@@ -392,15 +518,16 @@ export default async function AdminPage() {
         </table>
       </section>
 
-      <section style={{ marginBottom: "24px" }}>
+      <section
+        id="admin-emails-section"
+        data-test-id="admin-emails-section"
+        style={{ marginBottom: "32px" }}
+      >
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>Email activity</h2>
         <p style={{ marginBottom: "12px" }}>
           This panel reads from the mock email log. In development, calls to
           /api/email/test append entries here instead of sending real email.
         </p>
-      </section>
-
-      <section>
         <table
           data-test-id="admin-email-table"
           style={{
@@ -493,17 +620,132 @@ export default async function AdminPage() {
         </table>
       </section>
 
-      <section style={{ marginBottom: "24px", marginTop: "32px" }}>
+      <section
+        id="admin-system-comms-section"
+        data-test-id="admin-system-comms-section"
+        style={{ marginBottom: "32px", marginTop: "32px" }}
+      >
         <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>
           System communications
         </h2>
         <p style={{ marginBottom: "12px" }}>
           Check system health and test email/SMS delivery.
         </p>
+        <SystemCommsPanel />
       </section>
 
-      <section style={{ marginBottom: "32px" }}>
-        <SystemCommsPanel />
+      <section
+        id="admin-activity-section"
+        data-test-id="admin-activity-section"
+        style={{ marginBottom: "32px" }}
+      >
+        <h2 style={{ fontSize: "18px", marginBottom: "8px" }}>
+          Recent activity
+        </h2>
+        <p style={{ marginBottom: "12px" }}>
+          Latest member registrations across events.
+        </p>
+        <table
+          data-test-id="admin-activity-table"
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            maxWidth: "800px",
+          }}
+        >
+          <thead>
+            <tr>
+              <th
+                style={{
+                  borderBottom: "1px solid #ccc",
+                  textAlign: "left",
+                  padding: "8px",
+                }}
+              >
+                Member
+              </th>
+              <th
+                style={{
+                  borderBottom: "1px solid #ccc",
+                  textAlign: "left",
+                  padding: "8px",
+                }}
+              >
+                Event
+              </th>
+              <th
+                style={{
+                  borderBottom: "1px solid #ccc",
+                  textAlign: "left",
+                  padding: "8px",
+                }}
+              >
+                Status
+              </th>
+              <th
+                style={{
+                  borderBottom: "1px solid #ccc",
+                  textAlign: "left",
+                  padding: "8px",
+                }}
+              >
+                When
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentActivity.map((item) => (
+              <tr key={item.id} data-test-id="admin-activity-row">
+                <td
+                  style={{
+                    borderBottom: "1px solid #eee",
+                    padding: "8px",
+                  }}
+                >
+                  {item.memberName}
+                </td>
+                <td
+                  style={{
+                    borderBottom: "1px solid #eee",
+                    padding: "8px",
+                  }}
+                >
+                  {item.eventTitle}
+                </td>
+                <td
+                  style={{
+                    borderBottom: "1px solid #eee",
+                    padding: "8px",
+                  }}
+                >
+                  {item.status}
+                </td>
+                <td
+                  style={{
+                    borderBottom: "1px solid #eee",
+                    padding: "8px",
+                  }}
+                >
+                  {formatActivityTime(item.registeredAt)}
+                </td>
+              </tr>
+            ))}
+            {recentActivity.length === 0 && (
+              <tr data-test-id="admin-activity-empty-state">
+                <td
+                  colSpan={4}
+                  style={{
+                    padding: "8px",
+                    fontStyle: "italic",
+                    color: "#666",
+                  }}
+                >
+                  No recent activity.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </section>
     </div>
   );

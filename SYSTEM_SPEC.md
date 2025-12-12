@@ -505,3 +505,253 @@ Stage 4: Member and admin facing UX
 Notes
 - The current implementation intentionally favors simplicity and green tests over early database complexity.
 - When Prisma configuration is stable, we will update this checklist to mark Stage 3 as in progress and move the email log from memory to the database.
+
+Admin and Monitoring Surfaces (Current Status)
+
+Overview
+- The system is evolving toward a browser-based admin shell that surfaces:
+  - Recent outbound email activity.
+  - Basic member, event, and registration views.
+  - Simple debug-oriented telemetry for communications.
+
+Communication Endpoints (Implemented)
+- /api/email/test
+  - Accepts JSON with "to", optional "subject", optional "body".
+  - Uses a mockEmailSend helper (server/mock-email.ts) to generate a synthetic messageId.
+  - Returns JSON: { ok: true, to, messageId }.
+  - Designed for automated tests and manual smoke checks only; no real email delivery.
+- /api/sms/test
+  - Accepts JSON with "to" and optional "body".
+  - Uses a mockSmsSend helper to generate a synthetic messageId.
+  - Returns JSON: { ok: true, to, messageId }.
+  - Intended for confirming that SMS wiring is conceptually correct before integrating a real provider.
+- /api/email/log
+  - POST:
+    - Accepts subject and body fields (plus any future metadata).
+    - Generates a unique id and ISO timestamp.
+    - Stores an entry in an in-memory emailLog structure.
+  - GET:
+    - Returns the most recent entries in newest-first order.
+  - This in-memory store is process-lifetime only and is not yet backed by the database.
+  - Playwright tests validate both the HTTP contract and the store behavior:
+    - tests/api/email-log.spec.ts.
+    - tests/api/email-log-store.spec.ts.
+
+Database Layer (Planned for this area)
+- Prisma Client is generated and available via server/prisma.ts.
+- The Prisma schema defines an email_message_log table, but:
+  - The current HTTP endpoints do not write to or read from this table yet.
+  - Migration to a database-backed email log is deferred until Prisma configuration is stable in all target environments.
+
+Admin UI Surfaces (Planned)
+- Admin wrapper page:
+  - Route: /admin-frame.
+  - Purpose:
+    - Host an iframe that loads the main admin shell at /admin.
+    - Provide a stable container for embedding admin views into other sites or layouts.
+- Admin shell page:
+  - Route: /admin.
+  - Initial scope:
+    - Email activity table with data-test-id="admin-email-table".
+    - Events table with data-test-id="admin-events-table".
+    - Members table with data-test-id="admin-members-table".
+    - Registrations table with data-test-id="admin-registrations-table".
+  - Data sources (initial):
+    - Static or in-memory mock data that satisfies the existing Playwright tests under tests/admin/.
+    - No dependency on Prisma or live production data for the first iteration.
+
+Test Integration
+- API-level tests:
+  - All tests under tests/api currently pass against the mocked communication endpoints.
+  - The SMS tests now use process.env.PW_BASE_URL ?? "http://localhost:3000" for the base URL.
+- Admin tests:
+  - Tests under tests/admin are currently red.
+  - These tests assume:
+    - /admin-frame exists and can be navigated to.
+    - /admin exists and renders the four tables listed above with the specified data-test-id attributes.
+    - tests/admin/admin-registrations.spec.ts will be updated to respect process.env.PW_BASE_URL just like the other tests.
+  - Implementing a minimal /admin-frame and /admin that satisfy these tests is the next step before any deeper UX work.
+
+Implementation Notes
+- The communication layer is deliberately simple and mock-oriented so it can be replaced with real providers and a real email_message_log persistence layer later.
+- Any future migration to Prisma-backed storage for email logs must:
+  - Preserve the current HTTP contract for /api/email/log.
+  - Maintain backward compatibility with existing Playwright tests, or evolve the tests and documentation together.
+- The admin shell is intended to be a thin UI tailored to debugging and operations, not a full member portal.
+
+
+## 2025-12-11 Notes: Member API and Status Semantics
+
+Member definition
+
+- A "member" in ClubOS is defined as:
+  - Any Contact that has at least one ACTIVE Membership record.
+- This aligns the UI concept of "member" with the underlying data model:
+  - Contact: person-level record (name, email, household, etc.).
+  - Membership: time-bounded relationship between a Contact and the club, with a status enum (ACTIVE, LAPSED, ALUMNI, PROSPECT, etc.).
+
+Member status for API responses
+
+- When an endpoint needs to expose "member status", it MUST derive that field from Membership, not from Contact.
+- For now:
+  - status is the status of the current or most recent ACTIVE Membership if present.
+  - If a Contact has more than one Membership:
+    - The API should prefer the ACTIVE membership with the latest start date.
+- Longer term:
+  - We may introduce a helper view or computed field to encapsulate "current membership status" per Contact.
+
+Members API contract (initial)
+
+- The initial /api/members endpoint is defined as follows:
+  - Returns only Contacts that qualify as members (have at least one ACTIVE Membership).
+  - Each entry includes:
+    - id
+    - firstName
+    - lastName
+    - email
+    - status (derived from Membership as described above)
+- For now, tests are written against mock data so that the endpoint behavior is stable even while Prisma configuration is still being refined.
+- When Prisma is fully wired:
+  - The endpoint will query Contacts and Memberships via Prisma.
+  - Tests will be updated to either:
+    - Seed known test records (e.g., sample members), or
+    - Assert more generic conditions (shape and semantics) instead of hardcoded names.
+
+Event registration delegation (partner signups)
+
+- Requirement:
+  - A member should be able to delegate rights to another member to register them for events.
+  - Primary use case:
+    - Two partners in the same household who are both members want either partner to be able to sign up both of them for an event.
+- Early model sketch:
+  - Delegation is represented explicitly in the data model as:
+    - Delegation:
+      - id
+      - grantorContactId (the member who is delegating)
+      - delegateContactId (the member who is allowed to register on their behalf)
+      - scope (initially: EVENT_REGISTRATION)
+      - activeFrom, activeTo (optional; for future time-bounded delegation)
+  - Business rules (initial):
+    - Both grantor and delegate must be valid members.
+    - UI should make the household/partner use case easy, but the data model should not be limited only to couples.
+    - When a delegate registers for an event, the system:
+      - Records both who is ATTENDING and who performed the ACTION (delegate).
+      - Enforces event-level limits (per-member, per-household, etc.) based on attendees, not the delegate.
+- Implementation stages:
+  - Stage 1: Document requirement and data model concept (this note).
+  - Stage 2: Add Delegation model to Prisma schema (behind a feature flag or non-blocking migration).
+  - Stage 3: Extend event registration API to honor delegations.
+  - Stage 4: Add UI affordances so a member can:
+    - Grant or revoke delegation to another member.
+    - See who they can act on behalf of.
+
+----------------------------------------------------------------
+
+## Public Site, Content, And Mail System (v1 Requirements)
+
+### Goals
+
+- ClubOS must be able to host and manage the club's public website and member portal.
+- Every visitor should see content appropriate to their authentication state, role, and group membership.
+- Editors must be able to create, edit, and publish pages without directly editing code.
+- Site branding should be controlled via themes and templates, with modern CSS and design tokens.
+- Email templates, mailing lists, and access control lists must be first class features, not ad hoc lists.
+
+### Core Concepts
+
+- Site
+  - Represents the primary web property for a club.
+  - Holds global settings such as theme, navigation menus, and default layouts.
+
+- Page
+  - Identified by a path (for example, "/", "/events", "/groups/hiking").
+  - Has a type: public, members only, role restricted, or group targeted.
+  - References a PageTemplate and contains one or more Blocks.
+
+- PageTemplate
+  - Defines the structural layout of a page (for example, header, hero, main, sidebar, footer).
+  - Controls which block types can appear in each region.
+  - Reusable across multiple pages.
+
+- Theme
+  - Defines design tokens for colors, typography, spacing, and other visual properties.
+  - Exposed to CSS via variables (for example, --color-primary).
+  - Separable from templates so that multiple themes can share the same layout structure.
+
+- Block
+  - Represents a content component that appears on a page.
+  - Examples: hero, text section, image banner, event list, registration call to action, callout, gallery.
+  - Configured via structured data (for example, JSON) and rendered by React components.
+
+- NavigationMenu
+  - Named menus such as Primary, Footer, and Member menu.
+  - Contains ordered NavigationItems with label, href, and optional visibility rules.
+
+- AudienceSegment
+  - A dynamic definition of a set of members based on roles, groups, membership level, or other attributes.
+  - Used for both web visibility rules and mailing list targeting.
+
+- MailTemplate
+  - Represents a reusable email layout and content structure.
+  - Fields include: name, slug, type (transactional or campaign), subject, preheader, layout, and blocks.
+  - Uses safe, email friendly HTML and shares design tokens with the web theme.
+
+- MailingList
+  - Logical list of recipients, usually backed by an AudienceSegment.
+  - Includes meta data such as description, ownerRole, and unsubscribe policy.
+
+### Permissions And Personalization
+
+- The existing role and group model must be extended to cover:
+  - Who can view a page.
+  - Who can edit a page or specific blocks.
+  - Which menu items appear for which roles and groups.
+  - Who can send email to specific MailingLists.
+
+- Basic visitor categories:
+  - Guest (not logged in).
+  - Member (logged in, active member).
+  - Officer (board or committee roles).
+  - EventChair (has rights over one or more events).
+  - SiteAdmin (full control over site and content).
+
+- Personalization rules:
+  - A page may have blocks that only render for certain roles or groups.
+  - Navigation menus may hide or show items based on the viewer.
+  - Member dashboards must show upcoming events, group specific content, and shortcuts to relevant actions.
+
+### Web Layout, Themes, And CSS
+
+- Use design tokens and CSS variables to drive theming.
+- Use component level styling (for example, CSS modules) and avoid scattering inline styles.
+- Page rendering flow:
+  - Load Page + Blocks + Theme + Navigation from storage.
+  - Apply permissions filters based on viewer identity.
+  - Render via React components using tokens and templates.
+
+- Editors should:
+  - Choose a template and theme for a page (subject to permissions).
+  - Add, reorder, and configure Blocks via a structured editor.
+  - Save drafts and publish changes, with simple version history.
+
+### Email Templates And Mailing Lists
+
+- Email templates must support:
+  - Club level branding that matches the public site.
+  - Merge fields for member and event data.
+  - Two broad types: transactional and broadcast.
+
+- Mailing lists must:
+  - Be definable in terms of AudienceSegments.
+  - Be subject to clear access control rules (which roles can send).
+  - Support unsubscribe behavior that respects member preferences.
+
+### Out Of Scope For v1
+
+- Visual drag and drop page builders.
+- Integrated A/B testing and analytics.
+- Multi site support across many clubs.
+- Third party email provider integration beyond a single outbound channel.
+
+These items may be added in future phases once the core public site and mail system are stable.
+

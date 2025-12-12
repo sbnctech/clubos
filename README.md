@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ClubOS
 
-## Getting Started
+Admin and membership management system.
 
-First, run the development server:
+## Development
 
-```bash
+### Install Dependencies
+npm install
+
+### Run Dev Server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Testing
+See docs/INDEX.md for full testing instructions.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- make test-api
+- make test-admin
+- make test-changed
+- make smoke
+- make preflight
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Documentation
 
-## Learn More
+Full documentation index:
+- docs/INDEX.md
 
-To learn more about Next.js, take a look at the following resources:
+Quick links:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+#### Developer Guides
+- docs/ONBOARDING.md
+- docs/DEVELOPMENT_WORKFLOW.md
+- docs/ADMIN_ARCHITECTURE_MAP.md
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+#### Admin Feature Guides
+- docs/ADMIN_DASHBOARD_OVERVIEW.md
+- docs/ADMIN_MEMBERS_UI.md
+- docs/ADMIN_EVENTS_UI.md
+- docs/ADMIN_REGISTRATIONS_UI.md
+- docs/ADMIN_ACTIVITY_UI.md
 
-## Deploy on Vercel
+#### API Reference
+- docs/API_SURFACE.md
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+#### Navigation Overview
+- docs/NAV.md
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Tooling
+
+#### Development Scripts (scripts/dev)
+- doctor.sh
+- smoke.sh
+- preflight.sh
+- install-git-hooks.sh
+- collect-diagnostics.sh
+- test-changed.sh
+- playwright-clean.sh
+- playwright-report.sh
+
+All scripts are ASCII-only, zsh-based, and autodetect the project root.
+

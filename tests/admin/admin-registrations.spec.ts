@@ -1,7 +1,9 @@
 import { test, expect } from "@playwright/test";
 
+const BASE = process.env.PW_BASE_URL ?? "http://localhost:3000";
+
 test("Admin registrations table renders joined member/event data", async ({ page }) => {
-  await page.goto("http://localhost:3002/admin");
+  await page.goto(`${BASE}/admin`);
 
   // Table and rows exist
   const table = page.locator('[data-test-id="admin-registrations-table"]');
