@@ -40,7 +40,7 @@ test.describe("GET /api/v1/health", () => {
     expect(body.version.length).toBeGreaterThan(0);
   });
 
-  test.skip("returns 503 when database is unavailable", async ({ request }) => {
+  test.skip("returns 503 when database is unavailable", async () => {
     // TODO: Tester - Implement with database mocking
     // This test requires ability to simulate database failure
   });
