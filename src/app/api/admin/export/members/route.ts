@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 /**
  * GET /api/admin/export/members
@@ -7,7 +8,9 @@ import { prisma } from "@/lib/prisma";
  * Export all members as CSV.
  * Returns members ordered by lastName, firstName for deterministic output.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.response;
   const members = await prisma.member.findMany({
     include: {
       membershipStatus: true,

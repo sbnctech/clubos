@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { RegistrationStatus } from "@prisma/client";
+import { requireAdmin } from "@/lib/auth";
 
 type EnrichedRegistration = {
   id: string;
@@ -13,6 +14,9 @@ type EnrichedRegistration = {
 };
 
 export async function GET(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.response;
+
   const { searchParams } = new URL(req.url);
   const memberIdFilter = searchParams.get("memberId");
   const eventIdFilter = searchParams.get("eventId");

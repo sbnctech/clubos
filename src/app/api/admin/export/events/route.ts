@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { RegistrationStatus } from "@prisma/client";
+import { requireAdmin } from "@/lib/auth";
 
 /**
  * GET /api/admin/export/events
@@ -8,7 +9,9 @@ import { RegistrationStatus } from "@prisma/client";
  * Export all events as CSV with registration counts.
  * Returns events ordered by startTime for deterministic output.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if (!auth.ok) return auth.response;
   const events = await prisma.event.findMany({
     include: {
       registrations: {
