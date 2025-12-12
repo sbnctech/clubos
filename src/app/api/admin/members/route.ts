@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getActiveMembers } from "@/lib/mockMembers";
-import {
-  countMemberRegistrations,
-  countMemberWaitlisted,
-} from "@/lib/mockRegistrations";
+import { prisma } from "@/lib/prisma";
 
 type AdminMemberListItem = {
   id: string;
   name: string;
   email: string;
   status: string;
-  phone: string;
+  phone: string | null;
   joinedAt: string;
   registrationCount: number;
   waitlistedCount: number;
@@ -40,23 +36,65 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const activeMembers = getActiveMembers();
+  // Get total count for pagination
+  const totalItems = await prisma.member.count({
+    where: {
+      membershipStatus: {
+        isActive: true,
+      },
+    },
+  });
 
-  const allMembers: AdminMemberListItem[] = activeMembers.map((m) => ({
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const skip = (page - 1) * pageSize;
+
+  // Fetch members with related data
+  const members = await prisma.member.findMany({
+    where: {
+      membershipStatus: {
+        isActive: true,
+      },
+    },
+    include: {
+      membershipStatus: true,
+      _count: {
+        select: {
+          eventRegistrations: true,
+        },
+      },
+    },
+    orderBy: {
+      lastName: "asc",
+    },
+    skip,
+    take: pageSize,
+  });
+
+  // Get waitlisted counts for these members
+  const memberIds = members.map((m) => m.id);
+  const waitlistedCounts = await prisma.eventRegistration.groupBy({
+    by: ["memberId"],
+    where: {
+      memberId: { in: memberIds },
+      status: "WAITLISTED",
+    },
+    _count: true,
+  });
+
+  const waitlistedMap = new Map(
+    waitlistedCounts.map((w) => [w.memberId, w._count])
+  );
+
+  const items: AdminMemberListItem[] = members.map((m) => ({
     id: m.id,
     name: `${m.firstName} ${m.lastName}`,
     email: m.email,
-    status: m.status,
+    status: m.membershipStatus.code,
     phone: m.phone,
-    joinedAt: m.joinedAt,
-    registrationCount: countMemberRegistrations(m.id),
-    waitlistedCount: countMemberWaitlisted(m.id),
+    joinedAt: m.joinedAt.toISOString(),
+    registrationCount: m._count.eventRegistrations,
+    waitlistedCount: waitlistedMap.get(m.id) ?? 0,
   }));
-
-  const totalItems = allMembers.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const startIndex = (page - 1) * pageSize;
-  const items = allMembers.slice(startIndex, startIndex + pageSize);
 
   return NextResponse.json({
     items,

@@ -1,0 +1,292 @@
+/**
+ * Prisma Seed Script for ClubOS
+ *
+ * Creates minimal, coherent seed data for local development and testing.
+ * See docs/schema/SEED_DATA_PLAN.md for the full seed data specification.
+ *
+ * This script is idempotent - running it twice produces the same result.
+ *
+ * Usage:
+ *   npx prisma db seed
+ *   # or
+ *   npm run db:seed
+ */
+
+import { PrismaClient, RegistrationStatus } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
+
+// Load .env manually for seed script
+import { config } from "dotenv";
+config();
+
+function createPrismaClient(): PrismaClient {
+  const connectionString = process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    throw new Error("DATABASE_URL environment variable is not set");
+  }
+
+  const pool = new Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
+
+  return new PrismaClient({ adapter });
+}
+
+const prisma = createPrismaClient();
+
+// Safety check: prevent running against production
+function checkEnvironment(): void {
+  const dbUrl = process.env.DATABASE_URL || "";
+  const isProduction =
+    process.env.NODE_ENV === "production" ||
+    dbUrl.includes("production") ||
+    dbUrl.includes("prod.") ||
+    dbUrl.includes(".com"); // Simple heuristic
+
+  if (isProduction) {
+    console.error("ERROR: Seed script detected production environment.");
+    console.error("DATABASE_URL:", dbUrl.substring(0, 30) + "...");
+    console.error("Aborting to prevent data loss.");
+    process.exit(1);
+  }
+}
+
+async function clearData(): Promise<void> {
+  console.log("Clearing existing data...");
+
+  // Delete in reverse dependency order
+  await prisma.emailLog.deleteMany();
+  await prisma.photo.deleteMany();
+  await prisma.photoAlbum.deleteMany();
+  await prisma.eventRegistration.deleteMany();
+  await prisma.event.deleteMany();
+  await prisma.userAccount.deleteMany();
+  await prisma.roleAssignment.deleteMany();
+  await prisma.term.deleteMany();
+  await prisma.committeeRole.deleteMany();
+  await prisma.committee.deleteMany();
+  await prisma.member.deleteMany();
+  await prisma.membershipStatus.deleteMany();
+
+  console.log("Data cleared.");
+}
+
+async function seedMembershipStatuses(): Promise<Map<string, string>> {
+  console.log("Seeding membership statuses...");
+
+  const statuses = [
+    {
+      code: "PROSPECT",
+      label: "Prospect",
+      description: "Interested but not yet a member",
+      isActive: false,
+      isEligibleForRenewal: false,
+      isBoardEligible: false,
+      sortOrder: 1,
+    },
+    {
+      code: "NEWCOMER",
+      label: "Newcomer",
+      description: "New member within first 2 years",
+      isActive: true,
+      isEligibleForRenewal: true,
+      isBoardEligible: false,
+      sortOrder: 2,
+    },
+    {
+      code: "EXTENDED",
+      label: "Extended Member",
+      description: "Member beyond initial newcomer period",
+      isActive: true,
+      isEligibleForRenewal: true,
+      isBoardEligible: true,
+      sortOrder: 3,
+    },
+    {
+      code: "ALUMNI",
+      label: "Alumni",
+      description: "Former active member",
+      isActive: true,
+      isEligibleForRenewal: false,
+      isBoardEligible: false,
+      sortOrder: 4,
+    },
+    {
+      code: "LAPSED",
+      label: "Lapsed",
+      description: "Membership expired",
+      isActive: false,
+      isEligibleForRenewal: true,
+      isBoardEligible: false,
+      sortOrder: 5,
+    },
+  ];
+
+  const statusMap = new Map<string, string>();
+
+  for (const status of statuses) {
+    const created = await prisma.membershipStatus.upsert({
+      where: { code: status.code },
+      update: status,
+      create: status,
+    });
+    statusMap.set(status.code, created.id);
+  }
+
+  console.log(`  Created ${statuses.length} membership statuses`);
+  return statusMap;
+}
+
+async function seedMembers(
+  statusMap: Map<string, string>
+): Promise<Map<string, string>> {
+  console.log("Seeding members...");
+
+  const extendedId = statusMap.get("EXTENDED")!;
+  const newcomerId = statusMap.get("NEWCOMER")!;
+
+  const members = [
+    {
+      email: "alice@example.com",
+      firstName: "Alice",
+      lastName: "Chen",
+      phone: "+1-555-0101",
+      membershipStatusId: extendedId,
+      joinedAt: new Date("2022-01-15"),
+    },
+    {
+      email: "carol@example.com",
+      firstName: "Carol",
+      lastName: "Johnson",
+      phone: "+1-555-0102",
+      membershipStatusId: newcomerId,
+      joinedAt: new Date("2024-06-01"),
+    },
+  ];
+
+  const memberMap = new Map<string, string>();
+
+  for (const member of members) {
+    const created = await prisma.member.upsert({
+      where: { email: member.email },
+      update: member,
+      create: member,
+    });
+    memberMap.set(member.email, created.id);
+  }
+
+  console.log(`  Created ${members.length} members`);
+  return memberMap;
+}
+
+async function seedUserAccounts(
+  memberMap: Map<string, string>
+): Promise<void> {
+  console.log("Seeding user accounts...");
+
+  const aliceId = memberMap.get("alice@example.com")!;
+
+  // Simple hash for demo purposes - in production use bcrypt
+  // This is "password123" - NOT secure, for local dev only
+  const demoPasswordHash =
+    "$2b$10$demohashdemohashdemohashdemohashdemohashdemoha";
+
+  await prisma.userAccount.upsert({
+    where: { email: "alice@example.com" },
+    update: {
+      memberId: aliceId,
+      passwordHash: demoPasswordHash,
+      isActive: true,
+    },
+    create: {
+      memberId: aliceId,
+      email: "alice@example.com",
+      passwordHash: demoPasswordHash,
+      isActive: true,
+    },
+  });
+
+  console.log("  Created 1 admin user account (alice@example.com)");
+}
+
+async function seedEvents(): Promise<Map<string, string>> {
+  console.log("Seeding events...");
+
+  const events = [
+    {
+      title: "Welcome Coffee",
+      description: "A casual gathering for new and prospective members to learn about the club.",
+      category: "Social",
+      location: "Community Center, Room A",
+      startTime: new Date("2025-07-15T10:00:00Z"),
+      endTime: new Date("2025-07-15T12:00:00Z"),
+      capacity: 20,
+      isPublished: true,
+    },
+  ];
+
+  const eventMap = new Map<string, string>();
+
+  for (const event of events) {
+    const created = await prisma.event.create({
+      data: event,
+    });
+    eventMap.set(event.title, created.id);
+  }
+
+  console.log(`  Created ${events.length} events`);
+  return eventMap;
+}
+
+async function seedEventRegistrations(
+  eventMap: Map<string, string>,
+  memberMap: Map<string, string>
+): Promise<void> {
+  console.log("Seeding event registrations...");
+
+  const welcomeCoffeeId = eventMap.get("Welcome Coffee")!;
+  const carolId = memberMap.get("carol@example.com")!;
+
+  await prisma.eventRegistration.create({
+    data: {
+      eventId: welcomeCoffeeId,
+      memberId: carolId,
+      status: RegistrationStatus.CONFIRMED,
+      registeredAt: new Date("2025-06-20T14:30:00Z"),
+    },
+  });
+
+  console.log("  Created 1 event registration");
+}
+
+async function main(): Promise<void> {
+  console.log("=== ClubOS Seed Script ===\n");
+
+  checkEnvironment();
+
+  try {
+    await clearData();
+
+    const statusMap = await seedMembershipStatuses();
+    const memberMap = await seedMembers(statusMap);
+    await seedUserAccounts(memberMap);
+    const eventMap = await seedEvents();
+    await seedEventRegistrations(eventMap, memberMap);
+
+    console.log("\n=== Seed Complete ===");
+    console.log("Summary:");
+    console.log("  - 5 membership statuses");
+    console.log("  - 2 members (Alice Chen, Carol Johnson)");
+    console.log("  - 1 admin user account (alice@example.com)");
+    console.log("  - 1 event (Welcome Coffee)");
+    console.log("  - 1 event registration (Carol -> Welcome Coffee)");
+  } catch (error) {
+    console.error("Seed failed:", error);
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+main();

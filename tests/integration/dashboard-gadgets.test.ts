@@ -199,7 +199,7 @@ test.describe("Dashboard Gadget Integration", () => {
   });
 
   test.describe("Unknown Gadget Handling", () => {
-    test.skip("Unknown gadget ID shows error styling", async ({ page }) => {
+    test.skip("Unknown gadget ID shows error styling", async () => {
       // TODO: Test unknown gadget rendering
       // This is already implemented in GadgetHost but needs UI test
     });

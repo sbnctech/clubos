@@ -5,31 +5,16 @@ import { test, expect } from "@playwright/test";
  *
  * Tests for GET /api/v1/events (member-facing)
  * See: docs/api/dtos/event.md
+ *
+ * Note: This endpoint returns published events and does not require auth for v1.
+ * Auth will be added in a future iteration when JWT middleware is implemented.
  */
 
 const BASE_URL = process.env.PW_BASE_URL || "http://localhost:3000";
 
 test.describe("GET /api/v1/events", () => {
-  // TODO: Tester - Add auth helper to generate valid JWT
-
-  test.skip("returns 401 without auth token", async ({ request }) => {
+  test("returns 200 with event list response shape", async ({ request }) => {
     const response = await request.get(`${BASE_URL}/api/v1/events`);
-
-    expect(response.status()).toBe(401);
-
-    const body = await response.json();
-    expect(body.code).toBe("UNAUTHORIZED");
-  });
-
-  test.skip("returns event list with valid token", async ({ request }) => {
-    // TODO: Tester - Generate member JWT
-    const memberToken = "MEMBER_JWT_HERE";
-
-    const response = await request.get(`${BASE_URL}/api/v1/events`, {
-      headers: {
-        Authorization: `Bearer ${memberToken}`,
-      },
-    });
 
     expect(response.status()).toBe(200);
 
@@ -39,105 +24,9 @@ test.describe("GET /api/v1/events", () => {
     expect(body.pagination).toBeDefined();
   });
 
-  test.skip("returns EventSummary shape for each event", async ({ request }) => {
-    // TODO: Tester - Generate member JWT
-    const memberToken = "MEMBER_JWT_HERE";
-
-    const response = await request.get(`${BASE_URL}/api/v1/events`, {
-      headers: {
-        Authorization: `Bearer ${memberToken}`,
-      },
-    });
-
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    if (body.events.length > 0) {
-      const event = body.events[0];
-      expect(event.id).toBeDefined();
-      expect(event.title).toBeDefined();
-      expect(event.category).toBeDefined();
-      expect(event.startTime).toBeDefined();
-      expect(typeof event.isWaitlistOpen).toBe("boolean");
-    }
-  });
-
-  test.skip("filters by category", async ({ request }) => {
-    // TODO: Tester - Generate member JWT and seed test data
-    const memberToken = "MEMBER_JWT_HERE";
-
+  test("returns correct pagination metadata structure", async ({ request }) => {
     const response = await request.get(
-      `${BASE_URL}/api/v1/events?category=Outdoors`,
-      {
-        headers: {
-          Authorization: `Bearer ${memberToken}`,
-        },
-      }
-    );
-
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    for (const event of body.events) {
-      expect(event.category).toBe("Outdoors");
-    }
-  });
-
-  test.skip("filters by date range", async ({ request }) => {
-    // TODO: Tester - Generate member JWT
-    const memberToken = "MEMBER_JWT_HERE";
-    const from = "2025-06-01T00:00:00Z";
-    const to = "2025-06-30T23:59:59Z";
-
-    const response = await request.get(
-      `${BASE_URL}/api/v1/events?from=${from}&to=${to}`,
-      {
-        headers: {
-          Authorization: `Bearer ${memberToken}`,
-        },
-      }
-    );
-
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    for (const event of body.events) {
-      const startTime = new Date(event.startTime);
-      expect(startTime >= new Date(from)).toBe(true);
-      expect(startTime <= new Date(to)).toBe(true);
-    }
-  });
-
-  test.skip("returns only PUBLISHED events for members", async ({ request }) => {
-    // TODO: Tester - Generate member JWT
-    // Members should only see PUBLISHED events, not DRAFT or CANCELLED
-    const memberToken = "MEMBER_JWT_HERE";
-
-    const response = await request.get(`${BASE_URL}/api/v1/events`, {
-      headers: {
-        Authorization: `Bearer ${memberToken}`,
-      },
-    });
-
-    expect(response.status()).toBe(200);
-
-    const body = await response.json();
-    // Note: EventSummary doesn't include status, but we verify by checking
-    // that DRAFT events are not visible
-    // This requires seeded test data with known DRAFT events
-  });
-
-  test.skip("returns pagination metadata", async ({ request }) => {
-    // TODO: Tester - Generate member JWT
-    const memberToken = "MEMBER_JWT_HERE";
-
-    const response = await request.get(
-      `${BASE_URL}/api/v1/events?page=1&limit=5`,
-      {
-        headers: {
-          Authorization: `Bearer ${memberToken}`,
-        },
-      }
+      `${BASE_URL}/api/v1/events?page=1&limit=5`
     );
 
     expect(response.status()).toBe(200);
@@ -149,5 +38,96 @@ test.describe("GET /api/v1/events", () => {
     expect(typeof body.pagination.totalPages).toBe("number");
     expect(typeof body.pagination.hasNext).toBe("boolean");
     expect(typeof body.pagination.hasPrev).toBe("boolean");
+  });
+
+  test("returns EventSummary shape for each event", async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/api/v1/events`);
+
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    // If there are events in the database, verify shape
+    if (body.events.length > 0) {
+      const event = body.events[0];
+      expect(event.id).toBeDefined();
+      expect(event.title).toBeDefined();
+      expect(event.startTime).toBeDefined();
+      expect(typeof event.isWaitlistOpen).toBe("boolean");
+      expect(typeof event.registeredCount).toBe("number");
+      // Optional fields can be null
+      expect(event.category === null || typeof event.category === "string").toBe(true);
+      expect(event.description === null || typeof event.description === "string").toBe(true);
+      expect(event.location === null || typeof event.location === "string").toBe(true);
+      expect(event.capacity === null || typeof event.capacity === "number").toBe(true);
+    }
+  });
+
+  test("respects limit parameter", async ({ request }) => {
+    const response = await request.get(
+      `${BASE_URL}/api/v1/events?limit=2`
+    );
+
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.events.length).toBeLessThanOrEqual(2);
+    expect(body.pagination.limit).toBe(2);
+  });
+
+  test("clamps limit to max 100", async ({ request }) => {
+    const response = await request.get(
+      `${BASE_URL}/api/v1/events?limit=500`
+    );
+
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.pagination.limit).toBe(100);
+  });
+
+  test("clamps page to minimum 1", async ({ request }) => {
+    const response = await request.get(
+      `${BASE_URL}/api/v1/events?page=0`
+    );
+
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.pagination.page).toBe(1);
+  });
+
+  // Future tests that require seeded data or auth:
+
+  test.skip("filters by category", async ({ request }) => {
+    // Requires seeded test data with known categories
+    const response = await request.get(
+      `${BASE_URL}/api/v1/events?category=Outdoors`
+    );
+
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    for (const event of body.events) {
+      expect(event.category).toBe("Outdoors");
+    }
+  });
+
+  test.skip("filters by date range", async ({ request }) => {
+    // Requires seeded test data with known dates
+    const from = "2025-06-01T00:00:00Z";
+    const to = "2025-06-30T23:59:59Z";
+
+    const response = await request.get(
+      `${BASE_URL}/api/v1/events?from=${from}&to=${to}`
+    );
+
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    for (const event of body.events) {
+      const startTime = new Date(event.startTime);
+      expect(startTime >= new Date(from)).toBe(true);
+      expect(startTime <= new Date(to)).toBe(true);
+    }
   });
 });

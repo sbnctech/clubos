@@ -161,14 +161,14 @@ test.describe("POST /api/v1/admin/registrations/:id/promote", () => {
     expect(body.warning).toBeDefined();
   });
 
-  test.skip("records promotion in registration history", async ({ request }) => {
+  test.skip("records promotion in registration history", async () => {
     // TODO: Tester - Verify history entry after promotion
     // 1. Promote a registration
     // 2. GET /api/v1/admin/registrations/:id to check history
     // 3. Verify PROMOTED action in history
   });
 
-  test.skip("recalculates waitlist positions after promotion", async ({ request }) => {
+  test.skip("recalculates waitlist positions after promotion", async () => {
     // TODO: Tester - Verify remaining waitlist positions are updated
     // 1. Seed event with 3 waitlisted registrations (positions 1, 2, 3)
     // 2. Promote position 1

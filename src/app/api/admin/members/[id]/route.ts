@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMemberById } from "@/lib/mockMembers";
-import { listRegistrations } from "@/lib/mockRegistrations";
-import { listEvents } from "@/lib/mockEvents";
+import { prisma } from "@/lib/prisma";
 
 type MemberDetailResponse = {
   member: {
     id: string;
     name: string;
     email: string;
-    phone: string;
+    phone: string | null;
     joinedAt: string;
     status: string;
   };
@@ -26,29 +24,36 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const member = getMemberById(id);
+
+  // Validate UUID format to avoid Prisma errors
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const member = await prisma.member.findUnique({
+    where: { id },
+    include: {
+      membershipStatus: true,
+      eventRegistrations: {
+        include: {
+          event: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: {
+          registeredAt: "desc",
+        },
+      },
+    },
+  });
 
   if (!member) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-
-  const allRegistrations = listRegistrations();
-  const allEvents = listEvents();
-
-  const eventById = new Map(allEvents.map((e) => [e.id, e]));
-
-  const memberRegistrations = allRegistrations
-    .filter((r) => r.memberId === id)
-    .map((r) => {
-      const event = eventById.get(r.eventId);
-      return {
-        id: r.id,
-        eventId: r.eventId,
-        eventTitle: event ? event.title : r.eventId,
-        status: r.status,
-        registeredAt: r.registeredAt,
-      };
-    });
 
   const response: MemberDetailResponse = {
     member: {
@@ -56,10 +61,16 @@ export async function GET(
       name: `${member.firstName} ${member.lastName}`,
       email: member.email,
       phone: member.phone,
-      joinedAt: member.joinedAt,
-      status: member.status,
+      joinedAt: member.joinedAt.toISOString(),
+      status: member.membershipStatus.code,
     },
-    registrations: memberRegistrations,
+    registrations: member.eventRegistrations.map((r) => ({
+      id: r.id,
+      eventId: r.eventId,
+      eventTitle: r.event.title,
+      status: r.status,
+      registeredAt: r.registeredAt.toISOString(),
+    })),
   };
 
   return NextResponse.json(response);

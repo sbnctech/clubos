@@ -123,7 +123,7 @@ test.describe("Auth Flow Integration", () => {
       // TODO: Test token expiration handling
     });
 
-    test.skip("Invalid token returns 401", async ({ request }) => {
+    test.skip("Invalid token returns 401", async () => {
       // TODO: Test malformed token handling
     });
   });
