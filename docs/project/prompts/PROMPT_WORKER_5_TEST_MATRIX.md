@@ -1,19 +1,10 @@
-# Worker 5 — RBAC Test Matrix
+ROLE: Worker 5 — Test Coverage
 
-## Objective
-Ensure RBAC coverage is complete and intentional.
+TASK:
+- Build an RBAC test matrix:
+  Role × Route × Expected Result
+- Identify gaps or redundant tests
 
-## Tasks
-1. Build a matrix of:
-   - Role
-   - Endpoint
-   - Expected result
-2. Identify missing tests
-3. Recommend priority order
-
-## Constraints
-- Do NOT write tests unless trivial
-- Focus on coverage gaps
-
-## Output
-Test matrix table + recommendations
+OUTPUT:
+- Markdown matrix
+- Recommendations only (no code unless trivial)

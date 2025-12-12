@@ -111,10 +111,19 @@ export async function requireRole(
 }
 
 /**
+ * Check if role has VP-level access (admin or VP of Activities).
+ * VP-level access means the user can view/edit all events.
+ */
+export function hasVPAccess(role: GlobalRole): boolean {
+  return role === "admin" || role === "vp-activities";
+}
+
+/**
  * Check if role can view all events (including unpublished).
+ * Alias for hasVPAccess.
  */
 export function canViewAllEvents(role: GlobalRole): boolean {
-  return role === "admin" || role === "vp-activities";
+  return hasVPAccess(role);
 }
 
 /**

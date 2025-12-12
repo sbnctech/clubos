@@ -1,31 +1,13 @@
-# Worker 2 — RBAC Error Semantics
+ROLE: Worker 2 — Error Semantics
 
-## Objective
-Clarify and standardize how RBAC-related authorization errors are handled.
+TASK:
+- Audit 401 vs 403 usage across API
+- Ensure consistency with docs
+- Propose standard error response shape
 
-## Why This Matters
-Inconsistent use of HTTP status codes causes:
-- Confusing frontend behavior
-- Hard-to-debug API failures
-- Security ambiguity
+OUTPUT:
+- Table of current vs desired behavior
+- Tests to add or update (if needed)
 
-## Scope
-Focus only on **error semantics**, not business logic.
-
-## Questions to Answer
-1. When should the API return **401 Unauthorized** vs **403 Forbidden**?
-2. Should missing tokens and invalid tokens be treated differently?
-3. Should role failures expose role names or stay generic?
-4. What should the standard JSON error shape be?
-
-## Tasks
-1. Review current auth middleware and error helpers
-2. Identify inconsistencies
-3. Propose a single standard error contract
-4. Provide example error payloads (JSON)
-5. Recommend test cases (no coding unless trivial)
-
-## Output Format
-- Short written analysis
-- Clear recommendations
-- Example error responses
+DO NOT:
+- Introduce new error codes

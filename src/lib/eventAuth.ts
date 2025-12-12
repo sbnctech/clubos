@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, AuthContext, AuthResult, GlobalRole } from "@/lib/auth";
+import { requireAuth, AuthContext, AuthResult, GlobalRole, hasVPAccess } from "@/lib/auth";
 
 /**
  * Event Authorization Utilities
@@ -27,13 +27,6 @@ export type EventAuthContext = AuthContext & {
 export type EventAuthResult =
   | { ok: true; context: EventAuthContext }
   | { ok: false; response: NextResponse };
-
-/**
- * Check if role has VP-level access (can view/edit all events).
- */
-function hasVPAccess(role: GlobalRole): boolean {
-  return role === "admin" || role === "vp-activities";
-}
 
 /**
  * Check if role can delete events (admin only).
@@ -266,36 +259,6 @@ export async function getChairedEventIds(memberId: string): Promise<string[]> {
   });
 
   return events.map((e) => e.id);
-}
-
-/**
- * Require admin-only access.
- * Neither VP nor Event Chairs are allowed - only full admins.
- * Use this for sensitive admin operations like:
- * - Viewing all members
- * - Exporting data
- * - System configuration
- */
-export async function requireAdminOnly(req: NextRequest): Promise<AuthResult> {
-  const authResult = await requireAuth(req);
-  if (!authResult.ok) {
-    return authResult;
-  }
-
-  if (authResult.context.globalRole !== "admin") {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        {
-          error: "Forbidden",
-          message: "This action requires administrator privileges",
-        },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return authResult;
 }
 
 /**

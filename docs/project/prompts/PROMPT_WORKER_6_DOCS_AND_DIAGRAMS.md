@@ -1,15 +1,9 @@
-# Worker 6 — RBAC Documentation & Diagrams
+ROLE: Worker 6 — Documentation Polish
 
-## Objective
-Make RBAC understandable to non-technical admins.
+TASK:
+- Review AUTH_AND_RBAC.md and ACTIVITIES_ROLES.md
+- Align language with actual behavior
+- Suggest diagram or clarifying examples
 
-## Tasks
-- Explain RBAC vs data ownership in plain English
-- Create ASCII diagrams if helpful
-- Identify where docs should live
-
-## Audience
-Non-technical SBNC board members
-
-## Output
-Documentation-ready text
+OUTPUT:
+- Doc edits or inline suggestions
