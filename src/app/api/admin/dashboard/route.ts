@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getActiveMembers } from "@/lib/mockMembers";
-import { listEvents } from "@/lib/mockEvents";
-import { listRegistrations, countByStatus } from "@/lib/mockRegistrations";
+import { prisma } from "@/lib/prisma";
+import { RegistrationStatus } from "@prisma/client";
 
 // Fixed reference date for deterministic upcoming events calculation
 const REFERENCE_DATE = new Date("2025-05-01T00:00:00Z");
@@ -16,26 +15,47 @@ type DashboardSummary = {
 };
 
 export async function GET() {
-  const activeMembers = getActiveMembers();
-  const allEvents = listEvents();
-  const allRegistrations = listRegistrations();
+  // Count all members
+  const totalMembers = await prisma.member.count();
+
+  // Count active members (where membership status isActive = true)
+  const activeMembers = await prisma.member.count({
+    where: {
+      membershipStatus: {
+        isActive: true,
+      },
+    },
+  });
+
+  // Count all events
+  const totalEvents = await prisma.event.count();
 
   // Count upcoming events (startTime >= reference date)
-  const upcomingEvents = allEvents.filter((e) => {
-    const eventDate = new Date(e.startTime);
-    return eventDate >= REFERENCE_DATE;
-  }).length;
+  const upcomingEvents = await prisma.event.count({
+    where: {
+      startTime: {
+        gte: REFERENCE_DATE,
+      },
+    },
+  });
 
-  // Note: totalMembers equals activeMembers since current mock data
-  // only contains active members. When a getAllMembers() helper is added,
-  // this should be updated.
+  // Count all registrations
+  const totalRegistrations = await prisma.eventRegistration.count();
+
+  // Count waitlisted registrations
+  const waitlistedRegistrations = await prisma.eventRegistration.count({
+    where: {
+      status: RegistrationStatus.WAITLISTED,
+    },
+  });
+
   const summary: DashboardSummary = {
-    totalMembers: activeMembers.length,
-    activeMembers: activeMembers.length,
-    totalEvents: allEvents.length,
+    totalMembers,
+    activeMembers,
+    totalEvents,
     upcomingEvents,
-    totalRegistrations: allRegistrations.length,
-    waitlistedRegistrations: countByStatus("WAITLISTED"),
+    totalRegistrations,
+    waitlistedRegistrations,
   };
 
   return NextResponse.json({ summary });
