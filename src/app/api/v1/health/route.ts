@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getEnv } from "@/lib/env";
 
 /**
  * GET /api/v1/health
@@ -38,5 +39,14 @@ export async function GET() {
 
   const httpStatus = response.status === "healthy" ? 200 : 503;
 
-  return NextResponse.json(response, { status: httpStatus });
+  const env = getEnv();
+  return NextResponse.json(
+    {
+      ...response,
+      env: {
+        dbConfigured: !!env.DATABASE_URL,
+      },
+    },
+    { status: httpStatus }
+  );
 }

@@ -1,0 +1,35 @@
+# Runtime Environment Variables (ClubOS)
+
+Calendar note: This document is being added while we are still on Calendar Day 2.
+
+## Rules
+- No secrets in git.
+- Local dev uses .env (ignored).
+- Vercel Preview/Production use Vercel Environment Variables.
+- Do not point Vercel DATABASE_URL at localhost.
+
+## Required
+### DATABASE_URL
+- Local dev example:
+  postgresql://clubos:clubos@localhost:5432/clubos_dev
+- Vercel must be a hosted Postgres URL.
+
+## Optional (placeholders for Day 3 wiring)
+### AUTH_JWT_SECRET
+- Not used yet (auth not implemented).
+- When enabled, must be a long random string.
+
+### EMAIL_PROVIDER
+- Not used yet (email not implemented).
+- Example future values: "resend", "ses", "postmark"
+
+### SMS_PROVIDER
+- Not used yet (sms not implemented).
+- Example future values: "twilio"
+
+## Vercel UI Notes
+Settings -> Build and Deployment:
+- Root Directory: leave BLANK (do not enter "." or "./")
+- Framework Preset: Next.js (auto)
+- Build Command: npm run build (default)
+- Output Directory: default
