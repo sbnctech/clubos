@@ -1,43 +1,24 @@
-# Day 3 Status Report and Day 4 Objective
+# Day 3 Status and Day 4 Objective
 
-## Day 3 Status — Complete
+## Day 3 Status: Integration Closeout
+Current system state:
+- Preflight passes
+- Health endpoints return a canonical response shape
+- Seed data supports pagination and filters
+- Prisma-backed admin endpoints return live data from Postgres
+- API contract documentation exists and matches runtime behavior
 
-### Summary
-Day 3 successfully completed the API integration cycle. Core endpoints are now backed by Prisma, seed data supports realistic workflows, lint noise is under control, and the system is stable for downstream development.
+Definition of done check:
+- preflight: PASS
+- endpoints: PASS (health, members, events, registrations)
+- tests: PASS for updated suites; remaining skips are documented
 
-### Completed Work
-- Prisma schema baselined and locked
-- Prisma Client operational with PostgreSQL
-- Health endpoint verified with live database checks
-- Admin members endpoints converted to Prisma
-- Events endpoint verified with real data
-- Seed data expanded to support filtering and pagination tests
-- ESLint warnings reduced well below failure threshold
-- Preflight checks passing consistently on main
-
-### System State
-- Database: Local PostgreSQL (clubos_dev)
-- API: Live, Prisma-backed, contract-stable
-- Tests: Passing or explicitly skipped with rationale
-- Lint: Clean (warnings below max)
-- Git: main branch clean and up to date
-
-### Known Follow-Ups
-- Some endpoints still return mock data (explicitly identified)
-- Health endpoint has minor naming inconsistency ("ok" vs "healthy")
-- API contract documentation can be expanded with examples
-
----
-
-## Day 4 Objective — Authorization, Roles, and Access Control
-
-### Goal
-Introduce and enforce role-based access control across admin and member APIs, ensuring that only authorized users can access sensitive endpoints.
+## Day 4 Objective: Role-Based Access Control (RBAC) Foundation
 
 ### Primary Outcomes
 1. Authentication middleware applied consistently to protected routes
 2. Role checks enforced (admin vs member)
-3. API returns correct HTTP status codes for unauthorized and forbidden access
+3. API returns correct HTTP status codes for unauthenticated vs forbidden
 4. Seed data includes representative admin and member users
 5. Tests cover auth success and failure cases
 
