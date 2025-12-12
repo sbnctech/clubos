@@ -276,18 +276,44 @@ async function seedEventRegistrations(
   console.log("Seeding event registrations...");
 
   const welcomeCoffeeId = eventMap.get("Welcome Coffee")!;
+  const hikeId = eventMap.get("Morning Hike at Rattlesnake Canyon")!;
+  const picnicId = eventMap.get("Summer Beach Picnic")!;
   const carolId = memberMap.get("carol@example.com")!;
+  const aliceId = memberMap.get("alice@example.com")!;
 
-  await prisma.eventRegistration.create({
-    data: {
+  const registrations = [
+    {
       eventId: welcomeCoffeeId,
       memberId: carolId,
       status: RegistrationStatus.CONFIRMED,
       registeredAt: new Date("2025-06-20T14:30:00Z"),
     },
-  });
+    {
+      eventId: hikeId,
+      memberId: carolId,
+      status: RegistrationStatus.CONFIRMED,
+      registeredAt: new Date("2025-06-01T09:00:00Z"),
+    },
+    {
+      eventId: hikeId,
+      memberId: aliceId,
+      status: RegistrationStatus.WAITLISTED,
+      waitlistPosition: 1,
+      registeredAt: new Date("2025-06-02T10:30:00Z"),
+    },
+    {
+      eventId: picnicId,
+      memberId: aliceId,
+      status: RegistrationStatus.CONFIRMED,
+      registeredAt: new Date("2025-07-15T08:00:00Z"),
+    },
+  ];
 
-  console.log("  Created 1 event registration");
+  for (const reg of registrations) {
+    await prisma.eventRegistration.create({ data: reg });
+  }
+
+  console.log(`  Created ${registrations.length} event registrations`);
 }
 
 async function main(): Promise<void> {
@@ -310,7 +336,7 @@ async function main(): Promise<void> {
     console.log("  - 2 members (Alice Chen, Carol Johnson)");
     console.log("  - 1 admin user account (alice@example.com)");
     console.log("  - 4 events (3 published, 1 draft)");
-    console.log("  - 1 event registration (Carol -> Welcome Coffee)");
+    console.log("  - 4 event registrations (3 confirmed, 1 waitlisted)");
   } catch (error) {
     console.error("Seed failed:", error);
     throw error;

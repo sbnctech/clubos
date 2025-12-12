@@ -21,8 +21,8 @@ The seed script creates minimal, coherent data for local development:
 | MembershipStatus | 5 | PROSPECT, NEWCOMER, EXTENDED, ALUMNI, LAPSED |
 | Member | 2 | Alice Chen (Extended), Carol Johnson (Newcomer) |
 | UserAccount | 1 | alice@example.com (admin) |
-| Event | 1 | Welcome Coffee (future event) |
-| EventRegistration | 1 | Carol registered for Welcome Coffee |
+| Event | 4 | 3 published (Social, Outdoors categories), 1 draft |
+| EventRegistration | 4 | 3 confirmed, 1 waitlisted |
 
 ## Running the Seed
 
@@ -69,12 +69,16 @@ The script includes safety checks to prevent accidental production seeding:
 - **Role:** Newcomer
 - **Registration:** Confirmed for Welcome Coffee event
 
-### Sample Event
+### Sample Events
 
-- **Title:** Welcome Coffee
-- **Date:** 2025-07-15 10:00 AM UTC
-- **Capacity:** 20
-- **Status:** Published
+| Title | Category | Date | Capacity | Status |
+|-------|----------|------|----------|--------|
+| Welcome Coffee | Social | 2025-07-15 | 20 | Published |
+| Morning Hike at Rattlesnake Canyon | Outdoors | 2025-06-10 | 15 | Published |
+| Summer Beach Picnic | Social | 2025-08-20 | 50 | Published |
+| Draft Event | Social | 2025-09-01 | 10 | Draft |
+
+Events span June through September for date filter testing, with both Social and Outdoors categories.
 
 ## Extending the Seed
 
