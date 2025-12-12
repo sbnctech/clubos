@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listEvents } from "@/lib/mockEvents";
-import {
-  countEventRegistrations,
-  countEventWaitlisted,
-} from "@/lib/mockRegistrations";
+import { prisma } from "@/lib/prisma";
 
 type AdminEventListItem = {
   id: string;
   title: string;
-  category: string;
+  category: string | null;
   startTime: string;
   registrationCount: number;
   waitlistedCount: number;
@@ -38,21 +34,51 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const allEvents = listEvents();
+  // Get total count for pagination
+  const totalItems = await prisma.event.count();
 
-  const events: AdminEventListItem[] = allEvents.map((e) => ({
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const skip = (page - 1) * pageSize;
+
+  // Fetch events with registration counts
+  const events = await prisma.event.findMany({
+    include: {
+      _count: {
+        select: {
+          registrations: true,
+        },
+      },
+    },
+    orderBy: {
+      startTime: "asc",
+    },
+    skip,
+    take: pageSize,
+  });
+
+  // Get waitlisted counts for these events
+  const eventIds = events.map((e) => e.id);
+  const waitlistedCounts = await prisma.eventRegistration.groupBy({
+    by: ["eventId"],
+    where: {
+      eventId: { in: eventIds },
+      status: "WAITLISTED",
+    },
+    _count: true,
+  });
+
+  const waitlistedMap = new Map(
+    waitlistedCounts.map((w) => [w.eventId, w._count])
+  );
+
+  const items: AdminEventListItem[] = events.map((e) => ({
     id: e.id,
     title: e.title,
     category: e.category,
-    startTime: e.startTime,
-    registrationCount: countEventRegistrations(e.id),
-    waitlistedCount: countEventWaitlisted(e.id),
+    startTime: e.startTime.toISOString(),
+    registrationCount: e._count.registrations,
+    waitlistedCount: waitlistedMap.get(e.id) ?? 0,
   }));
-
-  const totalItems = events.length;
-  const totalPages = Math.ceil(totalItems / pageSize);
-  const startIndex = (page - 1) * pageSize;
-  const items = events.slice(startIndex, startIndex + pageSize);
 
   return NextResponse.json({
     items,
