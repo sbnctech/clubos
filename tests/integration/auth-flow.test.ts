@@ -61,9 +61,7 @@ test.describe("Auth Flow Integration", () => {
   });
 
   test.describe("Session Management", () => {
-    test.skip("Authenticated user can access protected routes", async ({
-      page,
-    }) => {
+    test.skip("Authenticated user can access protected routes", async () => {
       // TODO: Implement when session middleware exists
       // Login first
       // Then navigate to protected route
@@ -78,11 +76,11 @@ test.describe("Auth Flow Integration", () => {
       await expect(page).toHaveURL("/login");
     });
 
-    test.skip("Session persists across page refreshes", async ({ page }) => {
+    test.skip("Session persists across page refreshes", async () => {
       // TODO: Implement session persistence test
     });
 
-    test.skip("Session expires after timeout", async ({ page }) => {
+    test.skip("Session expires after timeout", async () => {
       // TODO: Implement session timeout test
     });
   });
@@ -95,13 +93,11 @@ test.describe("Auth Flow Integration", () => {
       await expect(page).toHaveURL("/login");
     });
 
-    test.skip("Logout clears session data", async ({ page }) => {
+    test.skip("Logout clears session data", async () => {
       // TODO: Verify session is cleared
     });
 
-    test.skip("After logout, protected routes redirect to login", async ({
-      page,
-    }) => {
+    test.skip("After logout, protected routes redirect to login", async () => {
       // TODO: Verify protected routes are inaccessible
     });
   });
@@ -115,11 +111,11 @@ test.describe("Auth Flow Integration", () => {
       expect(response.status()).toBe(401);
     });
 
-    test.skip("Valid token grants API access", async ({ request }) => {
+    test.skip("Valid token grants API access", async () => {
       // TODO: Test with valid JWT
     });
 
-    test.skip("Expired token returns 401", async ({ request }) => {
+    test.skip("Expired token returns 401", async () => {
       // TODO: Test token expiration handling
     });
 

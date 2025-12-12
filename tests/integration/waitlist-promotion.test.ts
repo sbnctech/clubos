@@ -34,7 +34,7 @@ test.describe("Waitlist Promotion Integration", () => {
       expect(data.waitlistPosition).toBeGreaterThan(0);
     });
 
-    test.skip("Waitlist positions are sequential", async ({ request }) => {
+    test.skip("Waitlist positions are sequential", async () => {
       // TODO: Verify sequential position assignment
       // Register multiple waitlisted members
       // Verify positions are 1, 2, 3, etc.
@@ -71,17 +71,13 @@ test.describe("Waitlist Promotion Integration", () => {
       expect(data.status).toBe("CONFIRMED");
     });
 
-    test.skip("Remaining waitlist positions are reordered after promotion", async ({
-      request,
-    }) => {
+    test.skip("Remaining waitlist positions are reordered after promotion", async () => {
       // TODO: Verify position reordering
       // After member at position 1 is promoted,
       // member at position 2 should become position 1
     });
 
-    test.skip("Multiple promotions occur when multiple spots open", async ({
-      request,
-    }) => {
+    test.skip("Multiple promotions occur when multiple spots open", async () => {
       // TODO: Test bulk cancellation scenario
       // Cancel 3 registrations
       // Verify 3 waitlisted members are promoted
@@ -89,22 +85,16 @@ test.describe("Waitlist Promotion Integration", () => {
   });
 
   test.describe("Promotion Notifications", () => {
-    test.skip("Promoted member receives email notification", async ({
-      request,
-    }) => {
+    test.skip("Promoted member receives email notification", async () => {
       // TODO: Verify email is sent on promotion
       // May need to check EmailLog model
     });
 
-    test.skip("Email contains event details and confirmation", async ({
-      request,
-    }) => {
+    test.skip("Email contains event details and confirmation", async () => {
       // TODO: Verify email content
     });
 
-    test.skip("Promotion notification includes deadline to confirm", async ({
-      request,
-    }) => {
+    test.skip("Promotion notification includes deadline to confirm", async () => {
       // TODO: If confirmation deadline exists, verify it's in email
     });
   });
@@ -120,9 +110,7 @@ test.describe("Waitlist Promotion Integration", () => {
       ).toBeVisible();
     });
 
-    test.skip("Unconfirmed promotion expires and goes to next in line", async ({
-      request,
-    }) => {
+    test.skip("Unconfirmed promotion expires and goes to next in line", async () => {
       // TODO: Test expiration logic
     });
   });
@@ -142,23 +130,17 @@ test.describe("Waitlist Promotion Integration", () => {
       expect(response.status()).toBe(409); // Conflict
     });
 
-    test.skip("Promotion skips members who cancelled waitlist position", async ({
-      request,
-    }) => {
+    test.skip("Promotion skips members who cancelled waitlist position", async () => {
       // TODO: Test cancelled waitlist handling
     });
 
-    test.skip("Event capacity increase promotes multiple members", async ({
-      request,
-    }) => {
+    test.skip("Event capacity increase promotes multiple members", async () => {
       // TODO: Test capacity increase scenario
       // Increase event capacity by 5
       // Verify 5 waitlisted members are promoted
     });
 
-    test.skip("Waitlist is cleared when event is cancelled", async ({
-      request,
-    }) => {
+    test.skip("Waitlist is cleared when event is cancelled", async () => {
       // TODO: Test event cancellation impact
     });
   });

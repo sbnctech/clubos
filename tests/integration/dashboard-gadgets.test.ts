@@ -49,11 +49,11 @@ test.describe("Dashboard Gadget Integration", () => {
       ).toBeVisible();
     });
 
-    test.skip("Events are sorted by date (soonest first)", async ({ page }) => {
+    test.skip("Events are sorted by date (soonest first)", async () => {
       // TODO: Verify sort order
     });
 
-    test.skip("Register button navigates to event detail", async ({ page }) => {
+    test.skip("Register button navigates to event detail", async () => {
       // TODO: Test registration flow entry point
     });
   });
@@ -85,13 +85,11 @@ test.describe("Dashboard Gadget Integration", () => {
       await expect(item.locator('[data-test-id="registration-status"]')).toBeVisible();
     });
 
-    test.skip("Waitlisted registrations show position", async ({ page }) => {
+    test.skip("Waitlisted registrations show position", async () => {
       // TODO: Verify waitlist position display
     });
 
-    test.skip("Cancel button available for confirmed registrations", async ({
-      page,
-    }) => {
+    test.skip("Cancel button available for confirmed registrations", async () => {
       // TODO: Test cancel action availability
     });
   });
@@ -105,13 +103,11 @@ test.describe("Dashboard Gadget Integration", () => {
       ).toBeVisible();
     });
 
-    test.skip("Announcements are ordered by date (newest first)", async ({
-      page,
-    }) => {
+    test.skip("Announcements are ordered by date (newest first)", async () => {
       // TODO: Verify sort order
     });
 
-    test.skip("Unread announcements are highlighted", async ({ page }) => {
+    test.skip("Unread announcements are highlighted", async () => {
       // TODO: Test unread indicator
     });
   });
@@ -127,47 +123,45 @@ test.describe("Dashboard Gadget Integration", () => {
   });
 
   test.describe("Recent Photos Gadget (Future)", () => {
-    test.skip("Gadget displays recent photo thumbnails", async ({ page }) => {
+    test.skip("Gadget displays recent photo thumbnails", async () => {
       // TODO: Implement when recent-photos gadget exists
     });
 
-    test.skip("Photo click opens lightbox or gallery", async ({ page }) => {
+    test.skip("Photo click opens lightbox or gallery", async () => {
       // TODO: Test photo interaction
     });
   });
 
   test.describe("Quick Actions Gadget (Future)", () => {
-    test.skip("Gadget displays action buttons", async ({ page }) => {
+    test.skip("Gadget displays action buttons", async () => {
       // TODO: Implement when quick-actions gadget exists
     });
 
-    test.skip("Actions navigate to correct destinations", async ({ page }) => {
+    test.skip("Actions navigate to correct destinations", async () => {
       // TODO: Test each action link
     });
   });
 
   test.describe("Gadget Error Handling", () => {
-    test.skip("Gadget shows error state on API failure", async ({ page }) => {
+    test.skip("Gadget shows error state on API failure", async () => {
       // TODO: Mock API failure and verify error display
     });
 
-    test.skip("Gadget shows retry button on error", async ({ page }) => {
+    test.skip("Gadget shows retry button on error", async () => {
       // TODO: Test retry functionality
     });
 
-    test.skip("Other gadgets continue working if one fails", async ({
-      page,
-    }) => {
+    test.skip("Other gadgets continue working if one fails", async () => {
       // TODO: Test isolation - one gadget error doesn't break others
     });
   });
 
   test.describe("Gadget Loading States", () => {
-    test.skip("Gadget shows loading spinner during fetch", async ({ page }) => {
+    test.skip("Gadget shows loading spinner during fetch", async () => {
       // TODO: Test loading state visibility
     });
 
-    test.skip("Loading state transitions to content", async ({ page }) => {
+    test.skip("Loading state transitions to content", async () => {
       // TODO: Verify transition from loading to content
     });
   });
@@ -191,9 +185,7 @@ test.describe("Dashboard Gadget Integration", () => {
       ).toBeVisible();
     });
 
-    test.skip("Gadgets maintain layout on different viewports", async ({
-      page,
-    }) => {
+    test.skip("Gadgets maintain layout on different viewports", async () => {
       // TODO: Test responsive behavior of gadget grid
     });
   });

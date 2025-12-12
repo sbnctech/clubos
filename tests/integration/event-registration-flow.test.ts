@@ -152,13 +152,11 @@ test.describe("Event Registration Flow Integration", () => {
   });
 
   test.describe("Registration Confirmation", () => {
-    test.skip("Member sees confirmation after successful registration", async ({
-      page,
-    }) => {
+    test.skip("Member sees confirmation after successful registration", async () => {
       // TODO: Implement confirmation UI test
     });
 
-    test.skip("Member receives email confirmation", async ({ page }) => {
+    test.skip("Member receives email confirmation", async () => {
       // TODO: Implement email verification (may need mock)
     });
 
@@ -194,9 +192,7 @@ test.describe("Event Registration Flow Integration", () => {
       expect(response.ok()).toBeTruthy();
     });
 
-    test.skip("Cancelled registration frees up spot for waitlist", async ({
-      request,
-    }) => {
+    test.skip("Cancelled registration frees up spot for waitlist", async () => {
       // TODO: Verify waitlist promotion trigger
     });
   });

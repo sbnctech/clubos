@@ -5,7 +5,7 @@ export async function POST(req: NextRequest) {
   let body: EmailLogEntryInput = {};
   try {
     body = await req.json();
-  } catch (_err) {
+  } catch {
     body = {};
   }
 
