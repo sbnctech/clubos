@@ -1,0 +1,284 @@
+2025-12-12 10:13 PST
+Recommended Test Cases
+
+  1. 401 Tests:
+    - No Authorization header → 401 with "Missing or invalid
+  authorization header"
+    - Authorization: Basic abc123 → 401 (wrong scheme)
+    - Authorization: Bearer (no token) → 401
+    - Authorization: Bearer invalid-token-xyz → 401 with "Invalid
+  or expired token"
+  2. 403 Tests:
+    - Valid member token on admin endpoint → 403 with "Admin
+  access required"
+    - Valid member token on event they don't own → 403 with "You
+  do not have permission..."
+    - Event chair trying to delete → 403 with "Only administrators
+   can delete events"
+  3. Role Escalation Tests:
+    - Member cannot access /api/admin/* endpoints
+    - Event chair can only access their own events via detail
+  endpoints
+
+  Summary of Recommendations
+
+  1. Keep 401/403 distinction - current implementation is correct
+  2. Keep separate messages for missing vs invalid tokens - aids
+  debugging
+  3. Accept role exposure for internal tool, but standardize
+  message format
+  4. Standardize error shape to always include both error and
+  message
+  5. Fix case inconsistency - always use Title Case for error
+  field
+  6. Add trivial fix to route files that use minimal error format
+
+RBAC Test Matrix Complete
+
+  File: docs/testing/RBAC_TEST_MATRIX.md
+
+  Coverage Summary
+
+  | Category               | Covered | Missing | Total |
+  |------------------------|---------|---------|-------|
+  | Events - View          | 2       | 4       | 6     |
+  | Events - Edit          | 0       | 3       | 3     |
+  | Events - Delete        | 0       | 1       | 1     |
+  | Registrations - View   | 0       | 6       | 6     |
+  | Registrations - Edit   | 0       | 4       | 4     |
+  | Registrations - Delete | 0       | 1       | 1     |
+  | Registrations - Create | 0       | 2       | 2     |
+  | TOTAL                  | 2       | 21      | 23    |
+
+  Prioritization
+
+  P0 — Day 4 Must-Have:
+  - Unauthenticated access returns 401 on all admin routes
+  - MEMBER role denied on admin endpoints (403)
+  - ADMIN role granted on admin endpoints (200)
+
+  P1 — Day 4 Should-Have:
+  - MEMBER self-register/cancel own registration
+  - ADMIN full CRUD on events/registrations
+
+  P2 — Day 5 (Deferred):
+  - VP_ACTIVITIES and EVENT_CHAIR committee roles
+  - Requires integrating CommitteeRole/RoleAssignment schema with
+  auth system
+
+  Key Finding
+
+  21 of 23 test cases are missing. The 2 covered tests verify
+  public endpoint functionality but don't test role enforcement.
+  All V1 admin routes have zero auth checks.
+  
+  
+  Summary: Event Chair Authorization Enforcement
+
+  Policy Enforced
+
+  | Rule                                     |
+  Implementation
+        | Status |
+  |------------------------------------------|------
+  --------------------------------------------------
+  -|--------|
+  | Event Chairs are NOT admins              | Token
+   test-member-{id} has globalRole: "member"
+   | ✅     |
+  | Chairs can view events they own          |
+  requireEventViewAccess checks eventChairId === 
+  memberId | ✅     |
+  | Chairs can edit events they own          |
+  requireEventEditAccess checks eventChairId === 
+  memberId | ✅     |
+  | Chairs cannot edit events they don't own |
+  Returns 403 Forbidden
+        | ✅     |
+  | Chairs cannot delete any events          |
+  requireEventDeleteAccess is admin-only
+        | ✅     |
+
+  API Routes Protected
+
+  | Route                  | Method | Guard
+             | Behavior                           |
+  |------------------------|--------|---------------
+  -----------|------------------------------------|
+  | /api/admin/events/[id] | GET    |
+  requireEventViewAccess   | Admin: all events;
+  Chair: own only |
+  | /api/admin/events/[id] | PATCH  |
+  requireEventEditAccess   | Admin: all events;
+  Chair: own only |
+  | /api/admin/events/[id] | DELETE |
+  requireEventDeleteAccess | Admin only; Chair: 403
+              |
+
+  Key Files
+
+  - src/lib/auth.ts - Base authentication (token
+  parsing)
+  - src/lib/eventAuth.ts - Event-specific ownership
+  checks
+  - src/app/api/admin/events/[id]/route.ts -
+  Protected route handlers
+  - tests/api/event-chair-access.spec.ts - 10
+  authorization tests
+
+  Test Coverage
+
+  ✓ Chair can view their own event
+  ✓ Chair can edit their own event
+  ✓ Chair cannot view another chair's event (403)
+  ✓ Chair cannot edit another chair's event (403)
+  ✓ Chair cannot view event with no chair (403)
+  ✓ Chair cannot delete their own event (403)
+  ✓ Admin can view any event
+  ✓ Admin can edit any event
+  ✓ Unauthenticated request returns 401
+  ✓ Non-chair member cannot access events (403)
+
+  ---
+  VP of Activities Authorization - Implementation 
+  Summary
+
+  Policy Implemented
+
+  Two VPs of Activities exist as peers with mutual 
+  trust.
+
+  | Action               | VP of Activities | Admin |
+  |----------------------|------------------|-------|
+  | View ALL events      |       Yes        |  Yes  |
+  | Edit ALL events      |       Yes        |  Yes  |
+  | Override Event Chair |       Yes        |  Yes  |
+  | Publish events       |       Yes        |  Yes  |
+  | Delete events        |        No        |  Yes  |
+
+  Code Changes
+
+  src/lib/auth.ts
+  - Added GlobalRole type: "admin" | "vp-activities" | 
+  "event-chair" | "member"
+  - Added test token support: test-vp-{id}, vp-token
+  - Added helper functions:
+    - canViewAllEvents(role) - admin or vp-activities
+    - canEditAnyEvent(role) - admin or vp-activities
+    - canPublishEvents(role) - admin or vp-activities
+    - canDeleteEvents(role) - admin only
+
+  src/lib/eventAuth.ts
+  - Added hasVPAccess(role) - returns true for admin or
+  vp-activities
+  - Updated requireEventViewAccess() - VP bypasses
+  ownership check
+  - Updated requireEventEditAccess() - VP bypasses
+  ownership check
+  - requireEventDeleteAccess() unchanged - still
+  admin-only
+  - Added requireVPOrAdmin() helper for route-level
+  checks
+
+  src/app/api/admin/events/route.ts
+  - Changed from requireAdmin to requireVPOrAdmin
+  - VP can now access admin events list
+
+  src/lib/eventScope.ts (new)
+  - Provides EventScopeContext type
+  - Helper functions for permission checking
+
+  Tests Added
+
+  tests/api/vp-activities-auth.spec.ts - 14 tests
+
+  | Test Category       | Tests
+                   |
+  |---------------------|-------------------------------
+  -----------------|
+  | Event List Access   | VP can access, sees all
+  events, member blocked |
+  | Event Detail Access | VP can view any event, even
+  unowned            |
+  | Event Edit Access   | VP can edit any event,
+  publish, member blocked |
+  | Event Delete Access | VP CANNOT delete (403), admin
+  only             |
+  | Error Messages      | Clear 403 messages, 401 for
+  unauthenticated    |
+
+  Enforcement Logic
+
+  Request -> requireAuth() -> check globalRole
+                                |
+                                v
+                           ┌────────────┐
+                           │   admin    │ -> Full access
+                           └────────────┘
+                                |
+                                v
+                       ┌────────────────┐
+                       │ vp-activities  │ -> View/Edit
+  ALL, no delete
+                       └────────────────┘
+                                |
+                                v
+                        ┌─────────────┐
+                        │ event-chair │ -> Own events
+  only
+                        └─────────────┘
+                                |
+                                v
+                          ┌──────────┐
+                          │  member  │ -> Published only
+                          └──────────┘
+
+───────────────────────────────────────────────────────────────────
+>  
+
+ Worker 6 Documentation & Diagrams - Complete
+
+  Commit: 4f4ab46 pushed to main
+
+  Files Created/Updated:
+
+  1. docs/rbac/AUTH_AND_RBAC.md (new)
+    - Plain-English explanation of authentication vs authorization
+    - ASCII diagram showing the two security layers
+    - Quick reference card for each role's capabilities
+    - Explanation of RBAC vs data ownership
+    - Error message guide (401 vs 403)
+  2. docs/rbac/ACTIVITIES_ROLES.md (new)
+    - Visual hierarchy diagram (Admin → VP → Chair → Events)
+    - Explanation of "mutual trust" philosophy
+    - Publication workflow diagram
+    - Scope rules with examples
+    - Common scenarios (Chair sick, VP fixes typo, etc.)
+    - Complete ASCII role permission flow
+  3. docs/HISTORY.md (updated)
+    - Added "Authentication and RBAC" milestone to timeline
+    - New section: "Authorization Design Decisions"
+    - Explains why mutual trust was chosen over strict approval
+    - Lists problems the VP scope model solves
+  4. docs/STORY.md (updated)
+    - New Chapter 8.5: "The Authorization Philosophy"
+    - Three options considered (Everyone Admin, Strict Approval,
+  Mutual Trust)
+    - Why mutual trust won
+    - The publication gate concept
+    - Scope boundary rationale
+  5. docs/INDEX.md (updated)
+    - New "Authorization & Access Control" section
+    - Links to all RBAC documentation
+
+  Key Diagrams Included:
+
+  - Role hierarchy (Admin → VP → Chair)
+  - Permission flow (Request → Auth → Role Check → Scope Check)
+  - Publication workflow (Draft → Review → Publish)
+  - RBAC vs Data Ownership comparison
+
+
+
+
+  
