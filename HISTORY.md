@@ -227,3 +227,102 @@ Whenever a new major phase or feature set is completed:
 HISTORY.md should grow slowly but steadily, mirroring how the
 system grows from prototype into production.
 
+
+## Day 2 — Deployment Tooling & Build Verification
+Calendar Day: Day 2
+Status: In progress (do not close)
+Scope: Tooling, CI/CD validation, no production activation
+
+### Summary
+Day 2 focused on validating deployment tooling and ensuring the ClubOS codebase builds and deploys cleanly in a hosted environment without introducing runtime configuration, data migrations, or production credentials.
+
+### Completed
+- Git repository clean and synced with main
+- ASCII documentation checks passing
+- Pre-push hooks verified
+- Vercel project connected to GitHub repo sbnctech/clubos
+- Next.js framework auto-detected by Vercel
+- Root Directory confirmed empty (repo-root app)
+- Full production build succeeded on Vercel
+- Prisma client generated during build
+- Static and dynamic routes generated correctly
+- Admin UI routes present (/admin/*)
+- API routes present (/api/* and /api/v1/*)
+- Local dev server verified with health endpoint returning {"status":"ok"}
+- No untracked or backup artifacts remain
+
+### Explicit Non-Actions
+- No environment variables configured
+- No database migrations run
+- No authentication providers enabled
+- No DNS or domain changes
+- No production data introduced
+
+### Current State
+- Deployment tooling validated
+- Project is deployable but not runtime-configured
+- System remains in safe pre-production posture
+
+### Next Planned Scope (Day 3, not started)
+- Environment variables
+- Runtime configuration (Prisma, auth, email)
+- Controlled activation of external dependencies
+
+
+---
+
+## Day 3 — Runtime Configuration & Environment Wiring
+Calendar Day: Day 3
+Status: Not started
+Scope: Environment variables, runtime services, controlled activation
+
+### Objectives
+- Define required environment variables (no secrets committed)
+- Prepare Prisma runtime configuration (no migrations yet)
+- Prepare auth/email/SMS wiring in disabled or test mode
+- Keep production safety guarantees intact
+
+### Guardrails
+- No destructive database actions
+- No live credentials enabled
+- No irreversible external integrations
+- All changes reversible
+
+### Planned Work Items
+- ENV variable inventory and documentation
+- Vercel environment setup (Preview only)
+- Runtime health verification
+- CI confirmation
+
+
+---
+
+## Day 2 — Tooling, CI Discipline, and Deployment Validation
+Calendar Day: Day 2
+Status: Complete (locked)
+
+### Accomplishments
+- Preflight tooling stabilized (lint, typecheck, build)
+- Pre-push hook updated to skip integration tests locally (CI responsibility)
+- ESLint errors resolved; warnings acknowledged and deferred
+- Build verified locally and on Vercel
+- Prisma client generation validated
+- Dev server verified with live health endpoint
+- No untracked or backup artifacts remain
+
+### Deployment Verification
+- Vercel build completed successfully
+- 39 static pages generated
+- 44 dynamic routes compiled
+- All /api and /api/v1 routes present
+- Admin UI routes verified
+- Build artifacts traced and deployed without error
+
+### Safety Posture
+- No database migrations executed
+- No production credentials enabled
+- No external services activated
+- No irreversible actions taken
+
+Day 2 closes with a clean, reproducible, deployable baseline.
+
