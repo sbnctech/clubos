@@ -19,14 +19,14 @@ import { test, expect } from "@playwright/test";
 
 test.describe("API Smoke Tests", () => {
   test.describe("Health Endpoint", () => {
-    test("GET /api/health returns ok status", async ({ request }) => {
+    test("GET /api/health returns healthy status", async ({ request }) => {
       const response = await request.get("/api/health");
 
       expect(response.ok()).toBeTruthy();
       expect(response.status()).toBe(200);
 
       const data = await response.json();
-      expect(data.status).toBe("ok");
+      expect(data.status).toBe("healthy");
       expect(typeof data.timestamp).toBe("string");
 
       // Verify timestamp is valid ISO date

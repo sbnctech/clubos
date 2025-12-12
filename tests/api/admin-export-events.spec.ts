@@ -19,23 +19,46 @@ test.describe("GET /api/admin/export/events", () => {
     expect(firstLine).toBe("id,title,category,startTime,registrationCount,waitlistedCount");
   });
 
-  test("includes Welcome Hike event with registration counts", async ({ request }) => {
+  test("includes seeded events with correct categories", async ({ request }) => {
     const response = await request.get(`${BASE}/api/admin/export/events`);
     const body = await response.text();
 
-    expect(body).toContain("Welcome Hike");
+    // Seed data includes these events
+    expect(body).toContain("Morning Hike at Rattlesnake Canyon");
+    expect(body).toContain("Welcome Coffee");
+    expect(body).toContain("Summer Beach Picnic");
     expect(body).toContain("Outdoors");
-    // e1 has 1 registration (r1 with status REGISTERED)
-    expect(body).toContain("e1,Welcome Hike,Outdoors,2025-06-01T09:00:00Z,1,0");
+    expect(body).toContain("Social");
   });
 
-  test("includes Wine Mixer event with waitlisted count", async ({ request }) => {
+  test("events include registration and waitlist counts", async ({ request }) => {
     const response = await request.get(`${BASE}/api/admin/export/events`);
     const body = await response.text();
+    const lines = body.split("\n").filter((line) => line.length > 0);
 
-    expect(body).toContain("Wine Mixer");
-    expect(body).toContain("Social");
-    // e2 has 1 registration (r2 with status WAITLISTED)
-    expect(body).toContain("e2,Wine Mixer,Social,2025-06-05T18:00:00Z,1,1");
+    // Skip header row
+    const dataLines = lines.slice(1);
+
+    // Morning Hike has 2 registrations (1 CONFIRMED, 1 WAITLISTED)
+    const hikeLine = dataLines.find((line) => line.includes("Morning Hike"));
+    expect(hikeLine).toBeDefined();
+    // Format: id,title,category,startTime,registrationCount,waitlistedCount
+    // Should have 2 registrations total, 1 waitlisted
+    expect(hikeLine).toMatch(/,2,1$/);
+  });
+
+  test("events are ordered by startTime", async ({ request }) => {
+    const response = await request.get(`${BASE}/api/admin/export/events`);
+    const body = await response.text();
+    const lines = body.split("\n").filter((line) => line.length > 0);
+
+    // Skip header row
+    const dataLines = lines.slice(1);
+
+    // Morning Hike (June 10) should come before Welcome Coffee (July 15)
+    const hikeIndex = dataLines.findIndex((line) => line.includes("Morning Hike"));
+    const coffeeIndex = dataLines.findIndex((line) => line.includes("Welcome Coffee"));
+
+    expect(hikeIndex).toBeLessThan(coffeeIndex);
   });
 });

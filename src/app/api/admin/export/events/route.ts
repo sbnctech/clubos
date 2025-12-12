@@ -1,19 +1,35 @@
 import { NextResponse } from "next/server";
-import { listEvents } from "@/lib/mockEvents";
-import {
-  countEventRegistrations,
-  countEventWaitlisted,
-} from "@/lib/mockRegistrations";
+import { prisma } from "@/lib/prisma";
+import { RegistrationStatus } from "@prisma/client";
 
+/**
+ * GET /api/admin/export/events
+ *
+ * Export all events as CSV with registration counts.
+ * Returns events ordered by startTime for deterministic output.
+ */
 export async function GET() {
-  const events = listEvents();
+  const events = await prisma.event.findMany({
+    include: {
+      registrations: {
+        select: {
+          status: true,
+        },
+      },
+    },
+    orderBy: { startTime: "asc" },
+  });
 
   const headerRow = "id,title,category,startTime,registrationCount,waitlistedCount";
 
   const dataRows = events.map((e) => {
-    const registrationCount = countEventRegistrations(e.id);
-    const waitlistedCount = countEventWaitlisted(e.id);
-    return `${e.id},${e.title},${e.category},${e.startTime},${registrationCount},${waitlistedCount}`;
+    const registrationCount = e.registrations.length;
+    const waitlistedCount = e.registrations.filter(
+      (r) => r.status === RegistrationStatus.WAITLISTED
+    ).length;
+    const category = e.category ?? "";
+    const startTime = e.startTime.toISOString();
+    return `${e.id},${e.title},${category},${startTime},${registrationCount},${waitlistedCount}`;
   });
 
   const csv = [headerRow, ...dataRows].join("\n") + "\n";

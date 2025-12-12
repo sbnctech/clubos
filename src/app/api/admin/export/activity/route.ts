@@ -1,39 +1,28 @@
 import { NextResponse } from "next/server";
-import { listRegistrations } from "@/lib/mockRegistrations";
-import { getMemberById } from "@/lib/mockMembers";
-import { listEvents } from "@/lib/mockEvents";
+import { prisma } from "@/lib/prisma";
 
+/**
+ * GET /api/admin/export/activity
+ *
+ * Export registration activity as CSV.
+ * Returns registrations ordered by registeredAt descending (most recent first).
+ */
 export async function GET() {
-  const allRegistrations = listRegistrations();
-  const allEvents = listEvents();
-  const eventById = new Map(allEvents.map((e) => [e.id, e]));
-
-  // Build activity items from registrations
-  const activity = allRegistrations.map((r) => {
-    const member = getMemberById(r.memberId);
-    const event = eventById.get(r.eventId);
-
-    return {
-      id: r.id,
-      type: "REGISTRATION",
-      memberId: r.memberId,
-      memberName: member
-        ? `${member.firstName} ${member.lastName}`
-        : "Unknown member",
-      eventId: r.eventId,
-      eventTitle: event ? event.title : "Unknown event",
-      status: r.status,
-      registeredAt: r.registeredAt,
-    };
+  const registrations = await prisma.eventRegistration.findMany({
+    include: {
+      member: true,
+      event: true,
+    },
+    orderBy: { registeredAt: "desc" },
   });
-
-  // Sort by registeredAt descending (most recent first)
-  activity.sort((a, b) => b.registeredAt.localeCompare(a.registeredAt));
 
   const headerRow = "id,type,memberId,memberName,eventId,eventTitle,status,registeredAt";
 
-  const dataRows = activity.map((a) => {
-    return `${a.id},${a.type},${a.memberId},${a.memberName},${a.eventId},${a.eventTitle},${a.status},${a.registeredAt}`;
+  const dataRows = registrations.map((r) => {
+    const memberName = `${r.member.firstName} ${r.member.lastName}`;
+    const eventTitle = r.event.title;
+    const registeredAt = r.registeredAt.toISOString();
+    return `${r.id},REGISTRATION,${r.memberId},${memberName},${r.eventId},${eventTitle},${r.status},${registeredAt}`;
   });
 
   const csv = [headerRow, ...dataRows].join("\n") + "\n";

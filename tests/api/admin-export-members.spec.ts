@@ -19,11 +19,26 @@ test.describe("GET /api/admin/export/members", () => {
     expect(firstLine).toBe("id,name,email,status,joinedAt,phone");
   });
 
-  test("includes Alice and Bob", async ({ request }) => {
+  test("includes seeded members (Alice Chen, Carol Johnson)", async ({ request }) => {
     const response = await request.get(`${BASE}/api/admin/export/members`);
     const body = await response.text();
 
-    expect(body).toContain("Alice Johnson");
-    expect(body).toContain("Bob Smith");
+    // Seed data contains Alice Chen and Carol Johnson
+    expect(body).toContain("Alice Chen");
+    expect(body).toContain("Carol Johnson");
+  });
+
+  test("members are ordered by lastName, firstName", async ({ request }) => {
+    const response = await request.get(`${BASE}/api/admin/export/members`);
+    const body = await response.text();
+    const lines = body.split("\n").filter((line) => line.length > 0);
+
+    // Skip header row
+    const dataLines = lines.slice(1);
+
+    // Chen comes before Johnson alphabetically
+    expect(dataLines.length).toBeGreaterThanOrEqual(2);
+    expect(dataLines[0]).toContain("Alice Chen");
+    expect(dataLines[1]).toContain("Carol Johnson");
   });
 });

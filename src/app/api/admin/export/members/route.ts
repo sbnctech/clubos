@@ -1,14 +1,28 @@
 import { NextResponse } from "next/server";
-import { getActiveMembers } from "@/lib/mockMembers";
+import { prisma } from "@/lib/prisma";
 
+/**
+ * GET /api/admin/export/members
+ *
+ * Export all members as CSV.
+ * Returns members ordered by lastName, firstName for deterministic output.
+ */
 export async function GET() {
-  const members = getActiveMembers();
+  const members = await prisma.member.findMany({
+    include: {
+      membershipStatus: true,
+    },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+  });
 
   const headerRow = "id,name,email,status,joinedAt,phone";
 
   const dataRows = members.map((m) => {
     const name = `${m.firstName} ${m.lastName}`;
-    return `${m.id},${name},${m.email},${m.status},${m.joinedAt},${m.phone}`;
+    const status = m.membershipStatus.code;
+    const joinedAt = m.joinedAt.toISOString();
+    const phone = m.phone ?? "";
+    return `${m.id},${name},${m.email},${status},${joinedAt},${phone}`;
   });
 
   const csv = [headerRow, ...dataRows].join("\n");
