@@ -220,3 +220,84 @@ Even if we used Google Photos as storage, these are not practically achievable w
 - We can architect the widget so photo binaries are stored on our server now, but storage can later be swapped (SmugMug or other) without rewriting the entire feature.  
 - Google Photos is not a practical target for "embed our private metadata and replicate our SBNC face-labeling functionality inside Google Photos."  
 - SmugMug is a more plausible external host than Google Photos for gallery delivery, but RBAC and SBNC-specific metadata still need to be enforced and stored by ClubOS.  
+
+## SmugMug: can we reuse their UI to reduce software we maintain?
+
+### Summary
+Yes, SmugMug can reduce the amount of gallery UI we maintain (album browsing, lightbox viewer, slideshow, theming, delivery/CDN),
+but it cannot enforce SBNC-specific governance (RBAC, membership-based access decisions, face labeling opt-outs, audit logs).
+If we use SmugMug, ClubOS must remain the system-of-record for identity, RBAC, and SBNC metadata, and should be the enforcement point
+for "who can see what."
+
+### What SmugMug can help with
+SmugMug can provide:
+- A polished album/gallery browsing UI and lightbox viewer.
+- Theming and layout configuration on the SmugMug side.
+- Hosting and image delivery (including derivatives/resizing and fast delivery).
+- Some protective controls (eg, discourage downloads), depending on plan/features.
+
+This can significantly reduce custom UI code compared to a fully bespoke gallery.
+
+### What SmugMug cannot practically do for SBNC
+Even if SmugMug hosts the photos and provides the viewer UI, it cannot natively implement:
+- ClubOS membership-based access control ("only current SBNC members may view").
+- SBNC role-based edit permissions for face labels ("Photo Editor" role).
+- SBNC-wide opt-out rules for face labeling and face search.
+- An SBNC audit trail for labeling and moderation actions.
+- "Hide photos containing member X" enforced for SBNC viewers (even if we keep this disabled by policy).
+
+Therefore, if we embed SmugMug UI directly, we should assume we are giving up strong guarantees that access is controlled solely by ClubOS.
+
+### Viable integration patterns
+
+#### Pattern A (recommended): SmugMug for storage/delivery, ClubOS for policy and metadata
+- Photo binaries and albums live in SmugMug.
+- ClubOS stores all SBNC metadata:
+  - face labels (including status: suggested/confirmed/rejected)
+  - member privacy preferences (opt-out controls)
+  - audit logs
+  - optional photo visibility overrides (future)
+- ClubOS provides the member-facing experience:
+  - browse events/albums
+  - search by member name (if permitted)
+  - enforce opt-out rules
+  - enforce RBAC and membership gating
+- ClubOS can deep-link to SmugMug viewer for specific albums/photos when appropriate, but the "front door" remains ClubOS.
+
+Pros:
+- Strong governance and privacy controls remain centralized in ClubOS.
+- SmugMug reduces storage/delivery burden and can reduce viewer UI work (if we choose to link-out or selectively embed).
+
+Cons:
+- Some UI is still maintained by ClubOS (at least the shell and policy-driven features).
+
+#### Pattern B (lower maintenance, weaker control): ClubOS gate page + embedded SmugMug UI
+- ClubOS requires login, then embeds a SmugMug gallery/slideshow.
+- SmugMug privacy is set to reduce public exposure (unlisted/password/private).
+
+Pros:
+- Minimal UI work for ClubOS.
+- Faster time-to-value.
+
+Cons (often a deal-breaker):
+- Once a SmugMug link/password is shared, ClubOS is no longer the effective enforcement mechanism.
+- SBNC-specific face labeling/search and audit cannot be enforced inside SmugMug.
+
+Conclusion: Pattern B is only acceptable if SBNC is comfortable with weaker access guarantees.
+
+### Design requirement for ClubOS: storage provider abstraction
+We should explicitly design the photo system so storage is swappable without rewriting the feature.
+
+Create a "PhotoStorageProvider" interface for:
+- putObject/getObject (or signed URL generation)
+- listObjects by event/album
+- deleteObject (admin-only)
+- resolveDisplayUrls for thumbnails and originals
+
+Providers:
+- LocalDiskProvider (initial: mail server storage)
+- SmugMugProvider (future)
+- Other providers (future)
+
+In all cases, SBNC metadata remains in ClubOS tables (face labels, preferences, audit logs).
+
