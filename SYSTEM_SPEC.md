@@ -265,6 +265,38 @@ Placeholder modules for future expansion:
 - Carpooling
 - Photo and media management
 - Volunteer management
+- Bill.com reimbursement workflow visibility (see docs/external/BILLCOM_REIMBURSEMENT_BACKLOG.md)
+
+----------------------------------------------------------------------
+
+12. External Systems and SSO
+
+ClubOS integrates with external systems for specialized functions while
+maintaining its role as the identity and authorization system of record.
+
+12.1 Requirements
+
+- ClubOS must support SSO for external system access where feasible.
+- External system access must be mapped to ClubOS roles and groups.
+- No core workflow may depend on a single departing volunteer.
+- Credentials for external systems must be owned by roles, not individuals.
+- Term transitions must include access review and credential rotation.
+
+12.2 Integration Patterns
+
+- OIDC/OAuth SSO (preferred for user access)
+- Webhook/API integration (for data sync)
+- Service accounts (break-glass only, documented and rotated)
+
+12.3 Current Integrations
+
+- JotForm: Event request form UI (transitioning to native ClubOS UI)
+- Bill.com: Reimbursement processing (QuickBooks remains accounting SOR)
+- QuickBooks: Accounting system of record
+
+See docs/external/EXTERNAL_SYSTEMS_AND_SSO_SPEC.md for the complete specification
+including JotForm migration plan, Bill.com integration flow, and term transition
+procedures.
 
 ----------------------------------------------------------------------
 
@@ -452,6 +484,44 @@ Testing:
 - Mock behavior must remain fully functional and testable until persistence is added.
 - Code written by agents must not assume that Prisma persistence is already wired.
 
+
+## Reporting and Chatbot Subsystem
+
+ClubOS provides a secure reporting interface for authorized users to query club data.
+
+### Query Modes
+
+1. **Sidebar Query Library**: 65 pretested, versioned questions scoped to roles
+2. **Ad Hoc Query Mode**: Free-form queries for Admin and ReportingAdmin roles only
+
+### Security Layers
+
+| Layer | Purpose |
+|-------|---------|
+| RBAC Gate | Validates user has role for query type |
+| Row-Level Security | Filters results by scope (self, committee, global) |
+| Column-Level Redaction | Omits/masks sensitive fields by role |
+| Audit Logging | Immutable log of all queries and exports |
+
+### Sensitive Data Handling
+
+- Payment tokens: **Never** exposed through reporting interface
+- Full card numbers: **Never** exposed regardless of role
+- PII (email, phone, address): Redacted/scoped based on role
+
+### Implementation Priority
+
+- P0: Sidebar library, RBAC gate, row-level security, audit logging
+- P1: Column redaction, result thresholds, query timeout
+- P2: Ad hoc mode, read replica, scheduled reports
+
+### Related Documents
+
+- `docs/reporting/REPORTING_CHATBOT_SYSTEM_SPEC.md` - Full specification
+- `docs/reporting/CHATBOT_QUERY_LIBRARY_V1.md` - 65 sidebar questions
+- `docs/rbac/AUTH_AND_RBAC.md` - Role definitions
+
+---
 
 ## Development Stages Checklist
 
