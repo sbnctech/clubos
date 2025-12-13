@@ -184,6 +184,84 @@ User Request: "Show me the events"
 
 ---
 
+## Evaluation Order
+
+When processing any request, ClubOS evaluates access in this order:
+
+```
+1. Authenticate user -----> 401 if failed
+        |
+        v
+2. Resolve roles and capabilities
+        |
+        v
+3. Apply scope rules (committee assignment)
+        |
+        v
+4. Apply delegation layer (if acting on behalf)
+        |
+        v
+5. Apply hard gates (agreements and releases)
+        |
+        v
+   ALLOW or DENY
+```
+
+Hard gates (step 5) are checked LAST and override all previous checks. A user may
+pass authentication, role, scope, and delegation checks but still be blocked by a
+missing or outdated agreement.
+
+---
+
+## Hard Gates: Agreements and Releases
+
+Certain actions require signed agreements regardless of role, scope, or delegation
+status. These are non-negotiable gates that cannot be bypassed by any role,
+including Admin.
+
+| Gate | Requirement | Applies To |
+|------|-------------|------------|
+| Membership Agreement | Current version required | Any event registration |
+| Media Rights Agreement | Current version required | Media-covered events only |
+| Guest Release | Guest-signed (non-delegable) | Events requiring guest release |
+| Partnership Consent | Both partners signed | Delegation/on-behalf actions |
+
+### Key Rules
+
+1. **Membership Agreement**: No event registration (self, partner, or admin-assisted)
+   without the current version of the Membership Agreement on file.
+
+2. **Media Rights Agreement**: No registration for events flagged as media-covered
+   without the current version of the Media Rights Agreement on file.
+
+3. **Guest Release**: For events requiring guest releases, the guest must sign
+   directly. A member cannot accept a guest release on behalf of a guest.
+   This is non-delegable.
+
+4. **Partnership Delegation Consent**: Partnership delegation is inactive until
+   BOTH partners have signed the partnership consent agreement. Either partner
+   may revoke at any time, immediately deactivating delegation.
+
+### Admin Does Not Bypass
+
+Admin role does not exempt a registrant from agreement requirements. When an Admin
+registers a member for an event, the system still checks that the member has the
+required agreements on file. Admin can record an admin-assisted acceptance but
+cannot skip the requirement.
+
+### Canonical Reference
+
+For agreement type definitions, versioning rules, acceptance tracking, and the
+data model, see the canonical document:
+
+- [Agreements and Consent Model](../agreements/AGREEMENTS_AND_CONSENT_MODEL.md)
+
+For gate enforcement rules in the context of event registration, see:
+
+- SYSTEM_SPEC.md - Agreement-Based Eligibility Gates section
+
+---
+
 ## Error Messages You Might See
 
 ### 401 Unauthorized

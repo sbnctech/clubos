@@ -268,6 +268,72 @@ Placeholder modules for future expansion:
 
 ----------------------------------------------------------------------
 
+12. Agreement-Based Eligibility Gates
+
+Certain actions require signed agreements regardless of role, scope, or delegation
+status. These gates are checked after all other authorization checks and cannot be
+bypassed.
+
+For the canonical agreement type definitions, versioning rules, and data model,
+see docs/agreements/AGREEMENTS_AND_CONSENT_MODEL.md.
+
+12.1 Gate Types
+
+Membership Agreement
+- Required for: Any event registration (self, partner, or admin-assisted)
+- Version requirement: Current version (effectiveDate <= now AND not deprecated)
+- If missing or outdated: Block registration with clear error message
+
+Media Rights Agreement
+- Required for: Registration to events flagged as media-covered (requiresMediaRights = true)
+- Version requirement: Current version
+- If missing or outdated: Block registration with clear error message
+- Note: Members who opt out of media rights cannot register for media-covered events
+
+Guest Release
+- Required for: Guest registration at events requiring guest release
+- Non-delegable: A member cannot accept this on behalf of a guest
+- The guest must accept directly (in-person or via guest registration flow)
+- If missing: Block guest registration
+
+Partnership Delegation Consent
+- Required for: One member to register on behalf of another (partner flows)
+- Bilateral: Both partners must have signed the current partnership consent
+- If either consent is missing or revoked: Delegation is inactive
+- Effect: Partner registration buttons/actions are disabled until both consent
+
+12.2 Gate Evaluation Order
+
+Agreement gates are evaluated AFTER all other authorization checks:
+
+1. Authenticate user (401 if failed)
+2. Resolve roles and capabilities
+3. Apply scope rules (committee assignment)
+4. Apply delegation layer (if acting on behalf)
+5. Apply agreement gates (this section)
+
+A user may pass steps 1-4 but still be blocked at step 5 if an agreement is
+missing, outdated, or revoked.
+
+12.3 Applicability
+
+These gates apply uniformly to:
+- Self actions (member registering themselves)
+- Partner on-behalf actions (partner registering for member via delegation)
+- Admin-assisted actions (admin registering a member)
+
+Admin role does not exempt a registrant from agreement requirements. An admin
+registering a member must ensure the member has the required agreements on file.
+
+12.4 Error Response
+
+When an agreement gate blocks an action, the response must include:
+- Which agreement is missing or outdated
+- What version is required
+- How to obtain or update the agreement
+
+----------------------------------------------------------------------
+
 END OF SYSTEM SPEC
 
 --------------------------------------------------
