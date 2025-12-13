@@ -265,6 +265,38 @@ Placeholder modules for future expansion:
 - Carpooling
 - Photo and media management
 - Volunteer management
+- Bill.com reimbursement workflow visibility (see docs/external/BILLCOM_REIMBURSEMENT_BACKLOG.md)
+
+----------------------------------------------------------------------
+
+12. External Systems and SSO
+
+ClubOS integrates with external systems for specialized functions while
+maintaining its role as the identity and authorization system of record.
+
+12.1 Requirements
+
+- ClubOS must support SSO for external system access where feasible.
+- External system access must be mapped to ClubOS roles and groups.
+- No core workflow may depend on a single departing volunteer.
+- Credentials for external systems must be owned by roles, not individuals.
+- Term transitions must include access review and credential rotation.
+
+12.2 Integration Patterns
+
+- OIDC/OAuth SSO (preferred for user access)
+- Webhook/API integration (for data sync)
+- Service accounts (break-glass only, documented and rotated)
+
+12.3 Current Integrations
+
+- JotForm: Event request form UI (transitioning to native ClubOS UI)
+- Bill.com: Reimbursement processing (QuickBooks remains accounting SOR)
+- QuickBooks: Accounting system of record
+
+See docs/external/EXTERNAL_SYSTEMS_AND_SSO_SPEC.md for the complete specification
+including JotForm migration plan, Bill.com integration flow, and term transition
+procedures.
 
 ----------------------------------------------------------------------
 
@@ -754,4 +786,51 @@ Event registration delegation (partner signups)
 - Third party email provider integration beyond a single outbound channel.
 
 These items may be added in future phases once the core public site and mail system are stable.
+
+----------------------------------------------------------------------
+
+## Agreements and Releases
+
+ClubOS enforces certain agreements as hard gates. Actions are blocked until the
+required agreements are satisfied.
+
+### Agreement Types
+
+- **Membership Agreement**: Required for all members. Cannot register for events without it.
+- **Media Rights Agreement**: Required for all members. Opt-out allowed but must be explicit.
+- **Partnership Delegation Agreement**: Bilateral. Partner A cannot act for Partner B unless B signed.
+- **Guest Release**: Event-scoped. Guest must sign directly; cannot be delegated.
+
+### Hard Gates
+
+Hard gates block actions when requirements are not met:
+
+1. **Event Registration Gate**: Members cannot register unless Membership Agreement AND Media Rights Agreement are signed.
+2. **Partnership Delegation Gate**: Partner A cannot register/cancel for Partner B unless B has granted delegation rights via signed agreement.
+3. **Guest Participation Gate**: Guests cannot participate in events requiring releases unless they have signed directly.
+
+### What Happens When Unmet
+
+- User sees clear message identifying which agreement is missing
+- Action is blocked (not just warned)
+- User is directed to signing flow
+- Admin override available for exceptional cases (logged)
+
+### Admin Views
+
+- Dashboard showing members missing required agreements
+- List of guests registered for release-required events who have not yet signed
+- Agreement signature history and audit trail
+- Export capability for compliance review
+
+### Key Rules
+
+- Delegation CANNOT override hard gates (Partner A cannot sign for Partner B)
+- Guest release is NON-DELEGABLE (member cannot sign for their guest)
+- Revocation of delegation is effective immediately
+- Agreement gates do not grant permissions; they only gate actions
+
+See docs/agreements/AGREEMENTS_SYSTEM_SPEC.md for full specification.
+
+----------------------------------------------------------------------
 

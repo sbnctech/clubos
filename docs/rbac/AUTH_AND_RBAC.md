@@ -238,6 +238,127 @@ A: An existing Admin must update your account. This is typically reserved for th
 
 ---
 
+## Partnership Delegation Layer
+
+Partnerships enable one member to act on behalf of another for specific actions.
+Delegation is evaluated AFTER role/scope checks but BEFORE hard gates.
+
+### Evaluation Order
+
+```
+Auth -> Roles -> Scope -> Delegation -> Hard Gates
+```
+
+### Delegation Modes
+
+Partnerships support these delegation modes:
+- **NONE**: No delegation. Each partner acts only for themselves.
+- **MUTUAL**: Either partner can act for either partner.
+- **PRIMARY_A**: Partner A can act for both; Partner B can only act for self.
+- **PRIMARY_B**: Partner B can act for both; Partner A can only act for self.
+- **INDEPENDENT**: Linked for household tracking but no delegation rights.
+
+### Scope of Delegation
+
+When delegation is granted, the delegating partner grants rights for:
+- Register for events (on behalf of partner)
+- Cancel event registrations (on behalf of partner)
+- Use partner's payment method on file
+
+### Bilateral Consent Requirement
+
+Both parties must sign a Partnership Delegation Agreement:
+- Partner A cannot act for Partner B unless B has signed
+- Partner B cannot act for Partner A unless A has signed
+- For MUTUAL mode, both must sign granting rights to each other
+- Agreement must be signed BEFORE delegation rights are effective
+
+### Revocation
+
+- Either partner can revoke delegation at any time
+- Revocation is effective IMMEDIATELY
+- No grace period
+- In-progress actions may complete; new actions are blocked
+- System logs revocation with timestamp and who revoked
+
+### Delegation Cannot Bypass Hard Gates
+
+Even with full delegation rights:
+- Partner A CANNOT sign agreements on behalf of Partner B
+- Partner A CANNOT register Partner B if B's required agreements are unsigned
+- Each member must satisfy their own agreement hard gates
+- Delegation expands WHO can act, not WHAT gates can be bypassed
+
+### Audit Trail
+
+Every delegated action must record:
+- acting_member_id: Who performed the action
+- affected_member_id: Whose record was changed
+- delegation_id: Which delegation relationship authorized this
+- timestamp
+- action_type
+
+---
+
+## Hard Gates (Agreement Enforcement)
+
+Hard gates are evaluated LAST in the authorization chain. A user may pass all role
+and delegation checks but still be blocked by an unmet hard gate.
+
+### Gate Types
+
+1. **Membership Agreement Gate**
+   - Blocks: Event registration
+   - Unmet message: "Please sign your Membership Agreement to continue"
+
+2. **Media Rights Agreement Gate**
+   - Blocks: Event registration
+   - Unmet message: "Please sign your Media Rights Agreement to continue"
+
+3. **Partnership Delegation Gate**
+   - Blocks: Acting on behalf of partner
+   - Unmet message: "Partner has not granted delegation rights"
+
+4. **Guest Release Gate**
+   - Blocks: Guest participation at check-in
+   - Unmet message: "Guest must sign release before participating"
+   - NON-DELEGABLE: Member cannot sign for their guest
+
+### Gate Evaluation Flow
+
+```
+User action requested
+        |
+        v
+   Auth check (401 if fail)
+        |
+        v
+   Role check (403 if fail)
+        |
+        v
+   Scope check (403 if fail)
+        |
+        v
+   Delegation check (403 if fail and acting for another)
+        |
+        v
+   Hard Gate check (blocked with specific message if fail)
+        |
+        v
+   Action proceeds
+```
+
+### Key Rules
+
+- Gates block the action; they do not warn
+- Clear message identifies which gate is unmet
+- Admin override available (logged with reason)
+- Gates do not grant permissions; they only gate actions
+
+See docs/agreements/AGREEMENTS_SYSTEM_SPEC.md for full specification.
+
+---
+
 ## For Developers
 
 See these technical documents:
