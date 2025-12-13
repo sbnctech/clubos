@@ -453,6 +453,44 @@ Testing:
 - Code written by agents must not assume that Prisma persistence is already wired.
 
 
+## Reporting and Chatbot Subsystem
+
+ClubOS provides a secure reporting interface for authorized users to query club data.
+
+### Query Modes
+
+1. **Sidebar Query Library**: 65 pretested, versioned questions scoped to roles
+2. **Ad Hoc Query Mode**: Free-form queries for Admin and ReportingAdmin roles only
+
+### Security Layers
+
+| Layer | Purpose |
+|-------|---------|
+| RBAC Gate | Validates user has role for query type |
+| Row-Level Security | Filters results by scope (self, committee, global) |
+| Column-Level Redaction | Omits/masks sensitive fields by role |
+| Audit Logging | Immutable log of all queries and exports |
+
+### Sensitive Data Handling
+
+- Payment tokens: **Never** exposed through reporting interface
+- Full card numbers: **Never** exposed regardless of role
+- PII (email, phone, address): Redacted/scoped based on role
+
+### Implementation Priority
+
+- P0: Sidebar library, RBAC gate, row-level security, audit logging
+- P1: Column redaction, result thresholds, query timeout
+- P2: Ad hoc mode, read replica, scheduled reports
+
+### Related Documents
+
+- `docs/reporting/REPORTING_CHATBOT_SYSTEM_SPEC.md` - Full specification
+- `docs/reporting/CHATBOT_QUERY_LIBRARY_V1.md` - 65 sidebar questions
+- `docs/rbac/AUTH_AND_RBAC.md` - Role definitions
+
+---
+
 ## Development Stages Checklist
 
 This section tracks implementation stages for ClubOS at the system level.

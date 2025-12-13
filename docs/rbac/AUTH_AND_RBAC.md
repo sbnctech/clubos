@@ -135,6 +135,28 @@ ClubOS currently uses four global roles (defined in `src/lib/auth.ts`):
 | Publish events | Yes | Yes | No | No |
 | Delete events | **Yes** | No | No | No |
 
+### Reporting and Query Permissions
+
+The reporting subsystem adds specialized permissions for data queries:
+
+| Role | Sidebar Queries | Ad Hoc Queries | Export | Max Rows |
+|------|:---------------:|:--------------:|:------:|:--------:|
+| Admin | All | Yes | 10000 | 5000 |
+| ReportingAdmin | All | Yes | 10000 | 5000 |
+| Finance Manager | Financial | No | 1000 | 1000 |
+| VP | Role-scoped | No | 1000 | 1000 |
+| Event Chair | Committee-scoped | No | 500 | 500 |
+| Member | Self-scoped | No | 100 | 100 |
+
+**ReportingAdmin** is a specialized role for users who need full reporting access without other Admin privileges. This role:
+
+- Can execute all sidebar queries regardless of scope
+- Can run ad hoc queries with guardrails
+- Cannot modify data, roles, or system configuration
+- All queries are audit logged
+
+See `docs/reporting/REPORTING_CHATBOT_SYSTEM_SPEC.md` for full reporting security model.
+
 ---
 
 ## How RBAC Differs from Data Ownership
