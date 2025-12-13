@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { getAdminEventById } from "@/server/admin/events";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -8,52 +8,14 @@ type PageProps = {
 export default async function EventDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  // Validate UUID format to avoid Prisma errors
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  if (!uuidRegex.test(id)) {
+  // Use server-side query module (NOT /api/admin/* - auth headers don't propagate)
+  const eventData = await getAdminEventById(id);
+
+  if (!eventData) {
     notFound();
   }
 
-  // Fetch event with registrations and member details directly from DB
-  const dbEvent = await prisma.event.findUnique({
-    where: { id },
-    include: {
-      registrations: {
-        include: {
-          member: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-            },
-          },
-        },
-        orderBy: {
-          registeredAt: "asc",
-        },
-      },
-    },
-  });
-
-  if (!dbEvent) {
-    notFound();
-  }
-
-  const event = {
-    id: dbEvent.id,
-    title: dbEvent.title,
-    category: dbEvent.category ?? "",
-    startTime: dbEvent.startTime.toISOString(),
-  };
-
-  const registrations = dbEvent.registrations.map((r) => ({
-    id: r.id,
-    memberId: r.memberId,
-    memberName: `${r.member.firstName} ${r.member.lastName}`,
-    status: r.status,
-    registeredAt: r.registeredAt.toISOString(),
-  }));
+  const { registrations, ...event } = eventData;
 
   return (
     <div data-test-id="admin-event-detail-root" style={{ padding: "20px" }}>
