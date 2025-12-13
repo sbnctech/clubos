@@ -13,3 +13,6 @@ tmp/mock-email-log.json
 test-results/
 tsconfig.tsbuildinfo
 .vercel/
+
+.DS_Store
+**/.DS_Store
