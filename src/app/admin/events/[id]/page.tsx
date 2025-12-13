@@ -1,29 +1,5 @@
 import { notFound } from "next/navigation";
-
-function getBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_BASE_URL) {
-    return process.env.NEXT_PUBLIC_BASE_URL;
-  }
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-  return "http://localhost:3000";
-}
-
-type Event = {
-  id: string;
-  title: string;
-  category: string;
-  startTime: string;
-};
-
-type Registration = {
-  id: string;
-  memberId: string;
-  memberName: string;
-  status: string;
-  registeredAt: string;
-};
+import { prisma } from "@/lib/prisma";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -31,27 +7,53 @@ type PageProps = {
 
 export default async function EventDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const base = getBaseUrl();
-  const res = await fetch(`${base}/api/admin/events/${id}`, {
-    cache: "no-store",
-  });
 
-  if (res.status === 404) {
+  // Validate UUID format to avoid Prisma errors
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!uuidRegex.test(id)) {
     notFound();
   }
 
-  if (!res.ok) {
-    return (
-      <div data-test-id="admin-event-detail-error" style={{ padding: "20px" }}>
-        <h1 style={{ fontSize: "24px", marginBottom: "12px" }}>Error</h1>
-        <p>Failed to load event details.</p>
-      </div>
-    );
+  // Fetch event with registrations and member details directly from DB
+  const dbEvent = await prisma.event.findUnique({
+    where: { id },
+    include: {
+      registrations: {
+        include: {
+          member: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+        orderBy: {
+          registeredAt: "asc",
+        },
+      },
+    },
+  });
+
+  if (!dbEvent) {
+    notFound();
   }
 
-  const data = await res.json();
-  const event: Event = data.event;
-  const registrations: Registration[] = data.registrations ?? [];
+  const event = {
+    id: dbEvent.id,
+    title: dbEvent.title,
+    category: dbEvent.category ?? "",
+    startTime: dbEvent.startTime.toISOString(),
+  };
+
+  const registrations = dbEvent.registrations.map((r) => ({
+    id: r.id,
+    memberId: r.memberId,
+    memberName: `${r.member.firstName} ${r.member.lastName}`,
+    status: r.status,
+    registeredAt: r.registeredAt.toISOString(),
+  }));
 
   return (
     <div data-test-id="admin-event-detail-root" style={{ padding: "20px" }}>

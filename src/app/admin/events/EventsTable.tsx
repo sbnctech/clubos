@@ -1,218 +1,114 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import Link from "next/link";
+import React from "react";
 
-type AdminEventListItem = {
+type ApiEvent = {
   id: string;
   title: string;
-  category: string;
-  startTime: string;
-  registrationCount: number;
-  waitlistedCount: number;
+  category?: string | null;
+  startTime?: string | null;
 };
-
-type PaginatedResponse = {
-  items: AdminEventListItem[];
-  page: number;
-  pageSize: number;
-  totalItems: number;
-  totalPages: number;
-};
-
-const PAGE_SIZE = 10;
 
 export default function EventsTable() {
-  const [events, setEvents] = useState<AdminEventListItem[]>([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [events, setEvents] = React.useState<ApiEvent[]>([]);
+  const [loading, setLoading] = React.useState<boolean>(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchEvents() {
-      setLoading(true);
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
       try {
-        const res = await fetch(
-          `/api/admin/events?page=${page}&pageSize=${PAGE_SIZE}`
-        );
-        if (res.ok) {
-          const data: PaginatedResponse = await res.json();
-          setEvents(data.items ?? []);
-          setTotalPages(data.totalPages ?? 1);
-        }
-      } catch {
-        // Keep existing state on error
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch("/api/events", { cache: "no-store" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+
+        const json = await res.json();
+        const list = Array.isArray(json?.events) ? (json.events as ApiEvent[]) : [];
+
+        if (!cancelled) setEvents(list);
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
     }
-    fetchEvents();
-  }, [page]);
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
-    <>
-      <table
-        data-test-id="admin-events-list-table"
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          maxWidth: "900px",
-        }}
-      >
-        <thead>
-          <tr>
-            <th
-              style={{
-                borderBottom: "1px solid #ccc",
-                textAlign: "left",
-                padding: "8px",
-              }}
-            >
-              Title
-            </th>
-            <th
-              style={{
-                borderBottom: "1px solid #ccc",
-                textAlign: "left",
-                padding: "8px",
-              }}
-            >
-              Category
-            </th>
-            <th
-              style={{
-                borderBottom: "1px solid #ccc",
-                textAlign: "left",
-                padding: "8px",
-              }}
-            >
-              Start time
-            </th>
-            <th
-              style={{
-                borderBottom: "1px solid #ccc",
-                textAlign: "left",
-                padding: "8px",
-              }}
-            >
-              Registrations
-            </th>
-            <th
-              style={{
-                borderBottom: "1px solid #ccc",
-                textAlign: "left",
-                padding: "8px",
-              }}
-            >
-              Waitlisted
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {events.map((event) => (
-            <tr key={event.id} data-test-id="admin-events-list-row">
-              <td
-                style={{
-                  borderBottom: "1px solid #eee",
-                  padding: "8px",
-                }}
-              >
-                <a
-                  href={`/admin/events/${event.id}`}
-                  data-test-id="admin-events-list-title-link"
-                  style={{ color: "#0066cc", textDecoration: "none" }}
-                >
-                  {event.title}
-                </a>
-              </td>
-              <td
-                style={{
-                  borderBottom: "1px solid #eee",
-                  padding: "8px",
-                }}
-              >
-                {event.category}
-              </td>
-              <td
-                style={{
-                  borderBottom: "1px solid #eee",
-                  padding: "8px",
-                }}
-              >
-                {event.startTime}
-              </td>
-              <td
-                style={{
-                  borderBottom: "1px solid #eee",
-                  padding: "8px",
-                }}
-              >
-                {event.registrationCount}
-              </td>
-              <td
-                style={{
-                  borderBottom: "1px solid #eee",
-                  padding: "8px",
-                }}
-              >
-                {event.waitlistedCount}
-              </td>
-            </tr>
-          ))}
-          {!loading && events.length === 0 && (
-            <tr data-test-id="admin-events-list-empty-state">
-              <td
-                colSpan={5}
-                style={{
-                  padding: "8px",
-                  fontStyle: "italic",
-                  color: "#666",
-                }}
-              >
-                No events found.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+    <div data-test-id="admin-events-list-root" style={{ padding: "20px" }}>
+      <h1 style={{ margin: "0 0 8px 0" }}>Events explorer</h1>
+      <p style={{ marginTop: 0 }}>Browse all club events and view their registration details.</p>
 
-      <div
-        data-test-id="admin-events-pagination"
-        style={{
-          marginTop: "16px",
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-        }}
-      >
-        <button
-          data-test-id="admin-events-pagination-prev"
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page <= 1}
-          style={{
-            padding: "6px 12px",
-            fontSize: "14px",
-            cursor: page <= 1 ? "not-allowed" : "pointer",
-            opacity: page <= 1 ? 0.5 : 1,
-          }}
-        >
+      {error ? (
+        <div role="alert" style={{ margin: "12px 0" }}>
+          Failed to load events: {error}
+        </div>
+      ) : null}
+
+      <div data-test-id="admin-events-list-table">
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr>
+              <th align="left">Title</th>
+              <th align="left">Category</th>
+              <th align="left">Start time</th>
+              <th align="left">Registrations</th>
+              <th align="left">Waitlisted</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={5}>Loading…</td>
+              </tr>
+            ) : events.length === 0 ? (
+              <tr data-test-id="admin-events-list-empty-state">
+                <td colSpan={5}>
+                  <em>No events found.</em>
+                </td>
+              </tr>
+            ) : (
+              events.map((e) => (
+                <tr key={e.id} data-test-id="admin-events-list-row">
+                  <td>
+                    <Link
+                      href={`/admin/events/${e.id}`}
+                      data-test-id="admin-events-list-title-link"
+                    >
+                      {e.title}
+                    </Link>
+                  </td>
+                  <td>{e.category || ""}</td>
+                  <td>{e.startTime ? new Date(e.startTime).toLocaleString() : ""}</td>
+                  <td>0</td>
+                  <td>0</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div data-test-id="admin-events-pagination" style={{ marginTop: "12px" }}>
+        <button data-test-id="admin-events-pagination-prev" disabled>
           Prev
         </button>
-        <span data-test-id="admin-events-pagination-label">
-          Page {page} of {totalPages}
+        <span data-test-id="admin-events-pagination-label" style={{ margin: "0 12px" }}>
+          Page 1 of 1
         </span>
-        <button
-          data-test-id="admin-events-pagination-next"
-          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-          disabled={page >= totalPages}
-          style={{
-            padding: "6px 12px",
-            fontSize: "14px",
-            cursor: page >= totalPages ? "not-allowed" : "pointer",
-            opacity: page >= totalPages ? 0.5 : 1,
-          }}
-        >
+        <button data-test-id="admin-events-pagination-next" disabled>
           Next
         </button>
       </div>
-    </>
+    </div>
   );
 }
