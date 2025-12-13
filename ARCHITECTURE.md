@@ -68,6 +68,30 @@ For now:
 
 This section is the authoritative reference for how the persistence layer is expected to behave in the current phase.
 
+## Server Components: Do Not Fetch /api/admin/*
+
+**Problem:** Next.js Server Components cannot propagate authentication headers or
+cookies to internal API routes. A `fetch("/api/admin/...")` from a Server Component
+arrives at the API handler without session context, resulting in "Unauthorized".
+
+**Solution:** Server Components must query the database directly via Prisma or call
+shared server modules. Do not use `fetch()` to hit `/api/admin/*` endpoints.
+
+**Pattern:**
+```typescript
+// BAD - fails with Unauthorized in Server Components
+const res = await fetch("/api/admin/events/123");
+
+// GOOD - use server module
+import { getAdminEventById } from "@/server/admin/events";
+const event = await getAdminEventById("123");
+```
+
+**Reference implementation:** `src/server/admin/events.ts`
+
+**ESLint guardrail:** The rule `no-restricted-syntax` blocks this pattern in
+`page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, and `not-found.tsx` files.
+
 ## Copyright
 
 Copyright (c) 2025 Santa Barbara Newcomers Club. All rights reserved.
