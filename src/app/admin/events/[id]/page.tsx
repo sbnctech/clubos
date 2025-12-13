@@ -1,29 +1,5 @@
 import { notFound } from "next/navigation";
-
-function getBaseUrl(): string {
-  if (process.env.NEXT_PUBLIC_BASE_URL) {
-    return process.env.NEXT_PUBLIC_BASE_URL;
-  }
-  if (typeof window !== "undefined") {
-    return window.location.origin;
-  }
-  return "http://localhost:3000";
-}
-
-type Event = {
-  id: string;
-  title: string;
-  category: string;
-  startTime: string;
-};
-
-type Registration = {
-  id: string;
-  memberId: string;
-  memberName: string;
-  status: string;
-  registeredAt: string;
-};
+import { getAdminEventById } from "@/server/admin/events";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -31,27 +7,15 @@ type PageProps = {
 
 export default async function EventDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const base = getBaseUrl();
-  const res = await fetch(`${base}/api/admin/events/${id}`, {
-    cache: "no-store",
-  });
 
-  if (res.status === 404) {
+  // Use server-side query module (NOT /api/admin/* - auth headers don't propagate)
+  const eventData = await getAdminEventById(id);
+
+  if (!eventData) {
     notFound();
   }
 
-  if (!res.ok) {
-    return (
-      <div data-test-id="admin-event-detail-error" style={{ padding: "20px" }}>
-        <h1 style={{ fontSize: "24px", marginBottom: "12px" }}>Error</h1>
-        <p>Failed to load event details.</p>
-      </div>
-    );
-  }
-
-  const data = await res.json();
-  const event: Event = data.event;
-  const registrations: Registration[] = data.registrations ?? [];
+  const { registrations, ...event } = eventData;
 
   return (
     <div data-test-id="admin-event-detail-root" style={{ padding: "20px" }}>
