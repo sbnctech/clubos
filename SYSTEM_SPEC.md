@@ -755,3 +755,100 @@ Event registration delegation (partner signups)
 
 These items may be added in future phases once the core public site and mail system are stable.
 
+---
+
+## Durable Business Rules (Harvested from Training Documents)
+
+This section codifies business rules extracted from organizational training
+materials. These rules represent institutional knowledge that must be preserved
+in ClubOS regardless of the underlying platform.
+
+Source: docs/WORKFLOW_REQUIREMENTS_HARVEST.md
+
+### Event Lifecycle Rules
+
+Event States:
+- Draft: Created but not visible
+- Published: Visible and accepting registrations
+- Registration Closed: Past registration deadline
+- Cancelled: Event will not occur (data preserved)
+- Completed: Event occurred
+- Deleted: Removed from system (NOT RECOMMENDED)
+
+Cancel vs Delete:
+- The system MUST prefer Cancel over Delete for events.
+- Cancel preserves registration history and triggers notifications.
+- Delete removes all data with no audit trail.
+- The system SHOULD display a warning when delete is attempted and recommend
+  cancel as the alternative.
+
+Registration Recovery:
+- If an event is accidentally deleted, the system should support manual
+  re-registration with audit notes.
+- Re-registered entries MUST be marked with a note indicating recovery.
+- The system MUST NOT re-charge members who already paid.
+
+### Waitlist Rules
+
+- When event capacity is reached, new registrations join the waitlist.
+- When a registered member cancels, the earliest waitlisted member is
+  automatically promoted (FIFO order).
+- Promoted members receive automatic notification via email (and optionally SMS).
+- Admin MAY manually promote a waitlisted member out of FIFO order for
+  documented special circumstances.
+
+### Committee and Leadership Rules
+
+Committee Storage Pattern:
+- Committee chairs are stored as Admin-level contacts (not regular members).
+- Naming convention: FirstName = Committee name, LastName = "{Name} Event_Chair"
+- Committee contacts MUST NOT be counted in member totals.
+- Chair names and emails stored in custom fields, not the contact's primary fields.
+
+Role Email Architecture:
+- Each leadership position has a stable role email (e.g., president@domain.org).
+- Role emails forward to the current holder's personal email.
+- Multiple co-chairs can share a role email (comma-separated destinations).
+- Role email addresses are permanent; only the forward destination changes.
+
+Leadership Transitions:
+- Transitions occur on term boundaries (Feb 1 or Aug 1 for SBNC).
+- The system SHOULD support transition workflows around these dates.
+- Minimum of 2 full administrators MUST be maintained at all times.
+- Admin access MUST be removed from outgoing officers.
+
+Committee Lifecycle:
+- Committees SHOULD be archived or marked "Lapsed", not deleted.
+- Inactive committees ("Going Dark") forward email to Activities VP.
+- Deactivation requires documentation of when, why, and who was last chair.
+
+### Approval Gates
+
+The following actions require explicit approval before execution:
+
+| Action | Approver | Reason |
+|--------|----------|--------|
+| Event activation | Activities VP | Content quality gate |
+| Refund execution | Finance Manager | Money movement authorization |
+| Committee deactivation | Activities VP | Impact on member programs |
+| Admin access grant | President or existing admin | Security control |
+| Event deletion | System warning + confirmation | Data preservation |
+
+### Email Forwarding Rules
+
+- After any email forward change, a test email MUST be sent.
+- New recipient MUST confirm receipt.
+- Old recipient SHOULD confirm non-receipt.
+- When a committee has no chair, forward to activities@ by default.
+
+### Event Submission Pipeline
+
+For events submitted by committees:
+1. Committee submits event request
+2. Activities VP approves content
+3. Posting team creates event in system
+4. Activities VP activates event
+5. Submitter receives confirmation
+
+This pipeline ensures content quality before events are visible to members.
+
