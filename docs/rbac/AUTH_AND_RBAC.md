@@ -71,14 +71,15 @@ Once ClubOS knows who you are, it checks what you're allowed to do.
 
 ## Understanding Roles
 
-### The Four Global Roles
+### The Five Global Roles
 
-ClubOS currently uses four global roles (defined in `src/lib/auth.ts`):
+ClubOS currently uses five global roles (defined in `src/lib/auth.ts`):
 
 | Role | Slug | What It Means | Example People |
 |------|------|---------------|----------------|
 | **Admin** | `admin` | Full access to everything | Tech Chair, Board Members |
 | **VP of Activities** | `vp-activities` | Can view/edit/publish all events | Sarah Martinez, John Kim |
+| **Finance Manager** | `finance-manager` | Manages refunds, fees, and financial workflows | Treasurer, designated finance volunteer |
 | **Event Chair** | `event-chair` | Manages events (scoping planned) | Alice (Hiking), Bob (Social) |
 | **Member** | `member` | Basic access, published events only | Regular club members |
 
@@ -110,6 +111,15 @@ ClubOS currently uses four global roles (defined in `src/lib/auth.ts`):
 +------------------+------------------------------------------+
 
 +------------------+------------------------------------------+
+| FINANCE MANAGER  |                                          |
+|                  |  - Approve/execute refunds               |
+|                  |  - Apply cancellation fees               |
+|                  |  - View financial transaction history    |
+|                  |  - Cannot delete events                  |
+|                  |  - See FINANCE_ROLES.md for details      |
++------------------+------------------------------------------+
+
++------------------+------------------------------------------+
 |   EVENT CHAIR    |                                          |
 |                  |  - (Scoped access planned for future)    |
 |                  |  - Currently same as Member              |
@@ -128,12 +138,14 @@ ClubOS currently uses four global roles (defined in `src/lib/auth.ts`):
 
 ### Permission Matrix (from code)
 
-| Permission | Admin | VP | Chair | Member |
-|------------|:-----:|:--:|:-----:|:------:|
-| View all events (incl. drafts) | Yes | Yes | No | No |
-| Edit any event | Yes | Yes | No | No |
-| Publish events | Yes | Yes | No | No |
-| Delete events | **Yes** | No | No | No |
+| Permission | Admin | VP | Finance | Chair | Member |
+|------------|:-----:|:--:|:-------:|:-----:|:------:|
+| View all events (incl. drafts) | Yes | Yes | No | No | No |
+| Edit any event | Yes | Yes | No | No | No |
+| Publish events | Yes | Yes | No | No | No |
+| Delete events | **Yes** | No | No | No | No |
+| Approve/execute refunds | Yes | No | Yes | No | No |
+| Apply cancellation fees | Yes | No | Yes | No | No |
 
 ---
 

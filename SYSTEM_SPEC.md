@@ -755,3 +755,51 @@ Event registration delegation (partner signups)
 
 These items may be added in future phases once the core public site and mail system are stable.
 
+----------------------------------------------------------------------
+
+## Observed Failures in Legacy Systems
+
+The following failure patterns were observed in prior systems and must be prevented in ClubOS:
+
+1. **Cancellation and substitution failures**: Event Chairs unable to execute cancellations or waitlist substitutions through the system. Resulted in escalations to email and manual workarounds. Members received inconsistent communication. No audit trail of who replaced whom.
+
+2. **Automatic refunds without oversight**: Refunds triggered automatically on cancellation without Finance Manager review. Inconsistent recording of refunds in the accounting system. Internal credits created that did not match QuickBooks, resulting in ghost credits and reconciliation risk.
+
+3. **Separation of duties not enforced**: Operational roles (Event Chair) and financial roles (Treasurer) not clearly separated. Money movement occurred without explicit authorization. Fee policies applied inconsistently across similar situations.
+
+ClubOS addresses these failures through the Finance Manager role, explicit workflow handoffs, and QuickBooks integration boundaries. See docs/rbac/FINANCE_ROLES.md and docs/QUICKBOOKS_INTEGRATION.md for details.
+
+----------------------------------------------------------------------
+
+## Finance Manager Role (Summary)
+
+ClubOS defines a first-class Finance Manager role with the following responsibilities:
+
+- Approve or deny refund requests
+- Apply cancellation fee policy
+- Execute refunds through payment processor
+- Ensure audit trail integrity
+- Reconcile against QuickBooks
+
+Separation of duties: Event Chair initiates cancellations and refund requests. Finance Manager authorizes and executes money movement. A cancellation is not a refund; these are separate, intentional actions.
+
+See docs/rbac/FINANCE_ROLES.md for the complete role specification.
+
+----------------------------------------------------------------------
+
+## QuickBooks Integration (Summary)
+
+QuickBooks is the system of record for all financial data. ClubOS integrates with QuickBooks but does not replace it.
+
+- ClubOS tracks workflow context and approvals
+- QuickBooks tracks accounting truth and the general ledger
+- Finalized transactions sync from ClubOS to QuickBooks with full context
+- Daily reconciliation validates processor, ClubOS, and QuickBooks alignment
+- Ghost credits (internal credit without QuickBooks entry) are a critical failure
+
+See docs/QUICKBOOKS_INTEGRATION.md for integration principles and sync flow.
+
+----------------------------------------------------------------------
+
+END OF SYSTEM SPEC
+
