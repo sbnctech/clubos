@@ -137,6 +137,72 @@ ClubOS currently uses four global roles (defined in `src/lib/auth.ts`):
 
 ---
 
+## Delegation Layer: Partnerships
+
+Partnerships are object-level delegated permissions applied after authentication.
+They enable one member to act on behalf of another for specific actions without
+granting global role privileges.
+
+### How Partnerships Fit into Authorization
+
+```
+User Request: "Register my partner for this event"
+                    |
+                    v
+         +-------------------+
+         |   RBAC Check      |
+         |   Can user access |
+         |   registration?   |
+         +-------------------+
+                    |
+                    v
+         +-------------------+
+         |   Partnership     |
+         |   Delegation      |
+         |   Check           |
+         +-------------------+
+                    |
+        +-----------+-----------+
+        |                       |
+        v                       v
+    NO delegation           Delegation exists
+    (can only act           (can act for partner
+     for self)               based on mode)
+```
+
+### Key Principles
+
+- Delegation does not grant global privileges. A member with a partnership
+  cannot access admin features or see other members' data just because they
+  have delegation rights.
+
+- Delegation only expands who may act on behalf of whom for specific actions:
+  - Event registration
+  - Event cancellation
+  - Payment method selection
+
+- Delegation must be logged and visible in audit trails. Every action taken
+  under delegation records both the acting member and the affected member.
+
+### Suggested Capability Hooks
+
+For implementation, the following capabilities may be checked:
+
+- events.registration.create_on_behalf: Can register another member for events
+- events.registration.cancel_on_behalf: Can cancel another member's registration
+- finance.payment.use_partner_method: Can use partner's payment method
+
+These capabilities are granted by active Partnership or Delegation records,
+not by global roles.
+
+### Reference
+
+See SYSTEM_SPEC.md section "Partnerships: Register, Pay, and Cancel on Behalf
+of a Partner" for the full specification including delegation modes, audit
+requirements, and guardrails.
+
+---
+
 ## How RBAC Differs from Data Ownership
 
 This is an important distinction:

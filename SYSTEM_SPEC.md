@@ -617,33 +617,118 @@ Members API contract (initial)
     - Seed known test records (e.g., sample members), or
     - Assert more generic conditions (shape and semantics) instead of hardcoded names.
 
-Event registration delegation (partner signups)
+Partnerships: Register, Pay, and Cancel on Behalf of a Partner
 
-- Requirement:
-  - A member should be able to delegate rights to another member to register them for events.
-  - Primary use case:
-    - Two partners in the same household who are both members want either partner to be able to sign up both of them for an event.
-- Early model sketch:
-  - Delegation is represented explicitly in the data model as:
-    - Delegation:
-      - id
-      - grantorContactId (the member who is delegating)
-      - delegateContactId (the member who is allowed to register on their behalf)
-      - scope (initially: EVENT_REGISTRATION)
-      - activeFrom, activeTo (optional; for future time-bounded delegation)
-  - Business rules (initial):
-    - Both grantor and delegate must be valid members.
-    - UI should make the household/partner use case easy, but the data model should not be limited only to couples.
-    - When a delegate registers for an event, the system:
-      - Records both who is ATTENDING and who performed the ACTION (delegate).
-      - Enforces event-level limits (per-member, per-household, etc.) based on attendees, not the delegate.
-- Implementation stages:
-  - Stage 1: Document requirement and data model concept (this note).
-  - Stage 2: Add Delegation model to Prisma schema (behind a feature flag or non-blocking migration).
-  - Stage 3: Extend event registration API to honor delegations.
-  - Stage 4: Add UI affordances so a member can:
-    - Grant or revoke delegation to another member.
-    - See who they can act on behalf of.
+Definition
+
+A partnership is a formal relationship between two members that enables one or
+both partners to act on behalf of the other for specific actions. Each member
+retains a separate identity, contact record, and membership status. Partnerships
+do not merge accounts; they add delegated permissions.
+
+Primary use case: Two partners in the same household who are both members want
+either partner to be able to register, pay, or cancel for both of them.
+
+Delegation Modes
+
+Partnerships support the following delegation modes:
+
+- None: No delegation. Each partner must act for themselves only.
+- Mutual: Either partner can act for either partner. Most common for couples.
+- Primary can act for both: One designated primary partner can act for both;
+  the secondary can only act for themselves.
+- Independent only: Explicit opt-out. Both partners are linked for household
+  tracking but neither can act on behalf of the other.
+
+The delegation mode is stored on the Partnership record and can be changed by
+either partner or by an admin.
+
+Actions Covered
+
+Partnerships enable delegation for the following actions:
+
+1. Register on behalf: Either partner may create event registrations for the
+   other (subject to delegation mode and event capacity rules).
+
+2. Cancel on behalf: Either partner may cancel event registrations for the
+   other. Cancellation does not automatically trigger a refund.
+
+3. Pay using partner payment method: Either partner may use a payment method
+   on file for the other partner when paying for registrations. This applies
+   to both self-registrations and registrations made on behalf of a partner.
+
+Note: Split tender (using two different cards for a single transaction) is a
+future enhancement. For now, a single payment method is used per transaction.
+
+Audit Requirements (Non-Negotiable)
+
+Every action taken under partnership delegation must record:
+
+- Acting member: The member who initiated the action
+- Affected member(s): The member(s) whose registration or payment was changed
+- Timestamp: When the action occurred
+- Event ID: The event involved
+- Registration ID(s): The registration(s) affected
+- Source: How the action was initiated (web UI, API, admin override, etc.)
+
+The audit trail must clearly distinguish between the actor and the affected
+party. This is required for compliance, support, and dispute resolution.
+
+Guardrails (Non-Negotiable)
+
+1. Cancellation is not a refund.
+
+   - A cancellation changes the registration status to CANCELLED.
+   - A cancellation may create a Pending Refund Request, but does not
+     automatically execute a refund.
+   - The Finance Manager reviews and decides on refund eligibility and amount.
+   - This separation of duties applies regardless of who initiated the
+     cancellation (member, partner, or Event Chair).
+
+2. Refund destination defaults to original payment method.
+
+   - Refunds are returned to the payment method used for the original
+     transaction, even if a partner paid on behalf of the registrant.
+   - Exceptions (such as refunding to a different method) require Finance
+     Manager approval and a logged reason code.
+
+3. Waitlist rules are independent of who initiated the action.
+
+   - If a cancellation opens a spot, waitlist promotion follows standard
+     priority rules regardless of whether the cancellation was initiated by
+     the registrant or their partner.
+
+Data Model Sketch
+
+Partnership:
+- id
+- partnerAContactId (first partner)
+- partnerBContactId (second partner)
+- delegationMode (NONE, MUTUAL, PRIMARY_A, PRIMARY_B, INDEPENDENT)
+- createdAt
+- updatedAt
+
+The Delegation model (for more general delegation beyond partnerships) remains:
+- id
+- grantorContactId
+- delegateContactId
+- scope (EVENT_REGISTRATION, EVENT_CANCELLATION, PAYMENT_METHOD_USE)
+- activeFrom, activeTo (optional; for time-bounded delegation)
+
+Both grantor and delegate must be valid members. The UI should make the
+household/partner use case easy, but the data model supports broader delegation
+scenarios beyond couples.
+
+Implementation Stages
+
+- Stage 1: Document requirement and data model (this section).
+- Stage 2: Add Partnership and Delegation models to Prisma schema.
+- Stage 3: Extend event registration API to honor partnership delegation.
+- Stage 4: Extend payment flow to allow partner payment method selection.
+- Stage 5: Add UI affordances so a member can:
+  - View and manage their partnership
+  - See who they can act on behalf of
+  - Select partner payment method at checkout
 
 ----------------------------------------------------------------
 
