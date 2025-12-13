@@ -755,3 +755,18 @@ Event registration delegation (partner signups)
 
 These items may be added in future phases once the core public site and mail system are stable.
 
+----------------------------------------------------------------------
+
+## Workflow Library
+
+Role-specific workflow documentation for operational procedures:
+
+- [Event Chair Workflow](docs/workflows/EVENT_CHAIR.md) - Cancellations, waitlist substitution, finance handoff
+- [Finance Manager Workflow](docs/workflows/FINANCE_MANAGER.md) - Refund lifecycle, cancellation fees, reconciliation
+- [Membership Manager Workflow](docs/workflows/MEMBERSHIP_MANAGER.md) - Status changes, approvals, communications
+
+These workflows define the operational procedures that ClubOS must support. Each document specifies the role, preconditions, steps, inputs, outputs, audit requirements, and failure modes for key business processes.
+
+----------------------------------------------------------------------
+
+END OF SYSTEM SPEC
