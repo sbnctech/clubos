@@ -1,4 +1,8 @@
-import { type QueryTemplateId } from "@/lib/query/templates";
+// Query template IDs (stub - will be replaced by actual template registry)
+export type QueryTemplateId =
+  | "EVT_UPCOMING_MEMBER"
+  | "REG_MY_UPCOMING"
+  | "MEM_DIRECTORY_MEMBER";
 
 export type ChatIntent =
   | { type: "HOW_TO"; topic: string }
@@ -22,7 +26,7 @@ export function routeChatMessage(message: string): ChatIntent {
 
 export function renderIntent(intent: ChatIntent): ChatResponse {
   if (intent.type === "HOW_TO") {
-    return { kind: "TEXT", text: `I can help with that. What are you trying to accomplish in the app?` };
+    return { kind: "TEXT", text: "I can help with that. What are you trying to accomplish in the app?" };
   }
   if (intent.type === "QUERY") {
     return { kind: "LIST", templateId: intent.templateId, title: "Here is what I found" };
