@@ -15,6 +15,8 @@ test.describe("Admin Registrations Filter", () => {
 
     // Seed data has 4 registrations
     const rows = page.locator('[data-test-id="admin-registrations-list-row"]');
+    await expect(rows.first()).toBeVisible();
+
     const count = await rows.count();
     expect(count).toBeGreaterThanOrEqual(1);
   });
@@ -22,10 +24,15 @@ test.describe("Admin Registrations Filter", () => {
   test("Confirmed only filter shows only CONFIRMED rows", async ({ page }) => {
     await page.goto(`${BASE}/admin/registrations`);
 
+    // Wait for initial data to load before interacting with filter
+    const rows = page.locator('[data-test-id="admin-registrations-list-row"]');
+    await expect(rows.first()).toBeVisible();
+
     const filterSelect = page.locator('[data-test-id="admin-registrations-filter-select"]');
     await filterSelect.selectOption(REGISTRATION_STATUS.CONFIRMED);
 
-    const rows = page.locator('[data-test-id="admin-registrations-list-row"]');
+    // Wait for filter to apply and verify at least one CONFIRMED row
+    await expect(rows.first()).toContainText(REGISTRATION_STATUS.CONFIRMED);
     const count = await rows.count();
     expect(count).toBeGreaterThanOrEqual(1);
 
