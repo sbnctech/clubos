@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 type TicketEligibility = {
   code: string;
@@ -29,11 +30,21 @@ type EligibilityResponse = {
 };
 
 export default function AdminEligibilityPage() {
+  const searchParams = useSearchParams();
+
   const [eventId, setEventId] = useState("");
   const [memberId, setMemberId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<EligibilityResponse | null>(null);
+
+  // Read eventId from URL search params on mount
+  useEffect(() => {
+    const urlEventId = searchParams.get("eventId");
+    if (urlEventId && !eventId) {
+      setEventId(urlEventId);
+    }
+  }, [searchParams, eventId]);
 
   async function handleLookup() {
     if (!eventId.trim()) {

@@ -1,4 +1,13 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+
+/**
+ * Check if admin eligibility visibility is enabled.
+ * Set FEATURE_ELIGIBILITY_ADMIN=1 in environment to enable.
+ */
+function isEligibilityAdminEnabled(): boolean {
+  return process.env.FEATURE_ELIGIBILITY_ADMIN === "1";
+}
 
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_BASE_URL) {
@@ -67,6 +76,39 @@ export default async function EventDetailPage({ params }: PageProps) {
           <span data-test-id="admin-event-detail-start-time">{event.startTime}</span>
         </div>
       </div>
+
+      {isEligibilityAdminEnabled() && (
+        <div
+          data-test-id="admin-event-eligibility-panel"
+          style={{
+            marginBottom: "24px",
+            padding: "12px 16px",
+            backgroundColor: "#f8f9fa",
+            border: "1px solid #dee2e6",
+            borderRadius: "4px",
+          }}
+        >
+          <strong>Eligibility</strong>
+          <p style={{ margin: "8px 0", fontSize: "14px", color: "#666" }}>
+            View ticket eligibility status for members attending this event.
+          </p>
+          <Link
+            href={`/admin/eligibility?eventId=${event.id}`}
+            data-test-id="admin-event-eligibility-link"
+            style={{
+              display: "inline-block",
+              padding: "6px 12px",
+              backgroundColor: "#0066cc",
+              color: "#fff",
+              textDecoration: "none",
+              borderRadius: "4px",
+              fontSize: "14px",
+            }}
+          >
+            View Eligibility
+          </Link>
+        </div>
+      )}
 
       <h2 style={{ fontSize: "18px", marginBottom: "12px" }}>Registrations</h2>
 
