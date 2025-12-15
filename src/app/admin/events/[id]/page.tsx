@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { EligibilityPanel } from "./EligibilityPanel";
 
 function getBaseUrl(): string {
   if (process.env.NEXT_PUBLIC_BASE_URL) {
@@ -155,6 +156,8 @@ export default async function EventDetailPage({ params }: PageProps) {
           )}
         </tbody>
       </table>
+
+      <EligibilityPanel eventId={event.id} />
     </div>
   );
 }
