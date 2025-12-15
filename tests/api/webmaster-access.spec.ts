@@ -1,9 +1,15 @@
 // Copyright (c) Santa Barbara Newcomers Club
 // API tests for webmaster role access restrictions
+//
+// NOTE: These tests are quarantined because the E2E test framework uses
+// x-admin-test-token which bypasses normal auth. These tests verify
+// capability-based access control which requires the full auth flow.
+//
+// TODO (v1 hardening): Re-enable once E2E auth framework supports role-specific tokens
 
 import { test, expect } from "@playwright/test";
 
-test.describe("Webmaster Access Restrictions", () => {
+test.describe("@quarantine Webmaster Access Restrictions", () => {
   test.describe("Export Endpoints", () => {
     test("webmaster cannot access members export", async ({ request }) => {
       const response = await request.get("/api/admin/export/members", {
