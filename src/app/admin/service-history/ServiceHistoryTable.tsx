@@ -11,10 +11,12 @@ type ServiceHistoryRecord = {
   roleTitle: string;
   committeeName: string | null;
   eventTitle: string | null;
+  eventId: string | null;
   termName: string | null;
   startAt: string;
   endAt: string | null;
   isActive: boolean;
+  createdByName: string | null;
 };
 
 type PaginatedResponse = {
@@ -48,6 +50,7 @@ export default function ServiceHistoryTable() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [forbidden, setForbidden] = useState(false);
   const [filters, setFilters] = useState<Filters>({
     serviceType: "",
     activeOnly: false,
@@ -56,6 +59,7 @@ export default function ServiceHistoryTable() {
   useEffect(() => {
     async function fetchRecords() {
       setLoading(true);
+      setForbidden(false);
       try {
         const params = new URLSearchParams({
           page: String(page),
@@ -69,6 +73,12 @@ export default function ServiceHistoryTable() {
         }
 
         const res = await fetch(`/api/v1/admin/service-history?${params}`);
+        if (res.status === 403) {
+          setForbidden(true);
+          setRecords([]);
+          setLoading(false);
+          return;
+        }
         if (res.ok) {
           const data: PaginatedResponse = await res.json();
           setRecords(data.items ?? []);
@@ -87,6 +97,29 @@ export default function ServiceHistoryTable() {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1); // Reset to first page on filter change
   };
+
+  // Render forbidden state if user lacks permission
+  if (forbidden) {
+    return (
+      <div
+        data-test-id="service-history-forbidden"
+        style={{
+          padding: "24px",
+          backgroundColor: "#fef2f2",
+          border: "1px solid #fecaca",
+          borderRadius: "8px",
+          textAlign: "center",
+        }}
+      >
+        <h2 style={{ color: "#991b1b", fontSize: "18px", marginBottom: "8px" }}>
+          Access Denied
+        </h2>
+        <p style={{ color: "#7f1d1d", fontSize: "14px" }}>
+          You do not have permission to view service history records.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <>
