@@ -3,6 +3,7 @@ import { listMockEmails, MockEmailEntry } from "@/lib/email";
 import SystemCommsPanel from "./SystemCommsPanel";
 import AdminSectionNav from "./AdminSectionNav";
 import AdminSearchPanel from "./AdminSearchPanel";
+import OrganizationalHealthPanel from "./OrganizationalHealthPanel";
 
 type Member = {
   id: string;
@@ -236,6 +237,17 @@ export default async function AdminPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section
+        id="admin-org-health-section"
+        data-test-id="admin-org-health-section"
+        style={{ marginBottom: "32px" }}
+      >
+        <h2 style={{ fontSize: "18px", marginBottom: "12px" }}>
+          Organizational health
+        </h2>
+        <OrganizationalHealthPanel />
       </section>
 
       <section
