@@ -11,7 +11,8 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
-    "next-env.d.ts",
+    &
+    ".netlify/**",
   ]),
   // Timezone guardrails: ban direct date formatting outside timezone.ts
   {
