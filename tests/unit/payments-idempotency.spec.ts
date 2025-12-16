@@ -99,20 +99,14 @@ describe("Payment Idempotency", () => {
     it("does not duplicate on rapid concurrent requests with same key", async () => {
       // First call returns null (intent doesn't exist)
       // Simulates a race condition where second request hits DB before first insert
-      let callCount = 0;
-      vi.mocked(prisma.paymentIntent.findUnique).mockImplementation(async () => {
-        callCount++;
-        if (callCount === 1) {
-          return null as never;
-        }
-        // Second call finds the intent created by first request
-        return {
+      vi.mocked(prisma.paymentIntent.findUnique)
+        .mockResolvedValueOnce(null as never)
+        .mockResolvedValueOnce({
           id: "first-intent-id",
           providerRef: "fake_pi_first",
           status: PaymentIntentStatus.CREATED,
           idempotencyKey: "race-key",
-        } as never;
-      });
+        } as never);
 
       vi.mocked(prisma.paymentIntent.create).mockResolvedValue({
         id: "first-intent-id",
