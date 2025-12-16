@@ -285,3 +285,146 @@ export async function auditMutation(
     },
   });
 }
+
+// ============================================================================
+// FAIL-CLOSED AUDIT ENFORCEMENT (Charter P9)
+// ============================================================================
+
+/**
+ * Error thrown when audit logging fails in fail-closed mode.
+ *
+ * Charter P9: Security must fail closed - if we cannot audit,
+ * we cannot allow the operation to succeed.
+ */
+export class AuditEnforcementError extends Error {
+  constructor(
+    message: string,
+    public readonly cause?: unknown
+  ) {
+    super(message);
+    this.name = "AuditEnforcementError";
+  }
+}
+
+/**
+ * Fail-closed audit entry creation.
+ *
+ * Unlike createAuditEntry which catches errors silently, this function
+ * throws an AuditEnforcementError if the audit log cannot be written.
+ *
+ * Charter P9: Security must fail closed - operations cannot succeed
+ * without a proper audit trail.
+ */
+export async function createAuditEntryRequired(
+  params: AuditEntryParams
+): Promise<void> {
+  const {
+    action,
+    resourceType,
+    resourceId,
+    actor,
+    req,
+    before,
+    after,
+    metadata,
+  } = params;
+
+  try {
+    const requestId = generateRequestId();
+
+    await prisma.auditLog.create({
+      data: {
+        action,
+        resourceType,
+        resourceId,
+        memberId: actor.memberId !== "e2e-admin" ? actor.memberId : null,
+        before: before ? JSON.parse(JSON.stringify(before)) : null,
+        after: after ? JSON.parse(JSON.stringify(after)) : null,
+        metadata: metadata
+          ? JSON.parse(JSON.stringify({ ...metadata, requestId }))
+          : { requestId },
+        ipAddress: getClientIp(req),
+        userAgent: req?.headers.get("user-agent") ?? null,
+      },
+    });
+
+    // Log for observability (Charter P7)
+    console.log(
+      `[AUDIT] ${action} ${resourceType}/${resourceId} by ${actor.email} (${actor.globalRole})`
+    );
+  } catch (error) {
+    // Charter P9: Fail closed - throw instead of swallowing
+    console.error("[AUDIT] CRITICAL: Failed to create required audit entry:", error);
+    throw new AuditEnforcementError(
+      `Failed to create audit entry for ${action} ${resourceType}/${resourceId}`,
+      error
+    );
+  }
+}
+
+/**
+ * Fail-closed audit mutation helper.
+ *
+ * This is the enforced version of auditMutation that implements Charter P9
+ * (Security must fail closed). If the audit log cannot be written, this
+ * function throws an AuditEnforcementError, preventing the operation from
+ * succeeding without an audit trail.
+ *
+ * Use this for critical operations where audit logging is mandatory:
+ * - Financial transactions
+ * - Role/permission changes
+ * - Data deletions
+ * - Security-sensitive operations
+ *
+ * Charter Principles:
+ * - P1: Identity and authorization must be provable
+ * - P7: Observability is a product feature
+ * - P9: Security must fail closed
+ * - N5: Never let automation mutate data without audit logs
+ *
+ * Usage:
+ * ```typescript
+ * export async function POST(req: NextRequest) {
+ *   const auth = await requireCapability(req, "users:manage");
+ *   if (!auth.ok) return auth.response;
+ *
+ *   // Perform mutation AFTER audit is guaranteed
+ *   // Or wrap in try/catch and only commit if audit succeeds
+ *
+ *   await auditMutationRequired(req, auth.context, {
+ *     action: "CREATE",
+ *     capability: "users:manage",
+ *     objectType: "TransitionPlan",
+ *     objectId: plan.id,
+ *     metadata: { targetTermId: plan.targetTermId },
+ *   });
+ *
+ *   return NextResponse.json({ plan }, { status: 201 });
+ * }
+ * ```
+ *
+ * @param req - The NextRequest object (for IP, user-agent extraction)
+ * @param auth - The authenticated AuthContext
+ * @param params - Audit mutation parameters
+ * @throws {AuditEnforcementError} If audit logging fails
+ */
+export async function auditMutationRequired(
+  req: NextRequest,
+  auth: AuthContext,
+  params: AuditMutationParams
+): Promise<void> {
+  const { action, capability, objectType, objectId, metadata } = params;
+
+  await createAuditEntryRequired({
+    action,
+    resourceType: objectType,
+    resourceId: objectId,
+    actor: auth,
+    req,
+    metadata: {
+      ...metadata,
+      capability,
+      actorRole: auth.globalRole,
+    },
+  });
+}

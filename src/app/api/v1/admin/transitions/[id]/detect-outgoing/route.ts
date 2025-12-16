@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth";
 import { errors } from "@/lib/api";
+import { auditMutationRequired, AuditEnforcementError } from "@/lib/audit";
 import { detectOutgoingAssignments } from "@/lib/serviceHistory";
 
 interface RouteParams {
@@ -26,11 +27,30 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
   try {
     const createdAssignments = await detectOutgoingAssignments(planId);
 
+    // Charter P9: Fail-closed audit logging for mutations
+    await auditMutationRequired(req, auth.context, {
+      action: "UPDATE",
+      capability: "users:manage",
+      objectType: "TransitionPlan",
+      objectId: planId,
+      metadata: {
+        operation: "detect-outgoing",
+        assignmentsCreated: createdAssignments.length,
+        assignmentIds: createdAssignments.map((a) => a.id),
+      },
+    });
+
     return NextResponse.json({
       message: `Detected ${createdAssignments.length} outgoing assignment(s)`,
       assignments: createdAssignments,
     });
   } catch (error) {
+    // Handle audit enforcement failure
+    if (error instanceof AuditEnforcementError) {
+      console.error("[AUDIT] Detect-outgoing failed due to audit failure:", error);
+      return errors.internal("Operation failed: audit logging unavailable");
+    }
+
     console.error("Error detecting outgoing assignments:", error);
     if (error instanceof Error) {
       if (error.message.includes("not found")) {
