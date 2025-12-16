@@ -99,20 +99,14 @@ describe("Payment Idempotency", () => {
     it("does not duplicate on rapid concurrent requests with same key", async () => {
       // First call returns null (intent doesn't exist)
       // Simulates a race condition where second request hits DB before first insert
-      let callCount = 0;
-      vi.mocked(prisma.paymentIntent.findUnique).mockImplementation(async () => {
-        callCount++;
-        if (callCount === 1) {
-          return null as never;
-        }
-        // Second call finds the intent created by first request
-        return {
+      vi.mocked(prisma.paymentIntent.findUnique)
+        .mockResolvedValueOnce(null as never)
+        .mockResolvedValueOnce({
           id: "first-intent-id",
           providerRef: "fake_pi_first",
           status: PaymentIntentStatus.CREATED,
           idempotencyKey: "race-key",
-        } as never;
-      });
+        } as never);
 
       vi.mocked(prisma.paymentIntent.create).mockResolvedValue({
         id: "first-intent-id",
@@ -274,19 +268,21 @@ describe("Payment Idempotency", () => {
 });
 
 describe("Production Safety", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("fake provider returns false for isAvailable in production", () => {
-    const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    // Use vitest stubEnv with type assertion to bypass TS readonly error
+    (vi.stubEnv as (key: string, value: string) => void)("NODE_ENV", "production");
 
     const provider = new FakePaymentProvider();
     expect(provider.isAvailable()).toBe(false);
-
-    process.env.NODE_ENV = originalEnv;
   });
 
   it("fake provider throws error on createPaymentIntent in production", async () => {
-    const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    // Use vitest stubEnv with type assertion to bypass TS readonly error
+    (vi.stubEnv as (key: string, value: string) => void)("NODE_ENV", "production");
 
     const provider = new FakePaymentProvider();
 
@@ -297,7 +293,5 @@ describe("Production Safety", () => {
         idempotencyKey: "test-key",
       })
     ).rejects.toThrow("Fake payment provider is not available in production");
-
-    process.env.NODE_ENV = originalEnv;
   });
 });
