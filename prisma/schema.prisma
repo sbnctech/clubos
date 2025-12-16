@@ -69,6 +69,23 @@ enum TransitionStatus {
   CANCELLED
 }
 
+enum FileVisibility {
+  BOARD
+  OFFICER
+  MEMBER
+  PUBLIC
+}
+
+enum FileObjectType {
+  EVENT
+  COMMITTEE
+  BOARD_RECORD
+  MEETING
+  TRANSITION_PLAN
+  PAGE
+  MEMBER
+}
+
 // Core Models
 
 model Member {
@@ -106,6 +123,7 @@ model Member {
   campaignsCreated MessageCampaign[]
   deliveryLogs     DeliveryLog[]
   auditLogs        AuditLog[]
+  filesUploaded    File[]
 
   @@index([membershipStatusId])
 }
@@ -767,5 +785,49 @@ model JobRun {
   @@index([jobName])
   @@index([status])
   @@index([scheduledFor])
+  @@index([createdAt])
+}
+
+// File - Uploaded files with object-scoped authorization
+// Charter P1/P2/P9: Identity, default-deny, fail closed
+model File {
+  id           String         @id @default(uuid()) @db.Uuid
+  objectType   FileObjectType
+  objectId     String         @db.Uuid
+  visibility   FileVisibility @default(MEMBER)
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  storageKey   String         @unique
+  uploadedById String         @db.Uuid
+  uploadedBy   Member         @relation(fields: [uploadedById], references: [id])
+  deletedAt    DateTime?
+  deletedById  String?        @db.Uuid
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  accessLogs FileAccessLog[]
+
+  @@index([objectType, objectId])
+  @@index([uploadedById])
+  @@index([storageKey])
+  @@index([deletedAt])
+}
+
+// FileAccessLog - Audit trail for file access
+model FileAccessLog {
+  id           String    @id @default(uuid()) @db.Uuid
+  fileId       String    @db.Uuid
+  file         File      @relation(fields: [fileId], references: [id])
+  accessedById String?   @db.Uuid
+  accessType   String
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([fileId])
+  @@index([accessedById])
   @@index([createdAt])
 }
