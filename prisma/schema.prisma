@@ -107,6 +107,10 @@ model Member {
   deliveryLogs     DeliveryLog[]
   auditLogs        AuditLog[]
 
+  // File management relations
+  filesUploaded    File[]            @relation("FilesUploaded")
+  fileAccessLogs   FileAccessLog[]   @relation("FileAccessLogs")
+
   @@index([membershipStatusId])
 }
 
@@ -745,6 +749,82 @@ model AuditLog {
   @@index([resourceType, resourceId])
   @@index([memberId])
   @@index([action])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// FILE MANAGEMENT WITH VISIBILITY-BASED AUTHORIZATION
+// Charter P2: Default-deny, object-scoped authorization
+// Charter P7: Observability - all file access is logged
+// ============================================================================
+
+// File visibility hierarchy: BOARD > OFFICER > MEMBER > PUBLIC
+enum FileVisibility {
+  BOARD   // Only board members (president, vp-activities, past-president)
+  OFFICER // Officers and above
+  MEMBER  // All authenticated members
+  PUBLIC  // No auth required
+}
+
+// Object types files can be associated with
+enum FileObjectType {
+  EVENT
+  COMMITTEE
+  BOARD_RECORD
+  MEETING
+  TRANSITION_PLAN
+  PAGE
+  MEMBER
+}
+
+// Access types for audit logging
+enum FileAccessType {
+  VIEW_METADATA
+  DOWNLOAD
+  SIGNED_URL
+}
+
+// File - Stored files with visibility-based authorization
+model File {
+  id           String         @id @default(uuid()) @db.Uuid
+  objectType   FileObjectType
+  objectId     String         @db.Uuid
+  visibility   FileVisibility @default(MEMBER)
+  filename     String // Display name
+  originalName String // Original uploaded filename
+  mimeType     String
+  size         Int // Bytes
+  storageKey   String         @unique // S3/storage path
+  uploadedById String         @db.Uuid
+  deletedAt    DateTime? // Soft delete
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  uploadedBy   Member          @relation("FilesUploaded", fields: [uploadedById], references: [id])
+  accessLogs   FileAccessLog[]
+
+  @@index([objectType, objectId])
+  @@index([visibility])
+  @@index([uploadedById])
+  @@index([deletedAt])
+}
+
+// FileAccessLog - Audit trail for file access (Charter P7)
+model FileAccessLog {
+  id           String         @id @default(uuid()) @db.Uuid
+  fileId       String         @db.Uuid
+  accessedById String?        @db.Uuid // null for anonymous/public access
+  accessType   FileAccessType
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime? // For signed URLs
+  createdAt    DateTime       @default(now())
+
+  file       File    @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  accessedBy Member? @relation("FileAccessLogs", fields: [accessedById], references: [id])
+
+  @@index([fileId])
+  @@index([accessedById])
   @@index([createdAt])
 }
 
