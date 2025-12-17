@@ -38,6 +38,13 @@ Signals that should be normal in the system:
 - It is normal to review action logs when something feels uncertain.
 
 ## What is not normal (red flags)
+
+- Silent failures where actions appear to succeed but nothing changes
+- Repeated manual work to fix the same issue without root cause review
+- Leaders avoiding actions due to fear of breaking the system
+- Missing or inconsistent signals (status, roles, permissions)
+- No audit trail for decisions that affect members
+- Emergency access or workarounds becoming routine
 - New members cannot find any viable events soon after joining.
 - Newbie reserved tickets are not released at the right time.
 - Signals do not flow through registration/email/events (status badges missing).
