@@ -15,6 +15,9 @@ playwright-report/
 test-results/
 playwright/.cache/
 
+# Migration reports
+scripts/migration/reports/*.json
+
 # Misc
 tmp/mock-email-log.json
 tsconfig.tsbuildinfo

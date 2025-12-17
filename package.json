@@ -18,6 +18,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:check-migrations": "bash scripts/ci/check-migration-safety.sh",
     "db:seed": "npx tsx prisma/seed.ts",
+    "migrate:dry-run": "npx tsx scripts/migration/migrate.ts --dry-run",
+    "migrate:live": "npx tsx scripts/migration/migrate.ts --live",
+    "migrate:reset": "npx tsx scripts/migration/reset-sandbox.ts",
     "postinstall": "prisma generate",
     "test:unit": "vitest run",
     "test:unit:coverage": "vitest run --coverage",
@@ -32,7 +35,8 @@
     "next": "^16.0.10",
     "pg": "^8.16.3",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "yaml": "^2.7.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
