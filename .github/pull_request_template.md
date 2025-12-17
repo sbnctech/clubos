@@ -13,6 +13,8 @@
 - [ ] `prisma generate` passes.
 - [ ] Code does not reference Prisma models/fields/enums that are not in `schema.prisma`.
 
+Note: CI requires DATABASE_URL during npm ci because postinstall runs prisma generate.
+
 ### Deployment / Preview sanity
 - [ ] Netlify/Vercel previews are green (or not applicable and explained).
 

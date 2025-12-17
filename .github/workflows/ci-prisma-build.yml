@@ -14,28 +14,95 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      prisma_build: ${{ steps.filter.outputs.prisma_build }}
+      schema_changed: ${{ steps.filter.outputs.schema_changed }}
+      code_changed: ${{ steps.filter.outputs.code_changed }}
+      prisma_usage_detected: ${{ steps.prisma_scan.outputs.detected }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Check for relevant changes
         uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            prisma_build:
+            schema_changed:
               - 'prisma/schema.prisma'
               - 'prisma/migrations/**'
-              - 'src/lib/prisma/**'
-              - 'src/app/api/**'
-              - 'src/lib/email/**'
               - 'package.json'
               - 'package-lock.json'
+            code_changed:
+              - 'src/**/*.ts'
+              - 'src/**/*.tsx'
+              - '!src/**/*.spec.ts'
+              - '!src/**/*.test.ts'
+              - '!src/**/*.stories.tsx'
+              - '!tests/**'
+
+      - name: Scan changed files for Prisma usage
+        id: prisma_scan
+        if: steps.filter.outputs.code_changed == 'true' && steps.filter.outputs.schema_changed == 'false'
+        run: |
+          echo "Scanning changed files for Prisma usage..."
+
+          # Determine diff range based on event type
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_REF="origin/${{ github.base_ref }}"
+            HEAD_REF="HEAD"
+          else
+            # Push event - prefer github.event.before, fall back to HEAD~1
+            if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+              BASE_REF="${{ github.event.before }}"
+            else
+              BASE_REF="HEAD~1"
+            fi
+            HEAD_REF="HEAD"
+          fi
+
+          # Try to compute diff; fail open if it fails
+          CHANGED_FILES=$(git diff --name-only "$BASE_REF"..."$HEAD_REF" -- '*.ts' '*.tsx' 2>/dev/null \
+            | grep -E '^src/' \
+            | grep -v -E '\.(spec|test|stories)\.(ts|tsx)$' \
+            || true)
+
+          # If diff failed or returned nothing suspicious, check exit status
+          if ! git rev-parse "$BASE_REF" >/dev/null 2>&1; then
+            echo "Cannot resolve BASE_REF ($BASE_REF), failing open to run full build"
+            echo "detected=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No relevant source files changed"
+            echo "detected=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Changed files to scan:"
+          echo "$CHANGED_FILES"
+
+          # Grep for Prisma usage patterns (comprehensive list)
+          # Patterns: @prisma/client, new PrismaClient, Prisma., prisma., @/lib/prisma
+          PRISMA_PATTERNS='@prisma/client|new PrismaClient|Prisma\.|prisma\.|@/lib/prisma|from "@/lib/prisma"'
+
+          MATCHES=$(echo "$CHANGED_FILES" | xargs grep -l -E "$PRISMA_PATTERNS" 2>/dev/null || true)
+
+          if [ -n "$MATCHES" ]; then
+            echo "Prisma usage detected in:"
+            echo "$MATCHES"
+            echo "detected=true" >> $GITHUB_OUTPUT
+          else
+            echo "No Prisma usage detected in changed files"
+            echo "detected=false" >> $GITHUB_OUTPUT
+          fi
 
   prisma_build:
     needs: changes
-    if: needs.changes.outputs.prisma_build == 'true'
+    if: |
+      needs.changes.outputs.schema_changed == 'true' ||
+      needs.changes.outputs.prisma_usage_detected == 'true'
     runs-on: ubuntu-latest
     env:
       DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public"
@@ -58,13 +125,24 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      - name: Type check
+        run: npm run typecheck
+
       - name: Build Next.js
         run: npm run build
 
   prisma_build_skipped:
     needs: changes
-    if: needs.changes.outputs.prisma_build != 'true'
+    if: |
+      needs.changes.outputs.schema_changed != 'true' &&
+      needs.changes.outputs.prisma_usage_detected != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Skip message
-        run: echo "Prisma/build checks skipped - no relevant file changes detected"
+        run: |
+          echo "Prisma/build checks skipped"
+          echo "  - Schema changed: ${{ needs.changes.outputs.schema_changed }}"
+          echo "  - Code changed: ${{ needs.changes.outputs.code_changed }}"
+          echo "  - Prisma usage detected: ${{ needs.changes.outputs.prisma_usage_detected }}"
+          echo ""
+          echo "No Prisma-related changes detected in this PR/push."
