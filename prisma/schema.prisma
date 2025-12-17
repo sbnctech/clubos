@@ -475,6 +475,8 @@ enum DeliveryStatus {
   DELIVERED
   BOUNCED
   FAILED
+  COMPLAINED
+  UNSUBSCRIBED
 }
 
 enum AuditAction {
@@ -485,6 +487,10 @@ enum AuditAction {
   UNPUBLISH
   SEND
   ARCHIVE
+  EMAIL_SENT
+  EMAIL_BOUNCED
+  EMAIL_COMPLAINED
+  EMAIL_UNSUBSCRIBED
 }
 
 // Theme - Visual styling tokens and CSS
@@ -712,7 +718,10 @@ model DeliveryLog {
   sentAt         DateTime?
   deliveredAt    DateTime?
   bouncedAt      DateTime?
+  bounceType     String?        // hard, soft, undetermined
   bounceReason   String?
+  complainedAt   DateTime?
+  unsubscribedAt DateTime?
   openedAt       DateTime?
   clickedAt      DateTime?
   createdAt      DateTime       @default(now())
@@ -768,4 +777,39 @@ model JobRun {
   @@index([status])
   @@index([scheduledFor])
   @@index([createdAt])
+}
+
+// ============================================================================
+// EMAIL TRACKING CONFIGURATION
+// ============================================================================
+
+// EmailTrackingConfig - Global settings for email tracking behavior
+// Privacy-conscious: open/click tracking OFF by default (Charter P6)
+model EmailTrackingConfig {
+  id                     String   @id @default(uuid()) @db.Uuid
+  trackOpens             Boolean  @default(false)  // Disabled by default for privacy
+  trackClicks            Boolean  @default(false)  // Disabled by default for privacy
+  trackBounces           Boolean  @default(true)   // Essential for deliverability
+  trackComplaints        Boolean  @default(true)   // Essential for compliance
+  autoSuppressHardBounce Boolean  @default(true)   // Auto-suppress hard bounced addresses
+  autoSuppressComplaint  Boolean  @default(true)   // Auto-suppress complaint addresses
+  retentionDays          Int      @default(90)     // Days to keep delivery logs
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+// EmailSuppressionList - Emails that should not receive messages
+// Tracks hard bounces, complaints, and manual suppressions
+model EmailSuppressionList {
+  id          String    @id @default(uuid()) @db.Uuid
+  email       String    @unique
+  reason      String    // hard_bounce, complaint, manual, unsubscribe
+  sourceLogId String?   @db.Uuid  // DeliveryLog that caused suppression
+  expiresAt   DateTime? // Optional expiration for temporary suppressions
+  addedAt     DateTime  @default(now())
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@index([reason])
+  @@index([expiresAt])
 }
