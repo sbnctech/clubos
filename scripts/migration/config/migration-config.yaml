@@ -1,0 +1,196 @@
+# ClubOS Migration Configuration
+# Wild Apricot (WA) -> ClubOS Data Migration Pipeline
+#
+# This configuration defines field mappings, ID reconciliation rules,
+# and transformation logic for migrating SBNC data from Wild Apricot.
+
+version: "1.0"
+source: "wild-apricot"
+target: "clubos"
+
+# ============================================================================
+# MEMBERSHIP STATUS MAPPING
+# Maps WA membership levels to ClubOS MembershipStatus codes
+# ============================================================================
+membership_status_mapping:
+  # WA Level Name -> ClubOS MembershipStatus code
+  "New Member": "NEWCOMER"
+  "Newcomer": "NEWCOMER"
+  "1st Year": "NEWCOMER"
+  "2nd Year": "NEWCOMER"
+  "Third Year": "EXTENDED"
+  "3rd Year": "EXTENDED"
+  "Extended": "EXTENDED"
+  "Alumni": "ALUMNI"
+  "Lapsed": "LAPSED"
+  "Prospect": "PROSPECT"
+  "Guest": "PROSPECT"
+  # Fallback for unmapped levels
+  _default: "PROSPECT"
+
+# ============================================================================
+# MEMBER FIELD MAPPING
+# Maps WA contact export columns to ClubOS Member fields
+# ============================================================================
+member_fields:
+  # ClubOS field: WA column name (or transformation)
+  firstName: "First name"
+  lastName: "Last name"
+  email: "Email"
+  phone: "Phone"
+  joinedAt: "Member since"
+  # Special handling
+  membershipStatusId:
+    source: "Membership level"
+    transform: "membership_status_lookup"
+  # WA-specific fields for ID reconciliation
+  _wa_contact_id: "Contact ID"
+  _wa_member_id: "Member ID"
+
+# ============================================================================
+# EVENT FIELD MAPPING
+# Maps WA event export columns to ClubOS Event fields
+# ============================================================================
+event_fields:
+  title: "Event name"
+  description: "Description"
+  category: "Tags"
+  location: "Location"
+  startTime: "Start date"
+  endTime: "End date"
+  capacity: "Registration limit"
+  isPublished: true  # Static value - all imported events are published
+  # WA-specific fields
+  _wa_event_id: "Event ID"
+
+# ============================================================================
+# EVENT CATEGORY MAPPING
+# Maps WA event tags to ClubOS categories
+# ============================================================================
+event_category_mapping:
+  "Social": "Social"
+  "Outdoor": "Outdoor Activities"
+  "Cultural": "Cultural"
+  "Educational": "Educational"
+  "Dining": "Dining Out"
+  "Travel": "Travel"
+  "Sports": "Sports & Recreation"
+  "Volunteer": "Volunteer"
+  "Board": "Board & Leadership"
+  _default: "General"
+
+# ============================================================================
+# REGISTRATION FIELD MAPPING
+# Maps WA registration exports to ClubOS EventRegistration
+# ============================================================================
+registration_fields:
+  # Requires ID reconciliation from members and events
+  memberId:
+    source: "Contact ID"
+    transform: "member_id_lookup"
+  eventId:
+    source: "Event ID"
+    transform: "event_id_lookup"
+  status:
+    source: "Registration status"
+    transform: "registration_status_lookup"
+  registeredAt: "Registration date"
+  cancelledAt: "Cancellation date"
+  _wa_registration_id: "Registration ID"
+
+# ============================================================================
+# REGISTRATION STATUS MAPPING
+# Maps WA registration statuses to ClubOS RegistrationStatus enum
+# ============================================================================
+registration_status_mapping:
+  "Confirmed": "CONFIRMED"
+  "Registered": "CONFIRMED"
+  "Paid": "CONFIRMED"
+  "Attended": "CONFIRMED"
+  "Cancelled": "CANCELLED"
+  "Canceled": "CANCELLED"
+  "Waitlisted": "WAITLISTED"
+  "On waitlist": "WAITLISTED"
+  "Pending": "PENDING"
+  "Pending payment": "PENDING_PAYMENT"
+  "No show": "NO_SHOW"
+  "No-show": "NO_SHOW"
+  _default: "CONFIRMED"
+
+# ============================================================================
+# COMMITTEE MAPPING
+# Maps WA groups/committees to ClubOS Committees
+# ============================================================================
+committee_mapping:
+  # WA Group Name -> ClubOS Committee slug
+  "Board of Directors": "board"
+  "Executive Committee": "executive"
+  "Activities Committee": "activities"
+  "Membership Committee": "membership"
+  "Communications Committee": "communications"
+  "Hospitality Committee": "hospitality"
+  "Social Committee": "social"
+  "Outdoor Activities": "outdoor"
+  "Cultural Activities": "cultural"
+  "Dining Out": "dining"
+
+# ============================================================================
+# ID RECONCILIATION RULES
+# How to match WA records to existing ClubOS records
+# ============================================================================
+id_reconciliation:
+  members:
+    # Primary: match by email (unique in both systems)
+    primary_key: "email"
+    # Secondary: match by WA Contact ID stored in metadata
+    secondary_key: "_wa_contact_id"
+    # On conflict: update existing or skip
+    on_conflict: "update"
+
+  events:
+    # Match by title + start time (within 1 hour)
+    composite_key:
+      - "title"
+      - "startTime"
+    time_tolerance_minutes: 60
+    on_conflict: "skip"
+
+  registrations:
+    # Match by member + event (unique constraint)
+    composite_key:
+      - "memberId"
+      - "eventId"
+    on_conflict: "update"
+
+# ============================================================================
+# IMPORT OPTIONS
+# ============================================================================
+import_options:
+  # Batch size for database operations
+  batch_size: 100
+
+  # Continue on individual record errors
+  continue_on_error: true
+
+  # Date parsing format (WA exports use this format)
+  date_format: "MM/DD/YYYY"
+  datetime_format: "MM/DD/YYYY HH:mm"
+
+  # Timezone for date conversion (WA times are typically in club's timezone)
+  source_timezone: "America/Los_Angeles"
+
+  # Skip records with missing required fields
+  skip_incomplete: true
+
+  # Required fields that must have values
+  required_fields:
+    members:
+      - "email"
+      - "firstName"
+      - "lastName"
+    events:
+      - "title"
+      - "startTime"
+    registrations:
+      - "memberId"
+      - "eventId"

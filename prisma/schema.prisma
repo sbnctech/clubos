@@ -301,6 +301,13 @@ model UserAccount {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // Two-Factor Authentication (Charter P1: Identity provable)
+  twoFactorEnabled    Boolean   @default(false)
+  twoFactorSecret     String?   // Encrypted TOTP secret
+  twoFactorVerifiedAt DateTime? // Last successful 2FA verification
+  twoFactorBackupCodes String[] // Hashed backup codes
+  twoFactorEnrolledAt DateTime? // When 2FA was first enabled
+
   member Member @relation(fields: [memberId], references: [id])
 }
 
@@ -475,6 +482,8 @@ enum DeliveryStatus {
   DELIVERED
   BOUNCED
   FAILED
+  COMPLAINED   // Spam complaint received
+  UNSUBSCRIBED // Recipient unsubscribed
 }
 
 enum AuditAction {
@@ -485,6 +494,18 @@ enum AuditAction {
   UNPUBLISH
   SEND
   ARCHIVE
+  // Email tracking events
+  EMAIL_SENT
+  EMAIL_DELIVERED
+  EMAIL_BOUNCED
+  EMAIL_COMPLAINED
+  EMAIL_UNSUBSCRIBED
+  // Two-Factor Authentication events (Charter P7: Observability)
+  TWO_FACTOR_ENROLLED
+  TWO_FACTOR_VERIFIED
+  TWO_FACTOR_DISABLED
+  TWO_FACTOR_REQUIRED_BLOCK
+  TWO_FACTOR_BACKUP_USED
 }
 
 // Theme - Visual styling tokens and CSS
@@ -713,6 +734,9 @@ model DeliveryLog {
   deliveredAt    DateTime?
   bouncedAt      DateTime?
   bounceReason   String?
+  bounceType     String?        // hard, soft, undetermined
+  complainedAt   DateTime?      // Spam complaint timestamp
+  unsubscribedAt DateTime?      // Unsubscribe timestamp
   openedAt       DateTime?
   clickedAt      DateTime?
   createdAt      DateTime       @default(now())
@@ -724,6 +748,8 @@ model DeliveryLog {
   @@index([recipientId])
   @@index([status])
   @@index([recipientEmail])
+  @@index([bouncedAt])
+  @@index([complainedAt])
 }
 
 // AuditLog - Track all privileged actions
@@ -769,3 +795,40 @@ model JobRun {
   @@index([scheduledFor])
   @@index([createdAt])
 }
+
+// ============================================================================
+// EMAIL TRACKING AND SUPPRESSION SYSTEM
+// Copyright (c) Santa Barbara Newcomers Club
+// ============================================================================
+
+// EmailSuppressionList - Emails that should not receive messages
+// Hard bounces and complaints are auto-added per tracking config
+model EmailSuppressionList {
+  id          String    @id @default(uuid()) @db.Uuid
+  email       String    @unique
+  reason      String    // hard_bounce, complaint, manual
+  sourceLogId String?   @db.Uuid // Reference to DeliveryLog that caused suppression
+  addedAt     DateTime  @default(now())
+  expiresAt   DateTime? // Optional expiration (null = permanent)
+  notes       String?   // Admin notes
+
+  @@index([email])
+  @@index([reason])
+  @@index([addedAt])
+}
+
+// EmailTrackingConfig - System-wide email tracking configuration
+// Privacy-first: open/click tracking OFF by default
+model EmailTrackingConfig {
+  id                     String   @id @default(uuid()) @db.Uuid
+  trackOpens             Boolean  @default(false)  // OFF by default (privacy)
+  trackClicks            Boolean  @default(false)  // OFF by default (privacy)
+  trackBounces           Boolean  @default(true)   // Essential for deliverability
+  trackComplaints        Boolean  @default(true)   // Essential for reputation
+  autoSuppressHardBounce Boolean  @default(true)   // Auto-add hard bounces to suppression
+  autoSuppressComplaint  Boolean  @default(true)   // Auto-add complaints to suppression
+  retentionDays          Int      @default(90)     // How long to keep delivery logs
+  updatedAt              DateTime @updatedAt
+  createdAt              DateTime @default(now())
+}
+
