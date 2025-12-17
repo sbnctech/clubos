@@ -37,6 +37,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.prisma_build == 'true'
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,18 +53,12 @@ jobs:
         run: npm ci
 
       - name: Validate Prisma schema
-        env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public"
         run: npx prisma validate
 
       - name: Generate Prisma client
-        env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public"
         run: npx prisma generate
 
       - name: Build Next.js
-        env:
-          DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public"
         run: npm run build
 
   prisma_build_skipped:
