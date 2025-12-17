@@ -107,6 +107,10 @@ model Member {
   deliveryLogs     DeliveryLog[]
   auditLogs        AuditLog[]
 
+  // Email outbox relations
+  outboxRecipient  EmailOutbox[]     @relation()
+  outboxCreated    EmailOutbox[]     @relation("OutboxCreatedBy")
+
   @@index([membershipStatusId])
 }
 
@@ -668,6 +672,7 @@ model MessageTemplate {
 
   template         Template?         @relation(fields: [templateId], references: [id])
   messageCampaigns MessageCampaign[]
+  outboxItems      EmailOutbox[]
 
   @@index([isActive])
 }
@@ -694,6 +699,7 @@ model MessageCampaign {
   audienceRule    AudienceRule?   @relation(fields: [audienceRuleId], references: [id])
   createdBy       Member?         @relation(fields: [createdById], references: [id])
   deliveryLogs    DeliveryLog[]
+  outboxItems     EmailOutbox[]
 
   @@index([status])
   @@index([scheduledAt])
@@ -768,4 +774,93 @@ model JobRun {
   @@index([status])
   @@index([scheduledFor])
   @@index([createdAt])
+}
+
+// ============================================================================
+// EMAIL IDENTITY AND OUTBOX SYSTEM
+// Copyright (c) Santa Barbara Newcomers Club
+// Charter P1: Provable identity - emails sent from verified identities only
+// Charter P2: Default deny - role-based control of from-addresses
+// Charter P3: State machine for email lifecycle
+// ============================================================================
+
+// Email send status lifecycle
+enum OutboxStatus {
+  DRAFT      // Composed but not yet queued
+  QUEUED     // Ready to send
+  SENDING    // Currently being processed
+  SENT       // Successfully delivered to SMTP
+  DELIVERED  // Delivery confirmed (if tracking available)
+  BOUNCED    // Delivery failed permanently
+  FAILED     // Send failed (SMTP error)
+}
+
+// EmailIdentity - Sender identities (from-addresses) for sbnewcomers.org
+// Charter P2: Role-based control of who can send as which address
+model EmailIdentity {
+  id          String   @id @default(uuid()) @db.Uuid
+  email       String   @unique // e.g., president@sbnewcomers.org
+  displayName String // e.g., "SBNC President"
+  description String? // Purpose of this identity
+  replyTo     String? // Optional reply-to address
+  isActive    Boolean  @default(true)
+  isDefault   Boolean  @default(false) // Default identity for new campaigns
+  smtpConfig  Json? // SMTP settings if different from default
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Roles that can use this identity (stored as JSON array of role slugs)
+  // e.g., ["president", "admin"] means only those roles can send as this address
+  allowedRoles Json @default("[]")
+
+  outboxItems EmailOutbox[]
+
+  @@index([isActive])
+  @@index([isDefault])
+}
+
+// EmailOutbox - Individual email items pending/sent
+// Charter P3: Explicit state machine for email lifecycle
+// Charter N5: Idempotent - use idempotencyKey to prevent duplicates
+model EmailOutbox {
+  id              String       @id @default(uuid()) @db.Uuid
+  idempotencyKey  String?      @unique // Client-provided key to prevent duplicate sends
+  identityId      String       @db.Uuid
+  campaignId      String?      @db.Uuid // Link to campaign if part of one
+  recipientEmail  String
+  recipientId     String?      @db.Uuid // Link to member if known
+  recipientName   String? // Display name for recipient
+  subject         String
+  bodyHtml        String       @db.Text
+  bodyText        String?      @db.Text
+  templateId      String?      @db.Uuid // Template used (for reference)
+  templateData    Json? // Variables used for rendering
+  status          OutboxStatus @default(DRAFT)
+  scheduledFor    DateTime? // When to send (null = immediate)
+  sentAt          DateTime? // When actually sent
+  deliveredAt     DateTime? // When delivery confirmed
+  bouncedAt       DateTime?
+  bounceReason    String?
+  providerMsgId   String? // Message ID from SMTP/provider
+  errorMessage    String? // Error details if failed
+  retryCount      Int          @default(0)
+  lastRetryAt     DateTime?
+  createdById     String?      @db.Uuid // Who composed this email
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  identity  EmailIdentity    @relation(fields: [identityId], references: [id])
+  campaign  MessageCampaign? @relation(fields: [campaignId], references: [id])
+  recipient Member?          @relation(fields: [recipientId], references: [id])
+  template  MessageTemplate? @relation(fields: [templateId], references: [id])
+  createdBy Member?          @relation("OutboxCreatedBy", fields: [createdById], references: [id])
+
+  @@index([status])
+  @@index([identityId])
+  @@index([campaignId])
+  @@index([recipientId])
+  @@index([recipientEmail])
+  @@index([scheduledFor])
+  @@index([createdAt])
+  @@index([status, scheduledFor])
 }
