@@ -33,6 +33,7 @@ export type GlobalRole =
   | "president"
   | "past-president"
   | "vp-activities"
+  | "vp-membership"
   | "event-chair"
   | "webmaster"
   | "member";
@@ -59,7 +60,10 @@ export type Capability =
   | "transitions:approve"   // Approve transition plans
   | "users:manage"          // Create/update user roles and entitlements
   | "admin:full"            // Full admin access (implies all capabilities)
-  | "debug:readonly";       // Debug read-only access (for support, default OFF)
+  | "debug:readonly"        // Debug read-only access (for support, default OFF)
+  // Mentorship program capabilities
+  | "mentorship:view"       // View mentorship assignments (mentors, mentees can see own)
+  | "mentorship:assign";    // Create/manage mentor assignments (VP Membership only)
 
 /**
  * Map of which capabilities each role has.
@@ -95,6 +99,8 @@ const ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     "transitions:view",
     "transitions:approve",
     "users:manage",
+    "mentorship:view",
+    "mentorship:assign",
   ],
   president: [
     "members:view",
@@ -106,10 +112,12 @@ const ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     "finance:view",
     "transitions:view",
     "transitions:approve",
+    "mentorship:view",
     // President can view but not directly manage finances
     // NO finance:manage - treasurer handles that
     // NO users:manage - handled through transitions
     // NO events:delete - use cancel flow instead
+    // NO mentorship:assign - VP Membership owns this
   ],
   "past-president": [
     "members:view",
@@ -134,6 +142,20 @@ const ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     // NO events:delete - admin only
     // NO finance:view/manage
     // NO exports:access
+  ],
+  "vp-membership": [
+    "members:view",
+    "members:history",
+    "registrations:view",
+    "events:view",
+    "mentorship:view",
+    "mentorship:assign",
+    // VP Membership owns the mentorship program
+    // Can view members and their history for matching decisions
+    // Can view events to see newbie engagement
+    // NO events:edit - not their domain
+    // NO finance:view/manage
+    // NO transitions:approve - not their domain
   ],
   "event-chair": [
     "members:view",

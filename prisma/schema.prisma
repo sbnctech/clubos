@@ -79,6 +79,7 @@ model Member {
   phone              String?
   joinedAt           DateTime
   membershipStatusId String   @db.Uuid
+  agreedToMentor     Boolean  @default(false) // Has member volunteered to be a mentor?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -107,7 +108,13 @@ model Member {
   deliveryLogs     DeliveryLog[]
   auditLogs        AuditLog[]
 
+  // Mentorship relations
+  mentorshipAssignmentsCreated MentorshipAssignment[] @relation("MentorshipCreatedBy")
+  mentorshipAsNewbie           MentorshipAssignment[] @relation("MentorshipNewbie")
+  mentorshipAsMentor           MentorshipAssignment[] @relation("MentorshipMentor")
+
   @@index([membershipStatusId])
+  @@index([agreedToMentor])
 }
 
 model MembershipStatus {
@@ -485,6 +492,11 @@ enum AuditAction {
   UNPUBLISH
   SEND
   ARCHIVE
+  // Mentorship actions
+  MENTOR_ASSIGNED
+  MENTOR_ENDED
+  MENTOR_NEWBIE_SHARED_REGISTRATION
+  MENTOR_NEWBIE_SHARED_ATTENDANCE
 }
 
 // Theme - Visual styling tokens and CSS
@@ -768,4 +780,73 @@ model JobRun {
   @@index([status])
   @@index([scheduledFor])
   @@index([createdAt])
+}
+
+// Mentorship Status enum (Charter P3: explicit state machine)
+enum MentorshipAssignmentStatus {
+  ACTIVE
+  ENDED
+}
+
+// Mentorship Assignment - Tracks mentor-mentee pairings
+// Owned by VP Membership. One active assignment per newbie at a time.
+// Reference: docs/ORG/SBNC_BUSINESS_MODEL.md
+model MentorshipAssignment {
+  id                String                     @id @default(uuid()) @db.Uuid
+  createdAt         DateTime                   @default(now())
+  createdByMemberId String?                    @db.Uuid // VP Membership actor who created match
+  newbieMemberId    String                     @db.Uuid
+  mentorMemberId    String                     @db.Uuid
+  status            MentorshipAssignmentStatus @default(ACTIVE)
+  endedAt           DateTime?
+  notes             String?                    @db.Text // Optional non-sensitive notes
+
+  // Relations
+  createdBy Member? @relation("MentorshipCreatedBy", fields: [createdByMemberId], references: [id])
+  newbie    Member  @relation("MentorshipNewbie", fields: [newbieMemberId], references: [id])
+  mentor    Member  @relation("MentorshipMentor", fields: [mentorMemberId], references: [id])
+
+  // Constraint: Only one ACTIVE assignment per newbie (enforced via application logic + partial index in migration)
+  // Note: Prisma doesn't support partial unique indexes directly, so we enforce in code
+
+  @@index([newbieMemberId])
+  @@index([mentorMemberId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Email Outbox Status (durable email queue)
+enum EmailOutboxStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// Email Outbox - Durable email queue for transactional emails
+// Emails are queued here and processed asynchronously by a worker.
+// Reference: docs/operations/EMAIL_OUTBOX.md
+model EmailOutbox {
+  id        String            @id @default(uuid()) @db.Uuid
+  createdAt DateTime          @default(now())
+  to        String // Recipient email
+  subject   String
+  bodyText  String            @db.Text
+  bodyHtml  String?           @db.Text
+  status    EmailOutboxStatus @default(PENDING)
+  sentAt    DateTime?
+  lastError String?           @db.Text
+  attempts  Int               @default(0)
+  metadata  Json? // Optional context (mentorId, newbieId, etc.)
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// System Setting - Key-value store for runtime configuration
+// Used for configurable limits like MENTOR_MAX_ACTIVE_ASSIGNMENTS
+model SystemSetting {
+  key       String   @id // Setting key (e.g., "MENTOR_MAX_ACTIVE_ASSIGNMENTS")
+  value     String // Setting value (string, parse as needed)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 }

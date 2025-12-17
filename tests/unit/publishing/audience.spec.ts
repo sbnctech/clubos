@@ -33,6 +33,7 @@ describe("Audience Rule System", () => {
     createdAt: new Date(),
     updatedAt: new Date(),
     roleAssignments: [],
+    agreedToMentor: false,
     ...overrides,
   });
 
