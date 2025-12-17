@@ -26,7 +26,9 @@ export interface CreateMatchResult {
   success: true;
   assignmentId: string;
   newbieName: string;
+  newbieEmail: string;
   mentorName: string;
+  mentorEmail: string;
 }
 
 export interface CreateMatchError {
@@ -83,6 +85,7 @@ export async function createMatch(
         id: true,
         firstName: true,
         lastName: true,
+        email: true,
         agreedToMentor: true,
         _count: {
           select: {
@@ -126,6 +129,7 @@ export async function createMatch(
       select: {
         firstName: true,
         lastName: true,
+        email: true,
       },
     });
 
@@ -179,7 +183,9 @@ export async function createMatch(
       success: true as const,
       assignmentId: assignment.id,
       newbieName,
+      newbieEmail: newbie.email,
       mentorName,
+      mentorEmail: mentor.email,
     };
   });
 }
@@ -246,11 +252,20 @@ export async function endAssignment(
 }
 
 /**
- * Get the max active assignments setting.
- * TODO: Read from a settings table when available
+ * Get the max active assignments setting from SystemSetting table.
  */
 async function getMaxActiveAssignments(): Promise<number> {
-  // For now, return default. Could be stored in a Settings table.
+  const setting = await prisma.systemSetting.findUnique({
+    where: { key: "MENTOR_MAX_ACTIVE_ASSIGNMENTS" },
+  });
+
+  if (setting?.value) {
+    const parsed = parseInt(setting.value, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
   return DEFAULT_MAX_ACTIVE_ASSIGNMENTS;
 }
 

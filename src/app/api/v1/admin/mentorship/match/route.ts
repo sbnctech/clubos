@@ -10,7 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireCapability } from "@/lib/auth";
-import { createMatch } from "@/lib/mentorship";
+import { createMatch, queueMentorMatchEmails } from "@/lib/mentorship";
 
 export async function POST(request: NextRequest) {
   const auth = await requireCapability(request, "mentorship:assign");
@@ -58,6 +58,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Queue notification emails to both mentor and newbie
+    const emailIds = await queueMentorMatchEmails({
+      assignmentId: result.assignmentId,
+      newbieName: result.newbieName,
+      newbieEmail: result.newbieEmail,
+      mentorName: result.mentorName,
+      mentorEmail: result.mentorEmail,
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -65,6 +74,10 @@ export async function POST(request: NextRequest) {
         message: `Successfully matched ${result.mentorName} with ${result.newbieName}`,
         newbieName: result.newbieName,
         mentorName: result.mentorName,
+        emailsQueued: {
+          newbieEmailId: emailIds.newbieEmailId,
+          mentorEmailId: emailIds.mentorEmailId,
+        },
       },
       { status: 201 }
     );

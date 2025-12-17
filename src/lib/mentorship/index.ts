@@ -10,3 +10,5 @@
  */
 
 export * from "./matching";
+export * from "./emails";
+export * from "./logging";

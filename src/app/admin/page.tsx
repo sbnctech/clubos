@@ -4,6 +4,7 @@ import SystemCommsPanel from "./SystemCommsPanel";
 import AdminSectionNav from "./AdminSectionNav";
 import AdminSearchPanel from "./AdminSearchPanel";
 import TransitionWidget from "./TransitionWidget";
+import MentorshipCard from "./MentorshipCard";
 
 // Use default dev token if ADMIN_E2E_TOKEN not set (matches auth.ts logic)
 const adminHeaders =
@@ -182,6 +183,10 @@ export default async function AdminPage() {
       {/* Transition Widget - visible only to President and Past President */}
       {/* Auth is handled via HttpOnly session cookies, not props (Charter P1, P7) */}
       <TransitionWidget />
+
+      {/* Mentorship Card - visible to VP Membership (edit) and President (view) */}
+      {/* Reference: docs/ORG/SBNC_BUSINESS_MODEL.md - mentorship as volunteer on-ramp */}
+      <MentorshipCard />
 
       <section
         id="admin-search-section"
