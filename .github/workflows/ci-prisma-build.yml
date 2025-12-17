@@ -1,5 +1,25 @@
 name: Prisma and Build CI
 
+# ==============================================================================
+# DETECTION CONTRACT
+# ==============================================================================
+# This workflow validates Prisma schema and build integrity. It runs when:
+#   1. Schema files change (prisma/schema.prisma, migrations/**, package*.json)
+#   2. Source files change AND contain Prisma usage patterns
+#
+# Detection patterns (PRISMA_PATTERNS):
+#   @prisma/client | new PrismaClient | Prisma. | prisma. | @/lib/prisma
+#
+# FAIL-OPEN POLICY: If diff computation fails or BASE_REF cannot be resolved,
+# we run the full build. False positives (unnecessary builds) are acceptable;
+# false negatives (missed validation) are not.
+#
+# DATABASE_URL is set at JOB level because npm ci runs postinstall hooks,
+# which includes prisma generate. Step-level env vars are too late.
+#
+# See: docs/CI/PRISMA_RULES.md
+# ==============================================================================
+
 on:
   pull_request:
   push:
