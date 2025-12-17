@@ -1,7 +1,7 @@
 # SBNC Business Model and Sustainability (Canonical Grounding)
 Santa Barbara Newcomers Club (SBNC)
 
-Purpose:
+## Purpose
 SBNC exists to help new residents thrive in Santa Barbara, their new home:
 - Feel at home in Santa Barbara
 - Know people
