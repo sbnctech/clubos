@@ -36,12 +36,14 @@ export {
   transformRegistration,
   mapContactStatusToCode,
   mapRegistrationStatus,
+  resolveMembershipTier,
   extractFieldValue,
   extractPhone,
   normalizeEmail,
   parseDate,
   deriveCategory,
 } from "./transformers";
+export type { MembershipTierResolution } from "./transformers";
 
 // Importer
 export {

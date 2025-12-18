@@ -20,6 +20,102 @@ import {
 // ============================================================================
 
 /**
+ * Membership tier resolution result.
+ */
+export interface MembershipTierResolution {
+  tierCode: string;          // ClubOS tier code: unknown, extended_member, newbie_member, member
+  rawValue: string | null;   // Raw WA value for traceability
+  confidence: "exact" | "unmapped" | "missing";  // How confident is the mapping
+}
+
+/**
+ * Map WA membership level name to ClubOS MembershipTier code.
+ *
+ * WA Level Name -> ClubOS tier code:
+ *   - "ExtendedNewcomer" -> extended_member
+ *   - "NewbieNewcomer"   -> newbie_member
+ *   - "NewcomerMember"   -> member
+ *   - "Admins"           -> unknown (Admins is a role, not a tier)
+ *   - (missing/null)     -> unknown
+ *   - (other)            -> unknown
+ */
+const WA_LEVEL_TO_TIER_CODE: Record<string, string> = {
+  "ExtendedNewcomer": "extended_member",
+  "NewbieNewcomer": "newbie_member",
+  "NewcomerMember": "member",
+};
+
+/**
+ * WA levels that are known but not membership tiers (e.g., Admins).
+ * These get mapped to "unknown" without warning.
+ */
+const WA_NON_TIER_LEVELS = new Set(["Admins"]);
+
+/**
+ * Resolve a WA contact's membership tier.
+ *
+ * Best-effort extraction:
+ * - If payload contains MembershipLevel with a Name, use that
+ * - Map exact WA names to ClubOS tier codes
+ * - Unknown/missing values map to "unknown" tier
+ *
+ * @param contact - WA contact object (may have MembershipLevel or not)
+ * @returns Resolution with tierCode, rawValue, and confidence level
+ */
+export function resolveMembershipTier(contact: WAContact): MembershipTierResolution {
+  const membershipLevel = contact.MembershipLevel;
+
+  // Case 1: No membership level data at all
+  if (!membershipLevel) {
+    return {
+      tierCode: "unknown",
+      rawValue: null,
+      confidence: "missing",
+    };
+  }
+
+  // Extract raw value - prefer Name, fall back to Id as string
+  const rawValue = membershipLevel.Name || (membershipLevel.Id ? String(membershipLevel.Id) : null);
+
+  // Case 2: Have a level but no name
+  if (!membershipLevel.Name) {
+    return {
+      tierCode: "unknown",
+      rawValue,
+      confidence: "missing",
+    };
+  }
+
+  const levelName = membershipLevel.Name.trim();
+
+  // Case 3: Known non-tier level (e.g., "Admins")
+  if (WA_NON_TIER_LEVELS.has(levelName)) {
+    return {
+      tierCode: "unknown",
+      rawValue: membershipLevel.Name, // Preserve original for traceability
+      confidence: "unmapped", // Known but not a tier
+    };
+  }
+
+  // Case 4: Exact match to known tier
+  const tierCode = WA_LEVEL_TO_TIER_CODE[levelName];
+  if (tierCode) {
+    return {
+      tierCode,
+      rawValue: membershipLevel.Name, // Preserve original for traceability
+      confidence: "exact",
+    };
+  }
+
+  // Case 5: Unknown level name
+  return {
+    tierCode: "unknown",
+    rawValue: membershipLevel.Name, // Preserve original for traceability
+    confidence: "unmapped",
+  };
+}
+
+/**
  * Map WA contact status to ClubOS MembershipStatus code.
  */
 export function mapContactStatusToCode(waStatus: WAContactStatus): string {

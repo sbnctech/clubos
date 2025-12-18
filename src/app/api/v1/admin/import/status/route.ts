@@ -4,7 +4,7 @@
  * Provides operational visibility into Wild Apricot sync state.
  *
  * GET /api/v1/admin/import/status
- *   Returns: Sync state, entity counts, last sync timestamps
+ *   Returns: Sync state, entity counts, last sync timestamps, tier distribution
  *
  * Authorization: Requires admin:full capability
  */
@@ -30,6 +30,12 @@ interface SyncStats {
     mapped: number;
     lastSynced: string | null;
   };
+}
+
+interface TierCount {
+  code: string;
+  name: string;
+  count: number;
 }
 
 export async function GET(req: NextRequest) {
@@ -107,11 +113,35 @@ export async function GET(req: NextRequest) {
     // Detect stale records (not synced in 7 days)
     const staleRecords = await detectStaleRecords(7);
 
+    // Get membership tier distribution
+    const tierCounts = await prisma.membershipTier.findMany({
+      select: {
+        code: true,
+        name: true,
+        _count: {
+          select: { members: true },
+        },
+      },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    const membershipTierCounts: TierCount[] = tierCounts.map((t) => ({
+      code: t.code,
+      name: t.name,
+      count: t._count.members,
+    }));
+
+    // Count members with no tier assigned
+    const membersMissingTierCount = await prisma.member.count({
+      where: { membershipTierId: null },
+    });
+
     return NextResponse.json({
       preflight: {
         ok: preflight.ok,
         checks: preflight.checks,
         missingStatuses: preflight.missingStatuses,
+        missingTiers: preflight.missingTiers,
         error: preflight.error,
       },
       syncState: syncState
@@ -125,6 +155,8 @@ export async function GET(req: NextRequest) {
           }
         : null,
       stats,
+      membershipTierCounts,
+      membersMissingTierCount,
       staleRecords: {
         threshold: staleRecords.threshold.toISOString(),
         staleDaysThreshold: staleRecords.staleDaysThreshold,

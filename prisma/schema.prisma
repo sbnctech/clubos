@@ -120,17 +120,20 @@ enum TransitionStatus {
 // Core Models
 
 model Member {
-  id                 String   @id @default(uuid()) @db.Uuid
-  firstName          String
-  lastName           String
-  email              String   @unique
-  phone              String?
-  joinedAt           DateTime
-  membershipStatusId String   @db.Uuid
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                    String   @id @default(uuid()) @db.Uuid
+  firstName             String
+  lastName              String
+  email                 String   @unique
+  phone                 String?
+  joinedAt              DateTime
+  membershipStatusId    String   @db.Uuid
+  membershipTierId      String?  @db.Uuid // Nullable: canonical ClubOS tier (derived from WA membership level)
+  waMembershipLevelRaw  String?  // Raw WA membership level value for traceability
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   membershipStatus   MembershipStatus    @relation(fields: [membershipStatusId], references: [id])
+  membershipTier     MembershipTier?     @relation(fields: [membershipTierId], references: [id])
   roleAssignments    RoleAssignment[]
   eventRegistrations EventRegistration[]
   userAccount        UserAccount?
@@ -180,6 +183,7 @@ model Member {
   fileAccessGrants FileAccess[]  @relation("FileAccessGrantedBy")
 
   @@index([membershipStatusId])
+  @@index([membershipTierId])
 }
 
 model MembershipStatus {
@@ -195,6 +199,21 @@ model MembershipStatus {
   updatedAt            DateTime @updatedAt
 
   members Member[]
+}
+
+// MembershipTier - Canonical membership tier/level in ClubOS
+// Maps from Wild Apricot membership levels to a stable ClubOS taxonomy
+model MembershipTier {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique // Stable key (lowercase, snake_case): unknown, extended_member, newbie_member, member
+  name      String // Human-readable: "Unknown", "Extended Member", "Newbie Member", "Member"
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members Member[]
+
+  @@index([sortOrder])
 }
 
 model Committee {

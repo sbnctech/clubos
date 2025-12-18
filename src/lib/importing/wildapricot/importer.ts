@@ -22,6 +22,7 @@ import {
   transformEvent,
   transformRegistration,
   mapContactStatusToCode,
+  resolveMembershipTier,
   getMemberChanges,
   getEventChanges,
 } from "./transformers";
@@ -48,6 +49,7 @@ interface SyncContext {
   };
   errors: SyncError[];
   membershipStatusMap: Map<string, string>; // code -> id
+  membershipTierMap: Map<string, string>;   // code -> id
   memberIdMap: Map<number, string>; // WA ID -> ClubOS ID
   eventIdMap: Map<number, string>; // WA ID -> ClubOS ID
 }
@@ -93,6 +95,17 @@ const REQUIRED_STATUS_CODES = [
   "unknown",
 ];
 
+/**
+ * Required MembershipTier codes for WA import.
+ * These must exist before sync can proceed.
+ */
+const REQUIRED_TIER_CODES = [
+  "unknown",
+  "extended_member",
+  "newbie_member",
+  "member",
+];
+
 export interface PreflightResult {
   ok: boolean;
   checks: {
@@ -100,14 +113,16 @@ export interface PreflightResult {
     waIdMappingTable: boolean;
     waSyncStateTable: boolean;
     membershipStatuses: boolean;
+    membershipTiers: boolean;
   };
   missingStatuses: string[];
+  missingTiers: string[];
   error?: string;
 }
 
 /**
  * Run preflight checks to ensure the system is ready for WA import.
- * Validates database connectivity, required tables, and MembershipStatus records.
+ * Validates database connectivity, required tables, MembershipStatus and MembershipTier records.
  */
 export async function runPreflightChecks(): Promise<PreflightResult> {
   const result: PreflightResult = {
@@ -117,8 +132,10 @@ export async function runPreflightChecks(): Promise<PreflightResult> {
       waIdMappingTable: false,
       waSyncStateTable: false,
       membershipStatuses: false,
+      membershipTiers: false,
     },
     missingStatuses: [],
+    missingTiers: [],
   };
 
   try {
@@ -156,9 +173,9 @@ export async function runPreflightChecks(): Promise<PreflightResult> {
       select: { code: true },
     });
 
-    const existingCodes = new Set(existingStatuses.map((s) => s.code));
+    const existingStatusCodes = new Set(existingStatuses.map((s) => s.code));
     result.missingStatuses = REQUIRED_STATUS_CODES.filter(
-      (code) => !existingCodes.has(code)
+      (code) => !existingStatusCodes.has(code)
     );
 
     if (result.missingStatuses.length > 0) {
@@ -167,6 +184,24 @@ export async function runPreflightChecks(): Promise<PreflightResult> {
     }
 
     result.checks.membershipStatuses = true;
+
+    // Check required MembershipTier codes exist
+    const existingTiers = await prisma.membershipTier.findMany({
+      where: { code: { in: REQUIRED_TIER_CODES } },
+      select: { code: true },
+    });
+
+    const existingTierCodes = new Set(existingTiers.map((t) => t.code));
+    result.missingTiers = REQUIRED_TIER_CODES.filter(
+      (code) => !existingTierCodes.has(code)
+    );
+
+    if (result.missingTiers.length > 0) {
+      result.error = `Missing MembershipTier codes: ${result.missingTiers.join(", ")}. Run: npx tsx scripts/importing/seed_membership_tiers.ts`;
+      return result;
+    }
+
+    result.checks.membershipTiers = true;
     result.ok = true;
     return result;
   } catch (error) {
@@ -250,6 +285,11 @@ async function auditImport(
 async function loadMembershipStatusMap(): Promise<Map<string, string>> {
   const statuses = await prisma.membershipStatus.findMany();
   return new Map(statuses.map((s) => [s.code, s.id]));
+}
+
+async function loadMembershipTierMap(): Promise<Map<string, string>> {
+  const tiers = await prisma.membershipTier.findMany();
+  return new Map(tiers.map((t) => [t.code, t.id]));
 }
 
 // ============================================================================
@@ -442,6 +482,21 @@ async function syncMember(contact: WAContact, ctx: SyncContext): Promise<void> {
     return;
   }
 
+  // Resolve membership tier from WA membership level
+  const tierResolution = resolveMembershipTier(contact);
+  const membershipTierId = ctx.membershipTierMap.get(tierResolution.tierCode);
+
+  // Log warning if tier couldn't be determined (missing or unmapped)
+  if (tierResolution.confidence !== "exact") {
+    const email = contact.Email || "(no email)";
+    await log(
+      "WARN",
+      `MembershipTier: Cannot determine tier for WA contact ${contact.Id} (${email}). ` +
+        `Raw value: ${tierResolution.rawValue ?? "null"}, confidence: ${tierResolution.confidence}. ` +
+        `Setting to "unknown".`
+    );
+  }
+
   // Transform contact to member
   const result = transformContact(contact, membershipStatusId);
 
@@ -454,6 +509,13 @@ async function syncMember(contact: WAContact, ctx: SyncContext): Promise<void> {
   for (const warning of result.warnings) {
     await log("WARN", warning);
   }
+
+  // Add tier fields to member data
+  const memberData = {
+    ...result.data,
+    membershipTierId: membershipTierId || null,
+    waMembershipLevelRaw: tierResolution.rawValue,
+  };
 
   // Check for existing mapping
   const existingId = ctx.memberIdMap.get(contact.Id);
@@ -471,13 +533,26 @@ async function syncMember(contact: WAContact, ctx: SyncContext): Promise<void> {
     // Update existing member
     const existing = await prisma.member.findUnique({
       where: { id: existingId },
-      select: { firstName: true, lastName: true, email: true, phone: true },
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        membershipTierId: true,
+        waMembershipLevelRaw: true,
+      },
     });
 
     if (!existing) {
       // Mapping exists but member doesn't - recreate
       await log("WARN", `Member ${existingId} not found, recreating for WA contact ${contact.Id}`);
-      const member = await prisma.member.create({ data: result.data });
+      const member = await prisma.member.create({
+        data: {
+          ...result.data,
+          ...(membershipTierId ? { membershipTier: { connect: { id: membershipTierId } } } : {}),
+          waMembershipLevelRaw: tierResolution.rawValue,
+        },
+      });
       await prisma.waIdMapping.update({
         where: { entityType_waId: { entityType: "Member", waId: contact.Id } },
         data: { clubosId: member.id, syncedAt: new Date() },
@@ -488,16 +563,30 @@ async function syncMember(contact: WAContact, ctx: SyncContext): Promise<void> {
       return;
     }
 
+    // Get base field changes
     const changes = getMemberChanges(existing, result.data);
+    const tierChanges: Record<string, unknown> = {};
 
-    if (changes) {
+    // Check if tier fields changed
+    if (existing.membershipTierId !== (membershipTierId || null)) {
+      tierChanges.membershipTierId = membershipTierId || null;
+    }
+    if (existing.waMembershipLevelRaw !== tierResolution.rawValue) {
+      tierChanges.waMembershipLevelRaw = tierResolution.rawValue;
+    }
+
+    const allChanges = changes || Object.keys(tierChanges).length > 0
+      ? { ...(changes || {}), ...tierChanges }
+      : null;
+
+    if (allChanges && Object.keys(allChanges).length > 0) {
       await prisma.member.update({
         where: { id: existingId },
-        data: changes,
+        data: allChanges,
       });
       await updateIdMappingSyncedAt("Member", contact.Id);
       ctx.stats.members.updated++;
-      await auditImport("UPDATE", "Member", existingId, ctx, { waId: contact.Id, changes });
+      await auditImport("UPDATE", "Member", existingId, ctx, { waId: contact.Id, changes: allChanges });
     } else {
       await updateIdMappingSyncedAt("Member", contact.Id);
       ctx.stats.members.skipped++;
@@ -510,8 +599,18 @@ async function syncMember(contact: WAContact, ctx: SyncContext): Promise<void> {
     });
 
     if (existingByEmail) {
-      // Map to existing member
+      // Map to existing member and update tier if needed
       await log("WARN", `Email ${result.data.email} already exists, mapping WA ${contact.Id} to existing member`);
+
+      // Update tier fields on existing member
+      await prisma.member.update({
+        where: { id: existingByEmail.id },
+        data: {
+          membershipTierId: membershipTierId || null,
+          waMembershipLevelRaw: tierResolution.rawValue,
+        },
+      });
+
       await createIdMapping({
         entityType: "Member",
         waId: contact.Id,
@@ -522,8 +621,14 @@ async function syncMember(contact: WAContact, ctx: SyncContext): Promise<void> {
       return;
     }
 
-    // Create new member
-    const member = await prisma.member.create({ data: result.data });
+    // Create new member with tier fields
+    const member = await prisma.member.create({
+      data: {
+        ...result.data,
+        ...(membershipTierId ? { membershipTier: { connect: { id: membershipTierId } } } : {}),
+        waMembershipLevelRaw: tierResolution.rawValue,
+      },
+    });
     await createIdMapping({
       entityType: "Member",
       waId: contact.Id,
@@ -835,6 +940,7 @@ export async function fullSync(): Promise<SyncResult> {
     },
     errors: [],
     membershipStatusMap: await loadMembershipStatusMap(),
+    membershipTierMap: await loadMembershipTierMap(),
     memberIdMap: await loadExistingMappings("Member"),
     eventIdMap: await loadExistingMappings("Event"),
   };
@@ -926,6 +1032,7 @@ export async function incrementalSync(): Promise<SyncResult> {
     },
     errors: [],
     membershipStatusMap: await loadMembershipStatusMap(),
+    membershipTierMap: await loadMembershipTierMap(),
     memberIdMap: await loadExistingMappings("Member"),
     eventIdMap: await loadExistingMappings("Event"),
   };

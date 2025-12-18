@@ -11,6 +11,7 @@ import {
   transformRegistration,
   mapContactStatusToCode,
   mapRegistrationStatus,
+  resolveMembershipTier,
   extractFieldValue,
   extractPhone,
   normalizeEmail,
@@ -26,6 +27,120 @@ import {
   WAEventRegistration,
   WAFieldValue,
 } from "@/lib/importing/wildapricot/types";
+
+// ============================================================================
+// Membership Tier Resolution Tests
+// ============================================================================
+
+describe("resolveMembershipTier", () => {
+  const makeContact = (membershipLevel: WAContact["MembershipLevel"]): WAContact => ({
+    Id: 12345,
+    FirstName: "John",
+    LastName: "Doe",
+    Email: "john@example.com",
+    DisplayName: "John Doe",
+    Organization: null,
+    MembershipLevel: membershipLevel,
+    Status: "Active",
+    MemberSince: "2024-01-01T00:00:00",
+    IsSuspendedMember: false,
+    ProfileLastUpdated: null,
+    IsAccountAdministrator: false,
+    FieldValues: [],
+  });
+
+  describe("exact mappings", () => {
+    it("maps ExtendedNewcomer to extended_member", () => {
+      const contact = makeContact({ Id: 1, Name: "ExtendedNewcomer", Url: "" });
+      const result = resolveMembershipTier(contact);
+
+      expect(result.tierCode).toBe("extended_member");
+      expect(result.rawValue).toBe("ExtendedNewcomer");
+      expect(result.confidence).toBe("exact");
+    });
+
+    it("maps NewbieNewcomer to newbie_member", () => {
+      const contact = makeContact({ Id: 2, Name: "NewbieNewcomer", Url: "" });
+      const result = resolveMembershipTier(contact);
+
+      expect(result.tierCode).toBe("newbie_member");
+      expect(result.rawValue).toBe("NewbieNewcomer");
+      expect(result.confidence).toBe("exact");
+    });
+
+    it("maps NewcomerMember to member", () => {
+      const contact = makeContact({ Id: 3, Name: "NewcomerMember", Url: "" });
+      const result = resolveMembershipTier(contact);
+
+      expect(result.tierCode).toBe("member");
+      expect(result.rawValue).toBe("NewcomerMember");
+      expect(result.confidence).toBe("exact");
+    });
+  });
+
+  describe("missing membership level", () => {
+    it("returns unknown when MembershipLevel is null", () => {
+      const contact = makeContact(null);
+      const result = resolveMembershipTier(contact);
+
+      expect(result.tierCode).toBe("unknown");
+      expect(result.rawValue).toBeNull();
+      expect(result.confidence).toBe("missing");
+    });
+
+    it("returns unknown when MembershipLevel has empty Name", () => {
+      const contact = makeContact({ Id: 99, Name: "", Url: "" });
+      const result = resolveMembershipTier(contact);
+
+      expect(result.tierCode).toBe("unknown");
+      expect(result.rawValue).toBe("99"); // Falls back to Id as string (empty string is falsy)
+      expect(result.confidence).toBe("missing");
+    });
+  });
+
+  describe("non-tier levels", () => {
+    it("maps Admins to unknown (Admins is a role, not a tier)", () => {
+      const contact = makeContact({ Id: 10, Name: "Admins", Url: "" });
+      const result = resolveMembershipTier(contact);
+
+      expect(result.tierCode).toBe("unknown");
+      expect(result.rawValue).toBe("Admins");
+      expect(result.confidence).toBe("unmapped");
+    });
+  });
+
+  describe("unexpected/unknown levels", () => {
+    it("maps unknown level name to unknown with rawValue preserved", () => {
+      const contact = makeContact({ Id: 999, Name: "SomeOtherLevel", Url: "" });
+      const result = resolveMembershipTier(contact);
+
+      expect(result.tierCode).toBe("unknown");
+      expect(result.rawValue).toBe("SomeOtherLevel");
+      expect(result.confidence).toBe("unmapped");
+    });
+
+    it("trims whitespace from level names", () => {
+      const contact = makeContact({ Id: 1, Name: "  ExtendedNewcomer  ", Url: "" });
+      const result = resolveMembershipTier(contact);
+
+      // After trimming, should match exactly
+      expect(result.tierCode).toBe("extended_member");
+      // rawValue preserves original untrimmed value for traceability
+      expect(result.rawValue).toBe("  ExtendedNewcomer  ");
+      expect(result.confidence).toBe("exact");
+    });
+
+    it("handles empty string level name as missing", () => {
+      const contact = makeContact({ Id: 1, Name: "", Url: "" });
+      const result = resolveMembershipTier(contact);
+
+      expect(result.tierCode).toBe("unknown");
+      // Empty string is falsy, so falls back to Id as string
+      expect(result.rawValue).toBe("1");
+      expect(result.confidence).toBe("missing");
+    });
+  });
+});
 
 // ============================================================================
 // Status Mapping Tests
