@@ -57,12 +57,47 @@ The seed script creates demo users for each role. Use these accounts to demonstr
 The Demo Dashboard (`/admin/demo`) provides:
 
 - **System Status Panel** - Shows database connectivity, email configuration, and environment info
+- **Lifecycle State Demo** - Demo members showing each membership lifecycle state
 - **Work Queue** - Lists items to demonstrate:
   - Upcoming events (next 30 days)
   - Recent registrations (last 7 days)
   - Pending governance items
 
+### Lifecycle Demo
+
+The Lifecycle State Demo section shows demo members in each lifecycle state. Click any member to view their lifecycle explainer panel.
+
+For detailed lifecycle demo instructions, see [docs/demos/LIFECYCLE_DEMO_FIXTURES.md](demos/LIFECYCLE_DEMO_FIXTURES.md).
+
+**Seed lifecycle demo members:**
+
+```bash
+npx tsx scripts/importing/seed_demo_members.ts
+```
+
 ## Demo Walkthrough
+
+### 0. Home Page & View-As Demo (NEW)
+
+The modern home page demonstrates role-aware rendering and the "View As" feature.
+
+**Key URLs:**
+- Public home: http://localhost:3000/
+- Member home: http://localhost:3000/my
+- Gift certificate: http://localhost:3000/gift
+
+**View-As Control:**
+- Located in header (top-right)
+- Switch between: Public, Member, Event Chair, VP Membership, President, Tech Lead
+- Yellow banner indicates simulated view
+
+**What to show:**
+1. Public home with marketing layout and Gift Certificate link
+2. Member home with two-column utility/curated layout
+3. Role-aware gadgets that change based on selected role
+4. How officers see their tools without navigating to admin
+
+For detailed walkthrough, see [docs/demos/HOME_PAGE_STRIPES_DEMO.md](demos/HOME_PAGE_STRIPES_DEMO.md).
 
 ### 1. System Health Check
 
