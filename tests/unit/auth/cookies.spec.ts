@@ -22,11 +22,8 @@ describe("Auth Cookie Utilities", () => {
   });
 
   describe("getSessionCookieName", () => {
-    const originalEnv = process.env.NODE_ENV;
-
     afterEach(() => {
       vi.unstubAllEnvs();
-      process.env.NODE_ENV = originalEnv;
     });
 
     it("returns __Host- prefixed name in production", () => {
@@ -49,11 +46,8 @@ describe("Auth Cookie Utilities", () => {
   });
 
   describe("getSessionCookieOptions", () => {
-    const originalEnv = process.env.NODE_ENV;
-
     afterEach(() => {
       vi.unstubAllEnvs();
-      process.env.NODE_ENV = originalEnv;
     });
 
     describe("in production", () => {
@@ -125,11 +119,8 @@ describe("Auth Cookie Utilities", () => {
   });
 
   describe("getClearSessionCookieOptions", () => {
-    const originalEnv = process.env.NODE_ENV;
-
     afterEach(() => {
       vi.unstubAllEnvs();
-      process.env.NODE_ENV = originalEnv;
     });
 
     it("sets maxAge to 0", () => {
@@ -176,11 +167,8 @@ describe("Auth Cookie Utilities", () => {
   });
 
   describe("Security Properties", () => {
-    const originalEnv = process.env.NODE_ENV;
-
     afterEach(() => {
       vi.unstubAllEnvs();
-      process.env.NODE_ENV = originalEnv;
     });
 
     it("production cookie name starts with __Host-", () => {
