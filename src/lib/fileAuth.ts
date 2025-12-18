@@ -110,10 +110,9 @@ export async function canWriteFile(
   for (const access of file.accessList) {
     if (access.expiresAt && access.expiresAt < now) continue;
 
-    const hasWritePermission = [
-      FilePermission.WRITE,
-      FilePermission.ADMIN,
-    ].includes(access.permission);
+    const hasWritePermission = (
+      [FilePermission.WRITE, FilePermission.ADMIN] as FilePermission[]
+    ).includes(access.permission);
 
     if (!hasWritePermission) continue;
 

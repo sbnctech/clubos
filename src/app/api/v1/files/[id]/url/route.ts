@@ -94,8 +94,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     headers["Content-Disposition"] =
       `${disposition}; filename="${file.name}"; filename*=UTF-8''${encodedFilename}`;
 
-    // Return file content
-    return new NextResponse(data, {
+    // Return file content (convert Buffer to Uint8Array for NextResponse compatibility)
+    return new NextResponse(new Uint8Array(data), {
       status: 200,
       headers,
     });

@@ -255,7 +255,7 @@ export default function FilePicker({
   const [uploading, setUploading] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout>();
+  const debounceRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Fetch files
   const fetchFiles = useCallback(async () => {

@@ -93,19 +93,24 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       updatedAt: file.updatedAt,
       // Only include access list for admins
       accessList: file.accessList
-        ? file.accessList.map((a) => ({
-            id: a.id,
-            principalType: a.principalType,
-            principalId: a.principalId,
-            permission: a.permission,
-            expiresAt: a.expiresAt,
-            grantedBy: a.grantedBy
-              ? {
-                  id: a.grantedBy.id,
-                  name: `${a.grantedBy.firstName} ${a.grantedBy.lastName}`,
-                }
-              : null,
-          }))
+        ? file.accessList.map((a) => {
+            const access = a as typeof a & {
+              grantedBy?: { id: string; firstName: string; lastName: string } | null;
+            };
+            return {
+              id: access.id,
+              principalType: access.principalType,
+              principalId: access.principalId,
+              permission: access.permission,
+              expiresAt: access.expiresAt,
+              grantedBy: access.grantedBy
+                ? {
+                    id: access.grantedBy.id,
+                    name: `${access.grantedBy.firstName} ${access.grantedBy.lastName}`,
+                  }
+                : null,
+            };
+          })
         : undefined,
     },
   });
