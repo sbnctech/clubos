@@ -245,7 +245,35 @@ describe("toProfileResponse", () => {
         code: "ACTIVE",
         label: "Active Member",
       },
+      membershipTier: null,
       updatedAt: "2024-01-10T12:00:00.000Z",
+    });
+  });
+
+  it("should include membershipTier when present", () => {
+    const member = {
+      id: "test-id",
+      firstName: "John",
+      lastName: "Doe",
+      email: "john@example.com",
+      phone: "555-1234",
+      joinedAt: new Date("2022-03-15T00:00:00Z"),
+      updatedAt: new Date("2024-01-10T12:00:00Z"),
+      membershipStatus: {
+        code: "ACTIVE",
+        label: "Active Member",
+      },
+      membershipTier: {
+        code: "newbie_member",
+        name: "Newbie Member",
+      },
+    };
+
+    const result = toProfileResponse(member);
+
+    expect(result.membershipTier).toEqual({
+      code: "newbie_member",
+      name: "Newbie Member",
     });
   });
 

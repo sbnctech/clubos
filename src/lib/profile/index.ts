@@ -81,6 +81,10 @@ export interface ProfileResponse {
     code: string;
     label: string;
   };
+  membershipTier: {
+    code: string;
+    name: string;
+  } | null;
   updatedAt: string; // ISO date string
 }
 
@@ -128,6 +132,10 @@ export function toProfileResponse(member: {
     code: string;
     label: string;
   };
+  membershipTier?: {
+    code: string;
+    name: string;
+  } | null;
 }): ProfileResponse {
   return {
     id: member.id,
@@ -141,6 +149,12 @@ export function toProfileResponse(member: {
       code: member.membershipStatus.code,
       label: member.membershipStatus.label,
     },
+    membershipTier: member.membershipTier
+      ? {
+          code: member.membershipTier.code,
+          name: member.membershipTier.name,
+        }
+      : null,
     updatedAt: member.updatedAt.toISOString(),
   };
 }

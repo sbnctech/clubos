@@ -74,6 +74,12 @@ export async function GET(req: NextRequest) {
             label: true,
           },
         },
+        membershipTier: {
+          select: {
+            code: true,
+            name: true,
+          },
+        },
       },
     });
 
@@ -161,6 +167,12 @@ export async function PATCH(req: NextRequest) {
           select: {
             code: true,
             label: true,
+          },
+        },
+        membershipTier: {
+          select: {
+            code: true,
+            name: true,
           },
         },
       },
