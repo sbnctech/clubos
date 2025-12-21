@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Block, BlockType } from "@/lib/publishing/blocks";
 import { BLOCK_METADATA } from "@/lib/publishing/blocks";
 import {
@@ -15,7 +15,7 @@ import {
   READONLY_BLOCK_TYPES,
 } from "@/lib/publishing/blockSchemas";
 import { PageLifecycleState, LifecycleAction } from "@/lib/publishing/pageLifecycle";
-import { formatDateLocale } from "@/lib/timezone";
+import { formatDateLocale, formatClubDate } from "@/lib/timezone";
 
 type Props = {
   pageId: string;
@@ -679,6 +679,178 @@ export default function PageEditorClient({ pageId, initialBlocks, lifecycle: ini
             );
           })}
         </ul>
+      )}
+
+      {/* Audit Log Panel */}
+      <AuditLogPanel pageId={pageId} />
+    </div>
+  );
+}
+
+// ============================================================================
+// Audit Log Panel
+// ============================================================================
+
+type AuditLogEntry = {
+  id: string;
+  action: string;
+  timestamp: string;
+  actor: {
+    id: string | null;
+    name: string;
+  };
+  summary: string;
+};
+
+function AuditLogPanel({ pageId }: { pageId: string }) {
+  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    async function fetchAuditLog() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/admin/content/pages/${pageId}/audit?limit=10`);
+        if (res.ok) {
+          const data = await res.json();
+          setEntries(data.entries || []);
+        } else {
+          setError("Failed to load audit log");
+        }
+      } catch {
+        setError("Failed to load audit log");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAuditLog();
+  }, [pageId]);
+
+  const getActionColor = (action: string): string => {
+    switch (action) {
+      case "CREATE":
+        return "#28a745";
+      case "PUBLISH":
+        return "#007bff";
+      case "UNPUBLISH":
+        return "#6c757d";
+      case "ARCHIVE":
+        return "#6c757d";
+      case "UPDATE":
+        return "#17a2b8";
+      case "DISCARD_DRAFT":
+        return "#dc3545";
+      case "DELETE":
+        return "#dc3545";
+      default:
+        return "#6c757d";
+    }
+  };
+
+  return (
+    <div
+      data-test-id="audit-log-panel"
+      style={{
+        marginTop: "24px",
+        borderTop: "1px solid #e0e0e0",
+        paddingTop: "16px",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "12px",
+        }}
+      >
+        <h3 style={{ fontSize: "16px", margin: 0 }}>
+          Activity Log
+        </h3>
+        <button
+          type="button"
+          data-test-id="audit-log-toggle"
+          onClick={() => setExpanded(!expanded)}
+          style={{
+            padding: "4px 10px",
+            fontSize: "13px",
+            border: "1px solid #ccc",
+            borderRadius: "4px",
+            backgroundColor: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          {expanded ? "Collapse" : "Expand"}
+        </button>
+      </div>
+
+      {expanded && (
+        <div data-test-id="audit-log-content">
+          {loading && (
+            <p style={{ color: "#666", fontSize: "13px" }}>Loading...</p>
+          )}
+          {error && (
+            <p style={{ color: "#c00", fontSize: "13px" }}>{error}</p>
+          )}
+          {!loading && !error && entries.length === 0 && (
+            <p style={{ color: "#666", fontSize: "13px", fontStyle: "italic" }}>
+              No activity recorded yet.
+            </p>
+          )}
+          {!loading && !error && entries.length > 0 && (
+            <ul
+              data-test-id="audit-log-list"
+              style={{ listStyle: "none", margin: 0, padding: 0 }}
+            >
+              {entries.map((entry) => (
+                <li
+                  key={entry.id}
+                  data-test-id="audit-log-entry"
+                  style={{
+                    padding: "8px 0",
+                    borderBottom: "1px solid #eee",
+                    fontSize: "13px",
+                    display: "flex",
+                    gap: "12px",
+                    alignItems: "flex-start",
+                  }}
+                >
+                  <span
+                    data-test-id="audit-log-action"
+                    style={{
+                      display: "inline-block",
+                      padding: "2px 6px",
+                      borderRadius: "3px",
+                      fontSize: "11px",
+                      fontWeight: 500,
+                      backgroundColor: getActionColor(entry.action),
+                      color: "#fff",
+                      minWidth: "60px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {entry.action}
+                  </span>
+                  <span style={{ flex: 1, color: "#333" }}>
+                    {entry.summary}
+                  </span>
+                  <span style={{ color: "#666", whiteSpace: "nowrap" }}>
+                    {entry.actor.name}
+                  </span>
+                  <span
+                    data-test-id="audit-log-timestamp"
+                    style={{ color: "#999", whiteSpace: "nowrap" }}
+                  >
+                    {formatClubDate(new Date(entry.timestamp))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );
