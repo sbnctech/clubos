@@ -266,6 +266,43 @@ npx tsx scripts/importing/wa_sync_member.ts --email john@example.com
 npx tsx scripts/importing/wa_sync_event.ts --wa-id 67890
 ```
 
+### 5.3 Probe Event Registrations (Diagnostic Mode)
+
+Use probe mode to debug why registrations aren't being imported for a specific event:
+
+```bash
+# Probe a specific event's registrations
+npx tsx scripts/importing/wa_full_sync.ts --probe-event-id 12345
+```
+
+This mode:
+
+- Fetches the event from WA and checks if it's mapped
+- Fetches all registrations for that event
+- Analyzes each registration to determine if it would be imported or skipped
+- Reports detailed reasons for any skips
+
+Example output:
+
+```
+============================================================
+  Probe Results
+============================================================
+
+Event ID:              12345
+Event found in WA:     YES
+Event mapped to ClubOS: YES
+ClubOS Event ID:       uuid-abc123
+Registrations from WA: 45
+
+Import Analysis:
+  Would import:               5
+  Would skip (missing member): 40
+  Would skip (transform error): 0
+```
+
+See [WA_REGISTRATIONS_DIAGNOSTIC.md](./WA_REGISTRATIONS_DIAGNOSTIC.md) for detailed troubleshooting.
+
 ## 6. Troubleshooting
 
 ### 6.1 Common Errors
@@ -310,6 +347,34 @@ ERROR: Failed to refresh WA access token
 ```
 
 **Fix**: Verify WA_API_KEY is valid. Keys may expire or be revoked.
+
+#### Issue: 0 registrations imported
+
+```
+Registrations: 0 created, 0 updated, 15000 skipped
+```
+
+**Root cause**: Registrations depend on both Member and Event mappings. If these don't exist, registrations are skipped.
+
+**Diagnosis**:
+
+1. Check the Registration Diagnostics output at the end of the sync
+2. Look for "Missing member mapping" count - if high, members weren't imported
+3. Use probe mode to analyze a specific event:
+
+```bash
+npx tsx scripts/importing/wa_full_sync.ts --probe-event-id <EVENT_ID>
+```
+
+**Common causes**:
+
+- Only a subset of contacts were fetched (check "Received X contacts" in logs)
+- Members sync failed silently
+- Running incremental sync before any full sync was done
+
+**Fix**: Re-run full sync to ensure all members are mapped first.
+
+See [WA_REGISTRATIONS_DIAGNOSTIC.md](./WA_REGISTRATIONS_DIAGNOSTIC.md) for detailed guidance.
 
 ### 6.2 Log Files
 
