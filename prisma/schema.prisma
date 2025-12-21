@@ -1011,6 +1011,7 @@ enum AuditAction {
   UNPUBLISH
   SEND
   ARCHIVE
+  DISCARD_DRAFT
   EMAIL_SENT
   EMAIL_BOUNCED
   EMAIL_COMPLAINED
@@ -1089,7 +1090,8 @@ model Page {
   visibility     PageVisibility @default(PUBLIC)
   templateId     String?        @db.Uuid
   themeId        String?        @db.Uuid
-  content        Json // Block content data
+  content        Json // Block content data (working draft)
+  publishedContent Json? // Frozen published snapshot
   seoTitle       String? // Override for SEO
   seoDescription String? // Override for SEO
   seoImage       String? // Social sharing image

@@ -1,9 +1,14 @@
 // Copyright (c) Santa Barbara Newcomers Club
 // Page editor route - renders page title and block list
+// A4: Lifecycle state passed to client for Draft/Published controls
 
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { PageContent } from "@/lib/publishing/blocks";
+import {
+  computeLifecycleState,
+  PageStatus,
+} from "@/lib/publishing/pageLifecycle";
 import PageEditorClient from "./PageEditorClient";
 
 type RouteParams = {
@@ -21,6 +26,8 @@ export default async function PageEditorPage({ params }: RouteParams) {
       slug: true,
       status: true,
       content: true,
+      publishedContent: true,
+      publishedAt: true,
     },
   });
 
@@ -30,8 +37,17 @@ export default async function PageEditorPage({ params }: RouteParams) {
 
   // Extract blocks from content, sorted by order field
   const content = page.content as PageContent | null;
+  const publishedContent = page.publishedContent as PageContent | null;
   const blocks = content?.blocks ?? [];
   const sortedBlocks = [...blocks].sort((a, b) => a.order - b.order);
+
+  // Compute lifecycle state for UI
+  const lifecycle = computeLifecycleState(
+    page.status as PageStatus,
+    page.publishedAt,
+    content,
+    publishedContent
+  );
 
   return (
     <div data-test-id="page-editor-root" style={{ padding: "20px" }}>
@@ -48,12 +64,13 @@ export default async function PageEditorPage({ params }: RouteParams) {
         {page.title}
       </h1>
       <p style={{ color: "#666", margin: "0 0 24px 0", fontSize: "14px" }}>
-        /{page.slug} &bull; {page.status}
+        /{page.slug}
       </p>
 
       <PageEditorClient
         pageId={page.id}
         initialBlocks={sortedBlocks}
+        lifecycle={lifecycle}
       />
     </div>
   );
