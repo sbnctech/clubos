@@ -1,0 +1,504 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clubos.app/schemas/intake/v1",
+  "$comment": "Copyright (c) Santa Barbara Newcomers Club. ClubOS Onboarding Intake Schema.",
+  "title": "ClubOS Onboarding Intake",
+  "description": "Schema for collecting information required to implement and operate ClubOS safely.",
+  "type": "object",
+  "required": ["org", "contacts", "dataSources", "successCriteria"],
+  "properties": {
+    "org": {
+      "type": "object",
+      "description": "Organization identity and configuration.",
+      "required": ["name", "timezone"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Legal or operating name of the organization.",
+          "minLength": 1,
+          "examples": ["Santa Barbara Newcomers Club"]
+        },
+        "timezone": {
+          "type": "string",
+          "description": "IANA timezone identifier for all date/time operations.",
+          "pattern": "^[A-Za-z_]+/[A-Za-z_]+$",
+          "examples": ["America/Los_Angeles", "America/New_York"]
+        },
+        "domains": {
+          "type": "array",
+          "description": "Web domains owned or controlled by the organization.",
+          "items": {
+            "type": "string",
+            "format": "hostname"
+          },
+          "examples": [["sbnewcomers.org", "www.sbnewcomers.org"]]
+        },
+        "taxId": {
+          "type": "string",
+          "description": "EIN or tax identifier (optional, for verification)."
+        },
+        "incorporationState": {
+          "type": "string",
+          "description": "State of incorporation (US orgs).",
+          "examples": ["CA", "NY"]
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "contacts": {
+      "type": "object",
+      "description": "Key contacts for system operations.",
+      "required": ["systemOwner"],
+      "properties": {
+        "systemOwner": {
+          "$ref": "#/$defs/contact",
+          "description": "Primary technical contact with authority to make system decisions."
+        },
+        "dataOwner": {
+          "$ref": "#/$defs/contact",
+          "description": "Contact responsible for data accuracy and privacy compliance."
+        },
+        "commsOwner": {
+          "$ref": "#/$defs/contact",
+          "description": "Contact responsible for member communications and marketing."
+        },
+        "executiveSponsor": {
+          "$ref": "#/$defs/contact",
+          "description": "Board member or executive with final authority."
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "currentSystems": {
+      "type": "object",
+      "description": "Inventory of systems currently in use.",
+      "properties": {
+        "membershipPlatform": {
+          "$ref": "#/$defs/systemRef",
+          "description": "Legacy membership platform (source of member data)."
+        },
+        "websiteHost": {
+          "$ref": "#/$defs/systemRef",
+          "description": "Current website hosting provider."
+        },
+        "emailProvider": {
+          "$ref": "#/$defs/systemRef",
+          "description": "Email service for member communications."
+        },
+        "paymentProcessor": {
+          "$ref": "#/$defs/systemRef",
+          "description": "Payment processing service."
+        },
+        "otherSystems": {
+          "type": "array",
+          "description": "Any additional systems that interact with member data.",
+          "items": {
+            "$ref": "#/$defs/systemRef"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "policies": {
+      "type": "object",
+      "description": "Organizational policies that affect system configuration.",
+      "properties": {
+        "membershipLevels": {
+          "type": "array",
+          "description": "Defined membership tiers/levels.",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string" },
+              "description": { "type": "string" },
+              "durationMonths": { "type": "integer", "minimum": 1 },
+              "isRenewable": { "type": "boolean" },
+              "eligibilityCriteria": { "type": "string" }
+            }
+          }
+        },
+        "eligibilityRules": {
+          "type": "string",
+          "description": "Plain-text description of who may join and under what conditions."
+        },
+        "refundsAndCancellations": {
+          "type": "string",
+          "description": "Policy text for refunds, cancellations, and prorations."
+        },
+        "dataRetention": {
+          "type": "string",
+          "description": "How long member data is retained after membership ends."
+        },
+        "codeOfConduct": {
+          "type": "string",
+          "description": "Reference to code of conduct document or summary."
+        },
+        "mediaRelease": {
+          "type": "string",
+          "description": "Policy for photography and media use."
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "rolesAndPermissions": {
+      "type": "object",
+      "description": "Organizational roles and their system permissions.",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "description": "Named roles in the organization.",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "examples": ["President", "VP Activities", "Webmaster"] },
+              "description": { "type": "string" },
+              "termMonths": { "type": "integer" },
+              "isBoardPosition": { "type": "boolean" }
+            }
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "System capabilities to be assigned to roles.",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "examples": ["events:manage", "members:view", "finance:read"] },
+              "description": { "type": "string" },
+              "riskLevel": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"]
+              }
+            }
+          }
+        },
+        "assignments": {
+          "type": "array",
+          "description": "Mapping of roles to capabilities.",
+          "items": {
+            "type": "object",
+            "required": ["role", "capabilities"],
+            "properties": {
+              "role": { "type": "string" },
+              "capabilities": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "dataSources": {
+      "type": "object",
+      "description": "Data exports to be migrated into ClubOS.",
+      "required": ["memberExport"],
+      "properties": {
+        "memberExport": {
+          "$ref": "#/$defs/dataExport",
+          "description": "Primary member data export from legacy system."
+        },
+        "eventExport": {
+          "$ref": "#/$defs/dataExport",
+          "description": "Historical event data if available."
+        },
+        "financialExport": {
+          "$ref": "#/$defs/dataExport",
+          "description": "Financial/transaction history if available."
+        },
+        "additionalExports": {
+          "type": "array",
+          "description": "Any other data exports.",
+          "items": {
+            "$ref": "#/$defs/dataExport"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "communications": {
+      "type": "object",
+      "description": "Email and messaging configuration.",
+      "properties": {
+        "audiences": {
+          "type": "array",
+          "description": "Named audience segments for communications.",
+          "items": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "examples": ["All Members", "Board Only", "Committee Chairs"] },
+              "criteria": { "type": "string" },
+              "estimatedSize": { "type": "integer" }
+            }
+          }
+        },
+        "templatesNeeded": {
+          "type": "array",
+          "description": "Email templates to be created.",
+          "items": {
+            "type": "string"
+          },
+          "examples": [["Welcome Email", "Renewal Reminder", "Event Confirmation"]]
+        },
+        "senderIdentities": {
+          "type": "array",
+          "description": "From addresses and names for outbound email.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "examples": ["SBNC Membership"] },
+              "email": { "type": "string", "format": "email" },
+              "purpose": { "type": "string" }
+            }
+          }
+        },
+        "approvalFlow": {
+          "type": "string",
+          "description": "Who must approve mass communications before sending.",
+          "examples": ["VP Marketing approval required for all-member emails"]
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "publishing": {
+      "type": "object",
+      "description": "Website and content publishing requirements.",
+      "properties": {
+        "publicPages": {
+          "type": "array",
+          "description": "Pages visible to the public (non-members).",
+          "items": { "type": "string" },
+          "examples": [["Home", "About Us", "Join", "Contact"]]
+        },
+        "memberPages": {
+          "type": "array",
+          "description": "Pages visible only to logged-in members.",
+          "items": { "type": "string" },
+          "examples": [["Member Directory", "My Profile", "Events Calendar"]]
+        },
+        "restrictedPages": {
+          "type": "array",
+          "description": "Pages restricted to specific roles.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "page": { "type": "string" },
+              "allowedRoles": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        },
+        "brandAssetsProvided": {
+          "type": "boolean",
+          "description": "Whether logo, colors, and brand guidelines will be provided."
+        },
+        "existingContentMigration": {
+          "type": "string",
+          "description": "Notes on content to migrate from existing website."
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "risks": {
+      "type": "object",
+      "description": "Identified and accepted risks for the implementation.",
+      "properties": {
+        "identifiedRisks": {
+          "type": "array",
+          "description": "Risks identified during intake.",
+          "items": {
+            "type": "object",
+            "required": ["description"],
+            "properties": {
+              "description": { "type": "string" },
+              "severity": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "critical"]
+              },
+              "mitigation": { "type": "string" }
+            }
+          }
+        },
+        "acceptedRisks": {
+          "type": "array",
+          "description": "Risks explicitly accepted by the organization.",
+          "items": {
+            "type": "object",
+            "required": ["description", "acceptedBy", "reviewDate"],
+            "properties": {
+              "description": { "type": "string" },
+              "acceptedBy": { "type": "string", "description": "Name of person accepting risk." },
+              "reviewDate": { "type": "string", "format": "date", "description": "Date risk was reviewed and accepted." },
+              "expiresDate": { "type": "string", "format": "date", "description": "When this acceptance should be re-evaluated." }
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "successCriteria": {
+      "type": "object",
+      "description": "Definition of successful implementation.",
+      "required": ["goLiveDefinition"],
+      "properties": {
+        "goLiveDefinition": {
+          "type": "string",
+          "description": "Plain-text description of what must be true for go-live.",
+          "minLength": 10,
+          "examples": ["All active members migrated, events calendar functional, board can log in and access reports."]
+        },
+        "mustHave": {
+          "type": "array",
+          "description": "Non-negotiable requirements for launch.",
+          "items": { "type": "string" },
+          "examples": [["Member login works", "Event registration works", "Payment processing works"]]
+        },
+        "niceToHave": {
+          "type": "array",
+          "description": "Desired but not blocking features.",
+          "items": { "type": "string" }
+        },
+        "noGoConditions": {
+          "type": "array",
+          "description": "Conditions that would prevent launch.",
+          "items": { "type": "string" },
+          "examples": [["Member data not validated", "No tested backup/restore", "Board has not signed off"]]
+        },
+        "targetDate": {
+          "type": "string",
+          "format": "date",
+          "description": "Target go-live date."
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "notes": {
+      "type": "string",
+      "description": "Free-form notes or special considerations."
+    },
+
+    "intakeVersion": {
+      "type": "string",
+      "description": "Version of this intake document.",
+      "examples": ["1.0", "1.1-draft"]
+    },
+
+    "intakeDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Date this intake was completed."
+    }
+  },
+
+  "$defs": {
+    "contact": {
+      "type": "object",
+      "required": ["name", "email"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name.",
+          "minLength": 1
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Primary email address."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Phone number (optional)."
+        },
+        "role": {
+          "type": "string",
+          "description": "Organizational role or title."
+        }
+      },
+      "additionalProperties": false
+    },
+
+    "systemRef": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the system or service."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["membership", "website", "email", "payment", "calendar", "storage", "other"],
+          "description": "Category of system."
+        },
+        "accessLevel": {
+          "type": "string",
+          "enum": ["admin", "editor", "viewer", "none", "unknown"],
+          "description": "Current access level available for migration."
+        },
+        "exportCapable": {
+          "type": "boolean",
+          "description": "Whether data can be exported from this system."
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+
+    "dataExport": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["csv", "json", "xml", "api", "manual", "other"],
+          "description": "Format of the export."
+        },
+        "dateRange": {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string", "format": "date" },
+            "to": { "type": "string", "format": "date" }
+          },
+          "description": "Date range covered by the export."
+        },
+        "locationRef": {
+          "type": "string",
+          "description": "Where the export file is stored (path, URL, or reference)."
+        },
+        "recordCount": {
+          "type": "integer",
+          "description": "Approximate number of records.",
+          "minimum": 0
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any special considerations for this export."
+        },
+        "validated": {
+          "type": "boolean",
+          "description": "Whether this export has been validated for completeness."
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+
+  "additionalProperties": true
+}

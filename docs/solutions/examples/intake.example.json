@@ -1,0 +1,91 @@
+{
+  "$comment": "Copyright (c) Santa Barbara Newcomers Club. Minimal example that passes validation.",
+  "intakeVersion": "1.0",
+  "intakeDate": "2025-01-15",
+
+  "org": {
+    "name": "Example Community Association",
+    "timezone": "America/Los_Angeles",
+    "domains": ["example-community.org"]
+  },
+
+  "contacts": {
+    "systemOwner": {
+      "name": "Jane Smith",
+      "email": "jane.smith@example-community.org",
+      "role": "Webmaster"
+    },
+    "dataOwner": {
+      "name": "John Doe",
+      "email": "john.doe@example-community.org",
+      "role": "Membership Chair"
+    }
+  },
+
+  "currentSystems": {
+    "membershipPlatform": {
+      "name": "Wild Apricot",
+      "type": "membership",
+      "accessLevel": "admin",
+      "exportCapable": true
+    }
+  },
+
+  "policies": {
+    "membershipLevels": [
+      {
+        "name": "Individual",
+        "description": "Single person membership",
+        "durationMonths": 12,
+        "isRenewable": true
+      },
+      {
+        "name": "Household",
+        "description": "Two adults at same address",
+        "durationMonths": 12,
+        "isRenewable": true
+      }
+    ],
+    "eligibilityRules": "Open to all residents of Example County.",
+    "dataRetention": "Member data retained for 3 years after membership ends."
+  },
+
+  "dataSources": {
+    "memberExport": {
+      "type": "csv",
+      "locationRef": "exports/ECA_MemberExport_20250115.csv",
+      "recordCount": 350,
+      "validated": false,
+      "notes": "Export from Wild Apricot, all active and lapsed members."
+    }
+  },
+
+  "successCriteria": {
+    "goLiveDefinition": "All active members migrated with valid login credentials, events calendar functional, board members can access admin dashboard.",
+    "mustHave": [
+      "Member login works",
+      "Event registration functional",
+      "Member directory accessible to logged-in members"
+    ],
+    "niceToHave": [
+      "Historical event data imported",
+      "Custom email templates configured"
+    ],
+    "noGoConditions": [
+      "Member data not validated",
+      "Payment processing not tested"
+    ]
+  },
+
+  "risks": {
+    "identifiedRisks": [
+      {
+        "description": "Some member emails may be outdated",
+        "severity": "medium",
+        "mitigation": "Send verification emails after migration"
+      }
+    ]
+  },
+
+  "notes": "This is a minimal example intake file demonstrating all required fields."
+}
