@@ -13,6 +13,7 @@ import { formatClubDateTime } from "@/lib/timezone";
 import Link from "next/link";
 import DemoScenarioCards from "./DemoScenarioCards";
 import ViewAsMemberSection from "./ViewAsMemberSection";
+import EventDerivedPreviewDemo from "./EventDerivedPreviewDemo";
 
 // Use default dev token if ADMIN_E2E_TOKEN not set (matches auth.ts logic)
 const adminHeaders =
@@ -227,6 +228,9 @@ export default async function DemoPage() {
 
       {/* View as Member - Impersonation Tool */}
       <ViewAsMemberSection />
+
+      {/* Event Field Intelligence Demo */}
+      <EventDerivedPreviewDemo />
 
       {/* System Status Section */}
       <section

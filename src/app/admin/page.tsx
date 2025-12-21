@@ -4,6 +4,7 @@ import SystemCommsPanel from "./SystemCommsPanel";
 import AdminSectionNav from "./AdminSectionNav";
 import AdminSearchPanel from "./AdminSearchPanel";
 import TransitionWidget from "./TransitionWidget";
+import AchMetricsWidget from "./AchMetricsWidget";
 
 // Use default dev token if ADMIN_E2E_TOKEN not set (matches auth.ts logic)
 const adminHeaders =
@@ -248,6 +249,9 @@ export default async function AdminPage() {
           </div>
         </div>
       </section>
+
+      {/* ACH Metrics Widget - shows fee savings when ACH is enabled */}
+      <AchMetricsWidget />
 
       <section
         id="admin-members-section"

@@ -1,7 +1,10 @@
 /**
  * ViewAsWrapper - Client component wrapper for ViewAs context
  *
- * Wraps children with ViewAsProvider and displays the ViewAsBanner.
+ * Wraps children with ViewAsProvider and displays banners:
+ * - ImpersonationBanner: Shows when admin is impersonating a specific member
+ * - ViewAsBanner: Shows when simulating a generic role
+ *
  * This is a client component because ViewAsProvider uses React state.
  *
  * Copyright (c) Santa Barbara Newcomers Club
@@ -10,7 +13,7 @@
 "use client";
 
 import { ReactNode } from "react";
-import { ViewAsProvider, ViewAsBanner } from "@/components/view-as";
+import { ViewAsProvider, ViewAsBanner, ImpersonationBanner } from "@/components/view-as";
 
 interface ViewAsWrapperProps {
   children: ReactNode;
@@ -25,6 +28,9 @@ export function ViewAsWrapper({ children }: ViewAsWrapperProps) {
 
   return (
     <ViewAsProvider enabled={isEnabled}>
+      {/* Impersonation banner shows when admin is viewing as a specific member */}
+      <ImpersonationBanner />
+      {/* Role simulation banner shows when simulating a generic role */}
       <ViewAsBanner />
       {children}
     </ViewAsProvider>
