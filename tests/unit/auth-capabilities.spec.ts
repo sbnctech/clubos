@@ -130,6 +130,16 @@ describe("Auth Capabilities", () => {
       it("has registrations:view capability", () => {
         expect(hasCapability(role, "registrations:view")).toBe(true);
       });
+
+      it("has events:approve capability", () => {
+        // VP Activities approves events for publication
+        expect(hasCapability(role, "events:approve")).toBe(true);
+      });
+
+      it("has events:schedule:view capability", () => {
+        // VP Activities can view event schedule
+        expect(hasCapability(role, "events:schedule:view")).toBe(true);
+      });
     });
 
     describe("event-chair role", () => {
@@ -394,6 +404,62 @@ describe("Auth Capabilities", () => {
       });
     });
 
+    describe("vp-communications role", () => {
+      const role: GlobalRole = "vp-communications";
+
+      it("does NOT have admin:full capability", () => {
+        expect(hasCapability(role, "admin:full")).toBe(false);
+      });
+
+      // VP Communications HAS these capabilities
+      it("has events:view capability", () => {
+        expect(hasCapability(role, "events:view")).toBe(true);
+      });
+
+      it("has events:schedule:view capability", () => {
+        expect(hasCapability(role, "events:schedule:view")).toBe(true);
+      });
+
+      it("has events:enews:edit capability", () => {
+        expect(hasCapability(role, "events:enews:edit")).toBe(true);
+      });
+
+      it("has comms:manage capability", () => {
+        expect(hasCapability(role, "comms:manage")).toBe(true);
+      });
+
+      it("has comms:send capability", () => {
+        expect(hasCapability(role, "comms:send")).toBe(true);
+      });
+
+      // VP Communications does NOT have these capabilities
+      it("does NOT have events:approve capability", () => {
+        // VP Activities approves, not VP Communications
+        expect(hasCapability(role, "events:approve")).toBe(false);
+      });
+
+      it("does NOT have events:edit capability", () => {
+        // Can only edit eNews blurb, not full event
+        expect(hasCapability(role, "events:edit")).toBe(false);
+      });
+
+      it("does NOT have finance:view capability", () => {
+        expect(hasCapability(role, "finance:view")).toBe(false);
+      });
+
+      it("does NOT have finance:manage capability", () => {
+        expect(hasCapability(role, "finance:manage")).toBe(false);
+      });
+
+      it("does NOT have members:history capability", () => {
+        expect(hasCapability(role, "members:history")).toBe(false);
+      });
+
+      it("does NOT have users:manage capability", () => {
+        expect(hasCapability(role, "users:manage")).toBe(false);
+      });
+    });
+
     describe("member role", () => {
       const role: GlobalRole = "member";
 
@@ -464,6 +530,10 @@ describe("Auth Capabilities", () => {
 
     it("returns false for past-president role", () => {
       expect(isFullAdmin("past-president")).toBe(false);
+    });
+
+    it("returns false for vp-communications role", () => {
+      expect(isFullAdmin("vp-communications")).toBe(false);
     });
 
     it("returns false for member role", () => {

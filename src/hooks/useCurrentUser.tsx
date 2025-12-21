@@ -187,6 +187,7 @@ const ROLE_DISPLAY_NAMES: Record<GlobalRole, string> = {
   president: "President",
   "past-president": "Past President",
   "vp-activities": "VP Activities",
+  "vp-communications": "VP Communications",
   "event-chair": "Event Chair",
   webmaster: "Webmaster",
   secretary: "Secretary",

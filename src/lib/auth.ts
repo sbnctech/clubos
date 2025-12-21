@@ -35,6 +35,7 @@ export type GlobalRole =
   | "president"
   | "past-president"
   | "vp-activities"
+  | "vp-communications"
   | "event-chair"
   | "webmaster"
   | "secretary"
@@ -56,6 +57,10 @@ export type Capability =
   | "events:view"           // View all events including unpublished
   | "events:edit"           // Edit any event
   | "events:delete"         // Delete events (admin only)
+  | "events:approve"        // Approve events (VP Activities) - PENDING_APPROVAL -> APPROVED
+  | "events:submit"         // Submit events for approval (event chairs)
+  | "events:schedule:view"  // View event schedule/eNews dashboard (VP Communications)
+  | "events:enews:edit"     // Edit eNews blurb drafts (VP Communications)
   | "exports:access"        // Access to data export endpoints
   | "finance:view"          // View financial data
   | "finance:manage"        // Edit financial data
@@ -134,6 +139,10 @@ const ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     "events:view",
     "events:edit",
     "events:delete",
+    "events:approve",
+    "events:submit",
+    "events:schedule:view",
+    "events:enews:edit",
     "exports:access",
     "finance:view",
     "finance:manage",
@@ -180,6 +189,9 @@ const ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     "registrations:view",
     "events:view",
     "events:edit",
+    "events:approve",        // Can approve events (PENDING_APPROVAL -> APPROVED)
+    "events:submit",         // Can also submit events (inherits chair permissions)
+    "events:schedule:view",  // Can view event schedule for coordination
     "transitions:view",
     "transitions:approve",
     // VP Activities can edit all events (peer trust model)
@@ -187,12 +199,27 @@ const ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     // NO finance:view/manage
     // NO exports:access
   ],
+  "vp-communications": [
+    "events:view",           // View all events for newsletter coordination
+    "events:schedule:view",  // View upcoming publish/registration schedule
+    "events:enews:edit",     // Edit eNews blurb drafts
+    "comms:manage",          // Manage email templates and campaigns
+    "comms:send",            // Send newsletter campaigns
+    // VP Communications focuses on newsletter and member communication
+    // NO events:edit - cannot modify event content (VP Activities handles that)
+    // NO events:approve - cannot approve events
+    // NO members:view - doesn't need member detail access
+    // NO finance:view/manage
+    // NO exports:access
+  ],
   "event-chair": [
     "members:view",
     "registrations:view",
     "events:view",
+    "events:submit",         // Can submit events for approval (own committee's events)
     // NO members:history - event chairs see only event-related member info
     // NO events:edit - committee-scoped edit handled separately
+    // NO events:approve - VP Activities handles approval
     // NO exports:access
     // NO finance:view
   ],
@@ -595,6 +622,174 @@ export async function requireCapabilityWithScope(
   }
 
   return { ok: true, context: authResult.context, scope };
+}
+
+// ============================================================================
+// IMPERSONATION SUPPORT
+// ============================================================================
+
+/**
+ * Capabilities that are BLOCKED during impersonation.
+ * These are dangerous capabilities that should not be exercised while
+ * viewing as another member.
+ *
+ * Charter P2: Default deny - impersonation is read-heavy.
+ * Charter P7: Audit trail - blocked actions prevent unauthorized mutations.
+ */
+export const BLOCKED_WHILE_IMPERSONATING: Capability[] = [
+  "finance:manage",   // No money movement while impersonating
+  "comms:send",       // No email sending while impersonating
+  "users:manage",     // No role changes while impersonating
+  "events:delete",    // No destructive actions
+  "admin:full",       // Downgrade to read-only admin
+];
+
+/**
+ * Extended auth context that includes impersonation info.
+ */
+export interface ImpersonationContext {
+  /** True if admin is impersonating another member */
+  isImpersonating: boolean;
+  /** The impersonated member's ID (if impersonating) */
+  impersonatedMemberId?: string;
+  /** The impersonated member's name (if impersonating) */
+  impersonatedMemberName?: string;
+  /** The real admin's member ID */
+  realAdminMemberId: string;
+  /** The session ID (needed for API operations) */
+  sessionId: string;
+}
+
+/**
+ * Get effective member info for the current request.
+ * If impersonating, returns the impersonated member's info.
+ * Otherwise, returns the authenticated user's info.
+ *
+ * This is the canonical function to use when you need to know
+ * "whose data should be shown" rather than "who is the real user".
+ */
+export async function getEffectiveMember(
+  req: NextRequest
+): Promise<{
+  memberId: string;
+  email: string;
+  isImpersonating: boolean;
+  realAdminMemberId?: string;
+  sessionId?: string;
+} | null> {
+  const { getSessionWithImpersonation } = await import("@/lib/auth/session");
+  const { getSessionCookieName } = await import("@/lib/auth/cookies");
+
+  const sessionCookie = req.cookies.get(getSessionCookieName());
+  if (!sessionCookie?.value) {
+    return null;
+  }
+
+  const session = await getSessionWithImpersonation(sessionCookie.value);
+  if (!session) {
+    return null;
+  }
+
+  // Get memberId from user account
+  const { prisma } = await import("@/lib/prisma");
+  const userAccount = await prisma.userAccount.findUnique({
+    where: { id: session.userAccountId },
+    select: { memberId: true },
+  });
+
+  const realMemberId = userAccount?.memberId ?? session.userAccountId;
+
+  if (session.impersonation) {
+    return {
+      memberId: session.impersonation.memberId,
+      email: session.impersonation.memberEmail,
+      isImpersonating: true,
+      realAdminMemberId: realMemberId,
+      sessionId: session.id,
+    };
+  }
+
+  return {
+    memberId: realMemberId,
+    email: session.email,
+    isImpersonating: false,
+    sessionId: session.id,
+  };
+}
+
+/**
+ * Check if a capability is blocked during impersonation.
+ */
+export function isBlockedWhileImpersonating(capability: Capability): boolean {
+  return BLOCKED_WHILE_IMPERSONATING.includes(capability);
+}
+
+/**
+ * Extended auth result that includes impersonation info.
+ */
+export type SafeAuthResult =
+  | { ok: true; context: AuthContext; isImpersonating: boolean; realAdminMemberId?: string }
+  | { ok: false; response: NextResponse };
+
+/**
+ * Validates the authenticated user has the required capability,
+ * with additional safety checks for impersonation.
+ *
+ * When a user is impersonating another member, dangerous capabilities
+ * (finance, email, role changes, deletions) are automatically blocked.
+ *
+ * Returns 403 if:
+ * - User lacks the capability
+ * - User is impersonating AND capability is in BLOCKED_WHILE_IMPERSONATING
+ *
+ * Charter P2: Authorization with impersonation safety.
+ */
+export async function requireCapabilitySafe(
+  req: NextRequest,
+  capability: Capability
+): Promise<SafeAuthResult> {
+  // First, do normal auth
+  const authResult = await requireAuth(req);
+  if (!authResult.ok) {
+    return authResult;
+  }
+
+  // Check if user has the capability
+  if (!hasCapability(authResult.context.globalRole, capability)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Access denied", message: `Required capability: ${capability}` },
+        { status: 403 }
+      ),
+    };
+  }
+
+  // Check for impersonation and blocked capabilities
+  const effectiveMember = await getEffectiveMember(req);
+  const isImpersonating = effectiveMember?.isImpersonating ?? false;
+
+  if (isImpersonating && isBlockedWhileImpersonating(capability)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          error: "Action blocked during impersonation",
+          message: `The capability "${capability}" is disabled while viewing as another member. Exit impersonation to perform this action.`,
+          blockedCapability: capability,
+          impersonating: true,
+        },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return {
+    ok: true,
+    context: authResult.context,
+    isImpersonating,
+    realAdminMemberId: effectiveMember?.realAdminMemberId,
+  };
 }
 
 /**
