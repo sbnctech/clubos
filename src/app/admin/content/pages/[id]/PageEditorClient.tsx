@@ -1,6 +1,7 @@
 // Copyright (c) Santa Barbara Newcomers Club
 // Page editor client component - block list with ordering and editing controls
 // A3: Schema-driven validation and improved editors
+// A4: Lifecycle controls for Draft/Published state management
 
 "use client";
 
@@ -13,19 +14,25 @@ import {
   EDITABLE_BLOCK_TYPES,
   READONLY_BLOCK_TYPES,
 } from "@/lib/publishing/blockSchemas";
+import { PageLifecycleState, LifecycleAction } from "@/lib/publishing/pageLifecycle";
+import { formatDateLocale } from "@/lib/timezone";
 
 type Props = {
   pageId: string;
   initialBlocks: Block[];
+  lifecycle: PageLifecycleState;
 };
 
-export default function PageEditorClient({ pageId, initialBlocks }: Props) {
+export default function PageEditorClient({ pageId, initialBlocks, lifecycle: initialLifecycle }: Props) {
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
+  const [lifecycle, setLifecycle] = useState<PageLifecycleState>(initialLifecycle);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<Record<string, unknown> | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<LifecycleAction | null>(null);
+  const [lifecycleLoading, setLifecycleLoading] = useState(false);
 
   // Reorder API call
   async function saveBlockOrder(newBlocks: Block[], previousBlocks: Block[]) {
@@ -159,8 +166,275 @@ export default function PageEditorClient({ pageId, initialBlocks }: Props) {
     setValidationError(null); // Clear validation error on change
   }, []);
 
+  // Lifecycle action API call
+  async function handleLifecycleAction(action: LifecycleAction) {
+    setLifecycleLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/content/pages/${pageId}?action=${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        setError(errorData.message || `Failed to ${action}. Please try again.`);
+        return;
+      }
+
+      // Reload the page to get fresh data
+      window.location.reload();
+    } catch {
+      setError(`Failed to ${action}. Please try again.`);
+    } finally {
+      setLifecycleLoading(false);
+      setConfirmAction(null);
+    }
+  }
+
+  // Handle confirm dialog
+  function handleConfirmLifecycleAction() {
+    if (confirmAction) {
+      handleLifecycleAction(confirmAction);
+    }
+  }
+
+  // Get action confirmation text
+  function getConfirmText(action: LifecycleAction): { title: string; message: string } {
+    switch (action) {
+      case "publish":
+        return {
+          title: "Publish Page",
+          message: "Are you sure you want to publish this page? It will become visible to users.",
+        };
+      case "unpublish":
+        return {
+          title: "Unpublish Page",
+          message: "Are you sure you want to unpublish this page? It will no longer be visible to users.",
+        };
+      case "discardDraft":
+        return {
+          title: "Discard Draft Changes",
+          message: "Are you sure you want to discard all draft changes? This will restore the page to its last published state.",
+        };
+      case "archive":
+        return {
+          title: "Archive Page",
+          message: "Are you sure you want to archive this page?",
+        };
+    }
+  }
+
+  // Format date for display
+  function formatDate(date: Date | null): string {
+    if (!date) return "";
+    return formatDateLocale(date, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
   return (
     <div data-test-id="page-editor-blocks">
+      {/* Lifecycle Status Banner */}
+      <div
+        data-test-id="page-lifecycle-banner"
+        style={{
+          padding: "12px 16px",
+          marginBottom: "16px",
+          backgroundColor: lifecycle.status === "PUBLISHED" ? "#e8f5e9" : lifecycle.status === "ARCHIVED" ? "#f5f5f5" : "#fff3e0",
+          border: `1px solid ${lifecycle.status === "PUBLISHED" ? "#4caf50" : lifecycle.status === "ARCHIVED" ? "#9e9e9e" : "#ff9800"}`,
+          borderRadius: "6px",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span
+                data-test-id="page-status-badge"
+                style={{
+                  display: "inline-block",
+                  padding: "4px 10px",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  borderRadius: "4px",
+                  backgroundColor: lifecycle.status === "PUBLISHED" ? "#4caf50" : lifecycle.status === "ARCHIVED" ? "#9e9e9e" : "#ff9800",
+                  color: "#fff",
+                }}
+              >
+                {lifecycle.status}
+              </span>
+              {lifecycle.hasDraftChanges && (
+                <span
+                  data-test-id="draft-changes-indicator"
+                  style={{
+                    display: "inline-block",
+                    padding: "4px 10px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    borderRadius: "4px",
+                    backgroundColor: "#fff3e0",
+                    border: "1px solid #ff9800",
+                    color: "#e65100",
+                  }}
+                >
+                  Unsaved draft changes
+                </span>
+              )}
+            </div>
+            {lifecycle.publishedAt && (
+              <div style={{ marginTop: "4px", fontSize: "13px", color: "#666" }}>
+                Last published: {formatDate(lifecycle.publishedAt)}
+              </div>
+            )}
+          </div>
+
+          {/* Lifecycle Action Buttons */}
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {lifecycle.canPublish && (
+              <button
+                type="button"
+                data-test-id="lifecycle-publish-btn"
+                onClick={() => setConfirmAction("publish")}
+                disabled={lifecycleLoading || saving}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  cursor: lifecycleLoading || saving ? "not-allowed" : "pointer",
+                  opacity: lifecycleLoading || saving ? 0.6 : 1,
+                  border: "none",
+                  borderRadius: "4px",
+                  backgroundColor: "#4caf50",
+                  color: "#fff",
+                }}
+              >
+                {lifecycle.hasDraftChanges ? "Publish Changes" : "Publish"}
+              </button>
+            )}
+            {lifecycle.canDiscardDraft && (
+              <button
+                type="button"
+                data-test-id="lifecycle-discard-btn"
+                onClick={() => setConfirmAction("discardDraft")}
+                disabled={lifecycleLoading || saving}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  cursor: lifecycleLoading || saving ? "not-allowed" : "pointer",
+                  opacity: lifecycleLoading || saving ? 0.6 : 1,
+                  border: "1px solid #f44336",
+                  borderRadius: "4px",
+                  backgroundColor: "#fff",
+                  color: "#f44336",
+                }}
+              >
+                Discard Draft
+              </button>
+            )}
+            {lifecycle.canUnpublish && (
+              <button
+                type="button"
+                data-test-id="lifecycle-unpublish-btn"
+                onClick={() => setConfirmAction("unpublish")}
+                disabled={lifecycleLoading || saving}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "14px",
+                  fontWeight: 500,
+                  cursor: lifecycleLoading || saving ? "not-allowed" : "pointer",
+                  opacity: lifecycleLoading || saving ? 0.6 : 1,
+                  border: "1px solid #666",
+                  borderRadius: "4px",
+                  backgroundColor: "#fff",
+                  color: "#666",
+                }}
+              >
+                Unpublish
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Confirmation Modal */}
+      {confirmAction && (
+        <div
+          data-test-id="lifecycle-confirm-modal"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              padding: "24px",
+              borderRadius: "8px",
+              maxWidth: "400px",
+              width: "90%",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+            }}
+          >
+            <h3 style={{ margin: "0 0 12px 0", fontSize: "18px" }}>
+              {getConfirmText(confirmAction).title}
+            </h3>
+            <p style={{ margin: "0 0 20px 0", color: "#666", fontSize: "14px" }}>
+              {getConfirmText(confirmAction).message}
+            </p>
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                data-test-id="lifecycle-confirm-cancel"
+                onClick={() => setConfirmAction(null)}
+                disabled={lifecycleLoading}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "14px",
+                  cursor: lifecycleLoading ? "not-allowed" : "pointer",
+                  border: "1px solid #ccc",
+                  borderRadius: "4px",
+                  backgroundColor: "#fff",
+                  color: "#333",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-test-id="lifecycle-confirm-ok"
+                onClick={handleConfirmLifecycleAction}
+                disabled={lifecycleLoading}
+                style={{
+                  padding: "8px 16px",
+                  fontSize: "14px",
+                  cursor: lifecycleLoading ? "not-allowed" : "pointer",
+                  opacity: lifecycleLoading ? 0.6 : 1,
+                  border: "none",
+                  borderRadius: "4px",
+                  backgroundColor: confirmAction === "discardDraft" ? "#f44336" : "#4caf50",
+                  color: "#fff",
+                }}
+              >
+                {lifecycleLoading ? "Processing..." : "Confirm"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
         <h2 style={{ fontSize: "18px", margin: 0 }}>Blocks ({blocks.length})</h2>
         {saving && (
