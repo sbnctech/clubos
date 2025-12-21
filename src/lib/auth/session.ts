@@ -448,3 +448,229 @@ export async function getSessionStats(): Promise<{
     revokedSessions: revoked,
   };
 }
+
+// ============================================================================
+// Impersonation Support
+// ============================================================================
+
+export interface ImpersonationData {
+  memberId: string;
+  memberName: string;
+  memberEmail: string;
+  impersonatedAt: Date;
+  /** Membership status code (active, pending, expired, etc.) */
+  memberStatus: string;
+  /** Membership status label for display */
+  memberStatusLabel: string;
+  /** Current committee role titles (e.g., "Event Chair - Book Club") */
+  roleAssignments: string[];
+  /** True if member has any event chair role */
+  isEventChair: boolean;
+  /** True if member has any officer role */
+  isOfficer: boolean;
+}
+
+/**
+ * Start impersonating a member.
+ * The admin's session is updated to track the impersonated member.
+ *
+ * @param sessionId - The admin's session ID
+ * @param targetMemberId - The member to impersonate
+ * @returns The impersonation data if successful
+ */
+export async function startImpersonation(
+  sessionId: string,
+  targetMemberId: string
+): Promise<ImpersonationData | null> {
+  // Verify target member exists and get full info
+  const member = await prisma.member.findUnique({
+    where: { id: targetMemberId },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      membershipStatus: {
+        select: { code: true, label: true },
+      },
+      roleAssignments: {
+        where: {
+          endDate: null, // Only current assignments
+        },
+        select: {
+          committeeRole: {
+            select: { name: true },
+          },
+          committee: {
+            select: { name: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!member) {
+    return null;
+  }
+
+  // Update session with impersonation data
+  const now = new Date();
+  await prisma.session.update({
+    where: { id: sessionId },
+    data: {
+      impersonatingMemberId: targetMemberId,
+      impersonatedAt: now,
+    },
+  });
+
+  // Build role assignment labels
+  type RoleAssignmentResult = {
+    committeeRole: { name: string };
+    committee: { name: string };
+  };
+  const roleAssignmentLabels = member.roleAssignments.map(
+    (ra: RoleAssignmentResult) => `${ra.committeeRole.name} - ${ra.committee.name}`
+  );
+
+  // Detect officer and event chair roles
+  const isEventChair = member.roleAssignments.some(
+    (ra: RoleAssignmentResult) => ra.committeeRole.name.toLowerCase().includes("chair")
+  );
+  const isOfficer = member.roleAssignments.some((ra: RoleAssignmentResult) =>
+    ["president", "vice president", "vp", "secretary", "treasurer", "parliamentarian"].some(
+      (title) => ra.committeeRole.name.toLowerCase().includes(title)
+    )
+  );
+
+  return {
+    memberId: member.id,
+    memberName: `${member.firstName} ${member.lastName}`,
+    memberEmail: member.email,
+    impersonatedAt: now,
+    memberStatus: member.membershipStatus.code,
+    memberStatusLabel: member.membershipStatus.label,
+    roleAssignments: roleAssignmentLabels,
+    isEventChair,
+    isOfficer,
+  };
+}
+
+/**
+ * End impersonation for a session.
+ *
+ * @param sessionId - The session ID
+ * @returns True if impersonation was ended
+ */
+export async function endImpersonation(sessionId: string): Promise<boolean> {
+  try {
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        impersonatingMemberId: null,
+        impersonatedAt: null,
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get impersonation data for a session.
+ *
+ * @param sessionId - The session ID
+ * @returns Impersonation data if impersonating, null otherwise
+ */
+export async function getImpersonationData(
+  sessionId: string
+): Promise<ImpersonationData | null> {
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    select: {
+      impersonatingMemberId: true,
+      impersonatedAt: true,
+      impersonatingMember: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          membershipStatus: {
+            select: { code: true, label: true },
+          },
+          roleAssignments: {
+            where: {
+              endDate: null, // Only current assignments
+            },
+            select: {
+              committeeRole: {
+                select: { name: true },
+              },
+              committee: {
+                select: { name: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!session?.impersonatingMemberId || !session.impersonatingMember) {
+    return null;
+  }
+
+  const member = session.impersonatingMember;
+
+  // Build role assignment labels
+  type RoleAssignmentData = {
+    committeeRole: { name: string };
+    committee: { name: string };
+  };
+  const roleAssignmentLabels = member.roleAssignments.map(
+    (ra: RoleAssignmentData) => `${ra.committeeRole.name} - ${ra.committee.name}`
+  );
+
+  // Detect officer and event chair roles
+  const isEventChair = member.roleAssignments.some(
+    (ra: RoleAssignmentData) => ra.committeeRole.name.toLowerCase().includes("chair")
+  );
+  const isOfficer = member.roleAssignments.some((ra: RoleAssignmentData) =>
+    ["president", "vice president", "vp", "secretary", "treasurer", "parliamentarian"].some(
+      (title) => ra.committeeRole.name.toLowerCase().includes(title)
+    )
+  );
+
+  return {
+    memberId: member.id,
+    memberName: `${member.firstName} ${member.lastName}`,
+    memberEmail: member.email,
+    impersonatedAt: session.impersonatedAt!,
+    memberStatus: member.membershipStatus.code,
+    memberStatusLabel: member.membershipStatus.label,
+    roleAssignments: roleAssignmentLabels,
+    isEventChair,
+    isOfficer,
+  };
+}
+
+/**
+ * Get session with impersonation data.
+ * Extended version of getSession that includes impersonation info.
+ */
+export async function getSessionWithImpersonation(
+  token: string
+): Promise<(SessionData & { impersonation: ImpersonationData | null }) | null> {
+  const session = await getSession(token);
+  if (!session) {
+    return null;
+  }
+
+  const impersonation = await getImpersonationData(session.id);
+
+  return {
+    ...session,
+    impersonation,
+  };
+}

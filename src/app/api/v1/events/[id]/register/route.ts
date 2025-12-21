@@ -1,4 +1,18 @@
-import { NextRequest } from "next/server";
+/**
+ * Event Self-Registration API
+ *
+ * POST /api/v1/events/:id/register - Register authenticated member for event
+ * DELETE /api/v1/events/:id/register - Cancel member's registration
+ *
+ * Charter compliance:
+ * - P1: Identity provable via session
+ * - P2: Default deny (auth required)
+ * - P7: Audit logging for registration actions
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { getCurrentSession } from "@/lib/passkey";
+import { prisma } from "@/lib/prisma";
 import { errors } from "@/lib/api";
 
 interface RouteParams {
@@ -11,23 +25,120 @@ interface RouteParams {
  * Registers the authenticated member for an event.
  * If event is at capacity, adds to waitlist (if open).
  *
- * Response: Registration object with status (REGISTERED or WAITLISTED)
+ * Response: Registration object with status (CONFIRMED or WAITLISTED)
  */
-export async function POST(request: NextRequest, { params }: RouteParams) {
-  const { id } = await params;
+export async function POST(_request: NextRequest, { params }: RouteParams) {
+  const { id: eventId } = await params;
 
-  // TODO: Wire - Implement event registration
-  // 1. Validate access token and extract memberId
-  // 2. Check if member is already registered (CONFLICT if so)
-  // 3. Check event capacity
-  //    - If spots available: create REGISTERED registration
-  //    - If at capacity and waitlist open: create WAITLISTED registration
-  //    - If at capacity and waitlist closed: return CAPACITY_EXCEEDED
-  // 4. Return created registration
+  // P1/P2: Authenticate
+  const session = await getCurrentSession();
+  if (!session) {
+    return errors.unauthorized("Not authenticated");
+  }
+  const { memberId } = session;
 
-  void request; // Suppress unused variable warning
+  // Fetch event with registration count
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: {
+      _count: {
+        select: {
+          registrations: {
+            where: { status: { in: ["CONFIRMED", "PENDING", "PENDING_PAYMENT"] } },
+          },
+        },
+      },
+    },
+  });
 
-  return errors.internal(`POST /api/v1/events/${id}/register not implemented`);
+  if (!event) {
+    return errors.notFound("Event", eventId);
+  }
+
+  if (!event.isPublished) {
+    return errors.forbidden("Event is not open for registration");
+  }
+
+  // Check for existing registration
+  const existing = await prisma.eventRegistration.findFirst({
+    where: {
+      eventId,
+      memberId,
+      status: { notIn: ["CANCELLED"] },
+    },
+  });
+
+  if (existing) {
+    return NextResponse.json(
+      { error: "ALREADY_REGISTERED", message: "You are already registered for this event" },
+      { status: 409 }
+    );
+  }
+
+  // Determine registration status based on capacity
+  const registeredCount = event._count.registrations;
+  const hasCapacity = event.capacity !== null;
+  const isFull = hasCapacity && registeredCount >= (event.capacity ?? 0);
+
+  let status: "CONFIRMED" | "WAITLISTED";
+  let waitlistPosition: number | null = null;
+
+  if (isFull) {
+    // Get current max waitlist position
+    const maxPosition = await prisma.eventRegistration.aggregate({
+      where: { eventId, status: "WAITLISTED" },
+      _max: { waitlistPosition: true },
+    });
+    waitlistPosition = (maxPosition._max.waitlistPosition ?? 0) + 1;
+    status = "WAITLISTED";
+  } else {
+    status = "CONFIRMED";
+  }
+
+  // Create registration
+  const registration = await prisma.eventRegistration.create({
+    data: {
+      eventId,
+      memberId,
+      status,
+      waitlistPosition,
+      registeredAt: new Date(),
+    },
+    include: {
+      event: {
+        select: { id: true, title: true, startTime: true },
+      },
+    },
+  });
+
+  // P7: Audit log
+  await prisma.auditLog.create({
+    data: {
+      action: status === "WAITLISTED" ? "EVENT_WAITLIST_JOIN" : "EVENT_REGISTER",
+      resourceType: "EventRegistration",
+      resourceId: registration.id,
+      memberId,
+      metadata: {
+        eventId,
+        eventTitle: registration.event.title,
+        status,
+        waitlistPosition,
+      },
+    },
+  });
+
+  return NextResponse.json({
+    id: registration.id,
+    eventId: registration.eventId,
+    status: registration.status,
+    waitlistPosition: registration.waitlistPosition,
+    registeredAt: registration.registeredAt.toISOString(),
+    event: {
+      id: registration.event.id,
+      title: registration.event.title,
+      startTime: registration.event.startTime.toISOString(),
+    },
+  }, { status: 201 });
 }
 
 /**
@@ -37,17 +148,58 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
  *
  * Response: 204 No Content
  */
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
-  const { id } = await params;
+export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+  const { id: eventId } = await params;
 
-  // TODO: Wire - Implement registration cancellation
-  // 1. Validate access token and extract memberId
-  // 2. Find member's registration for this event
-  // 3. If not found: return RESOURCE_NOT_FOUND
-  // 4. Update registration status to CANCELLED
-  // 5. Return 204 No Content
+  // P1/P2: Authenticate
+  const session = await getCurrentSession();
+  if (!session) {
+    return errors.unauthorized("Not authenticated");
+  }
+  const { memberId } = session;
 
-  void request; // Suppress unused variable warning
+  // Find active registration
+  const registration = await prisma.eventRegistration.findFirst({
+    where: {
+      eventId,
+      memberId,
+      status: { notIn: ["CANCELLED"] },
+    },
+    include: {
+      event: { select: { title: true } },
+    },
+  });
 
-  return errors.internal(`DELETE /api/v1/events/${id}/register not implemented`);
+  if (!registration) {
+    return errors.notFound("Registration", `member=${memberId},event=${eventId}`);
+  }
+
+  const wasWaitlisted = registration.status === "WAITLISTED";
+
+  // Cancel registration
+  await prisma.eventRegistration.update({
+    where: { id: registration.id },
+    data: { status: "CANCELLED" },
+  });
+
+  // P7: Audit log
+  await prisma.auditLog.create({
+    data: {
+      action: "EVENT_CANCEL_REGISTRATION",
+      resourceType: "EventRegistration",
+      resourceId: registration.id,
+      memberId,
+      metadata: {
+        eventId,
+        eventTitle: registration.event.title,
+        previousStatus: registration.status,
+      },
+    },
+  });
+
+  // If cancelled from waitlist, no promotion needed
+  // If cancelled from confirmed, could promote waitlisted member (future enhancement)
+  void wasWaitlisted;
+
+  return new NextResponse(null, { status: 204 });
 }

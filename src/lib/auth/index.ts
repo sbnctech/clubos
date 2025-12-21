@@ -50,8 +50,14 @@ export {
   logoutUser,
   cleanupExpiredSessions,
   getSessionStats,
+  // Impersonation support
+  startImpersonation,
+  endImpersonation,
+  getImpersonationData,
+  getSessionWithImpersonation,
   type SessionData,
   type CreateSessionParams,
+  type ImpersonationData,
 } from "./session";
 
 // Audit logging

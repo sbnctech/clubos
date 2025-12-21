@@ -1,0 +1,3781 @@
+openapi: 3.1.0
+info:
+  title: ClubOS Internal API Documentation
+  version: 1.0.0
+  description: |
+    **Internal Developer Documentation for ClubOS API**
+
+    This documentation covers ALL ClubOS APIs including public, member, admin, officer, and internal endpoints.
+    It is intended for developers, tech leads, reviewers, and future maintainers.
+
+    ## Authentication
+
+    ClubOS uses session-based authentication with HttpOnly cookies. For local development and testing:
+
+    - **Cookie-based auth**: The primary method. Session cookies are set after login.
+    - **Test tokens (dev only)**: Use headers like `x-admin-test-token: dev-admin-token` for E2E tests.
+    - **Bearer tokens (dev only)**: Format: `Bearer test-{role}-{memberId}` (e.g., `test-admin-123`)
+
+    **IMPORTANT**: Never embed real tokens in documentation or code. Use placeholder values.
+
+    ## Testing Endpoints Safely
+
+    1. Use the dev environment only for testing
+    2. Use test tokens with `x-admin-test-token` header
+    3. Never test destructive operations against production data
+
+    ## Error Responses
+
+    All endpoints return standardized error responses:
+    - `400` - Validation error (bad request body/params)
+    - `401` - Unauthorized (missing or invalid auth)
+    - `403` - Forbidden (insufficient permissions)
+    - `404` - Resource not found
+    - `429` - Rate limited
+    - `500` - Internal server error
+
+  contact:
+    name: ClubOS Development Team
+  license:
+    name: Proprietary
+    identifier: Proprietary
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: https://clubos.example.com
+    description: Production (replace with actual URL)
+
+tags:
+  - name: Health
+    description: System health checks (public)
+  - name: Auth
+    description: Authentication endpoints (magic link, passkey)
+  - name: Me
+    description: Current authenticated user endpoints
+  - name: Members
+    description: Member directory and public profiles
+  - name: Events
+    description: Public event listing and details
+  - name: Committees
+    description: Committee listing
+  - name: Files
+    description: File upload and download
+  - name: Admin/Members
+    description: Admin member management
+  - name: Admin/Events
+    description: Admin event management
+  - name: Admin/Registrations
+    description: Admin registration management
+  - name: Admin/Transitions
+    description: Leadership transition planning
+  - name: Admin/Dashboard
+    description: Admin dashboard and summaries
+  - name: Admin/Content
+    description: Content management (pages, themes, templates)
+  - name: Admin/Comms
+    description: Communications (campaigns, templates, lists)
+  - name: Admin/Export
+    description: Data export endpoints
+  - name: Admin/Files
+    description: Admin file management
+  - name: Admin/Debug
+    description: Debug and diagnostic endpoints
+  - name: Admin/Demo
+    description: Demo data and scenarios
+  - name: Admin/Impersonation
+    description: Member impersonation for support
+  - name: Officer/Secretary
+    description: Secretary dashboard and minutes workflow
+  - name: Officer/Parliamentarian
+    description: Parliamentarian dashboard and rules
+  - name: Officer/VP-Activities
+    description: VP Activities dashboard
+  - name: Officer/Governance
+    description: Governance (annotations, flags, rules, meetings)
+  - name: Officer/Meetings
+    description: Meeting management
+  - name: Officer/Board-Records
+    description: Board records management
+  - name: Payments
+    description: Payment processing
+  - name: Cron
+    description: Internal cron job endpoints
+  - name: Webhooks
+    description: External webhook receivers
+  - name: Email
+    description: Email testing and logging
+  - name: SMS
+    description: SMS testing
+  - name: Version
+    description: Application version info
+
+paths:
+  # ===========================================
+  # HEALTH ENDPOINTS
+  # ===========================================
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: System health check
+      description: Returns system health status including database connectivity. No authentication required.
+      operationId: getHealth
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: System is degraded (e.g., database unreachable)
+
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Legacy health check
+      description: Legacy health endpoint. Prefer /api/v1/health.
+      operationId: getLegacyHealth
+      responses:
+        '200':
+          description: OK
+
+  /api/health/db:
+    get:
+      tags: [Health]
+      summary: Database health check
+      description: Check database connectivity specifically.
+      operationId: getDbHealth
+      responses:
+        '200':
+          description: Database is connected
+        '503':
+          description: Database is unreachable
+
+  /api/health/auth:
+    get:
+      tags: [Health]
+      summary: Auth system health check
+      description: Check authentication system health.
+      operationId: getAuthHealth
+      responses:
+        '200':
+          description: Auth system is healthy
+
+  /api/health/cron:
+    get:
+      tags: [Health]
+      summary: Cron system health check
+      description: Check cron job system health.
+      operationId: getCronHealth
+      responses:
+        '200':
+          description: Cron system is healthy
+
+  # ===========================================
+  # VERSION ENDPOINT
+  # ===========================================
+  /api/v1/version:
+    get:
+      tags: [Version]
+      summary: Get application version
+      description: Returns the current application version and build info.
+      operationId: getVersion
+      responses:
+        '200':
+          description: Version info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: "1.0.0"
+                  buildDate:
+                    type: string
+                    format: date-time
+                  gitCommit:
+                    type: string
+
+  # ===========================================
+  # AUTH ENDPOINTS
+  # ===========================================
+  /api/v1/auth/magic-link/send:
+    post:
+      tags: [Auth]
+      summary: Request magic link
+      description: |
+        Request a magic link for email-based authentication.
+        Always returns success to prevent email enumeration.
+        Rate limited by email and IP.
+      operationId: sendMagicLink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: member@example.com
+      responses:
+        '200':
+          description: Request processed (always returns success)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '429':
+          description: Rate limited
+
+  /api/v1/auth/magic-link/verify:
+    post:
+      tags: [Auth]
+      summary: Verify magic link token
+      description: Verify a magic link token and establish session.
+      operationId: verifyMagicLink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Token verified, session established
+        '400':
+          description: Invalid or expired token
+
+  /api/v1/auth/passkey/register/begin:
+    post:
+      tags: [Auth]
+      summary: Begin passkey registration
+      description: Start WebAuthn passkey registration flow.
+      operationId: beginPasskeyRegistration
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Registration options
+        '401':
+          description: Not authenticated
+
+  /api/v1/auth/passkey/register/finish:
+    post:
+      tags: [Auth]
+      summary: Finish passkey registration
+      description: Complete WebAuthn passkey registration.
+      operationId: finishPasskeyRegistration
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Passkey registered successfully
+        '400':
+          description: Invalid registration data
+        '401':
+          description: Not authenticated
+
+  /api/v1/auth/passkey/login/begin:
+    post:
+      tags: [Auth]
+      summary: Begin passkey login
+      description: Start WebAuthn passkey authentication flow.
+      operationId: beginPasskeyLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Authentication options
+
+  /api/v1/auth/passkey/login/finish:
+    post:
+      tags: [Auth]
+      summary: Finish passkey login
+      description: Complete WebAuthn passkey authentication.
+      operationId: finishPasskeyLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Logged in successfully
+        '400':
+          description: Invalid authentication data
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh session
+      description: Refresh the current session token.
+      operationId: refreshSession
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Session refreshed
+        '401':
+          description: Not authenticated
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: End the current session.
+      operationId: logout
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Legacy logout
+      description: Legacy logout endpoint.
+      operationId: legacyLogout
+      responses:
+        '200':
+          description: Logged out
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Legacy current user
+      description: Legacy endpoint to get current user info.
+      operationId: legacyGetMe
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current user info
+        '401':
+          description: Not authenticated
+
+  /api/auth/request-link:
+    post:
+      tags: [Auth]
+      summary: Legacy request magic link
+      description: Legacy endpoint to request magic link.
+      operationId: legacyRequestLink
+      responses:
+        '200':
+          description: Link requested
+
+  # ===========================================
+  # ME (CURRENT USER) ENDPOINTS
+  # ===========================================
+  /api/v1/me:
+    get:
+      tags: [Me]
+      summary: Get current user profile
+      description: Returns the authenticated member's profile including membership status and tenure.
+      operationId: getMe
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MemberProfile'
+        '401':
+          description: Not authenticated
+
+  /api/v1/me/profile:
+    get:
+      tags: [Me]
+      summary: Get extended profile
+      description: Get the current user's extended profile information.
+      operationId: getMyProfile
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Extended profile
+        '401':
+          description: Not authenticated
+    patch:
+      tags: [Me]
+      summary: Update profile
+      description: Update the current user's profile information.
+      operationId: updateMyProfile
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                phone:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated
+        '401':
+          description: Not authenticated
+
+  /api/v1/me/registrations:
+    get:
+      tags: [Me]
+      summary: Get my registrations
+      description: Get the current user's event registrations.
+      operationId: getMyRegistrations
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of registrations
+        '401':
+          description: Not authenticated
+
+  /api/v1/me/recommended-events:
+    get:
+      tags: [Me]
+      summary: Get recommended events
+      description: Get personalized event recommendations for the current user.
+      operationId: getMyRecommendedEvents
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Recommended events
+        '401':
+          description: Not authenticated
+
+  /api/v1/me/committees:
+    get:
+      tags: [Me]
+      summary: Get my committees
+      description: Get committees the current user is a member of.
+      operationId: getMyCommittees
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of committees
+        '401':
+          description: Not authenticated
+
+  /api/v1/me/passkeys:
+    get:
+      tags: [Me]
+      summary: Get my passkeys
+      description: List passkeys registered for the current user.
+      operationId: getMyPasskeys
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of passkeys
+        '401':
+          description: Not authenticated
+
+  /api/v1/me/payment-methods:
+    get:
+      tags: [Me]
+      summary: Get my payment methods
+      description: List payment methods for the current user.
+      operationId: getMyPaymentMethods
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of payment methods
+        '401':
+          description: Not authenticated
+    post:
+      tags: [Me]
+      summary: Add payment method
+      description: Add a new payment method.
+      operationId: addPaymentMethod
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Payment method added
+        '401':
+          description: Not authenticated
+
+  /api/v1/me/payment-methods/{id}:
+    delete:
+      tags: [Me]
+      summary: Delete payment method
+      description: Remove a payment method.
+      operationId: deletePaymentMethod
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Payment method deleted
+        '401':
+          description: Not authenticated
+        '404':
+          description: Payment method not found
+
+  /api/v1/me/payment-methods/ach:
+    post:
+      tags: [Me]
+      summary: Add ACH payment method
+      description: Add an ACH (bank account) payment method.
+      operationId: addAchPaymentMethod
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: ACH payment method added
+        '401':
+          description: Not authenticated
+
+  # ===========================================
+  # MEMBERS ENDPOINTS
+  # ===========================================
+  /api/v1/members:
+    get:
+      tags: [Members]
+      summary: List members (limited)
+      description: List members with limited public info. Requires authentication.
+      operationId: listMembers
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: Paginated list of members
+        '401':
+          description: Not authenticated
+
+  /api/v1/members/directory:
+    get:
+      tags: [Members]
+      summary: Member directory
+      description: Get the member directory (requires authentication).
+      operationId: getMemberDirectory
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Member directory
+        '401':
+          description: Not authenticated
+
+  /api/v1/members/{id}:
+    get:
+      tags: [Members]
+      summary: Get member by ID
+      description: Get a specific member's information.
+      operationId: getMember
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Member details
+        '401':
+          description: Not authenticated
+        '404':
+          description: Member not found
+
+  /api/v1/members/{id}/public:
+    get:
+      tags: [Members]
+      summary: Get member public profile
+      description: Get a member's public profile information.
+      operationId: getMemberPublicProfile
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Public profile
+        '404':
+          description: Member not found
+
+  /api/members:
+    get:
+      tags: [Members]
+      summary: Legacy list members
+      description: Legacy endpoint for listing members.
+      operationId: legacyListMembers
+      responses:
+        '200':
+          description: List of members
+
+  # ===========================================
+  # EVENTS ENDPOINTS
+  # ===========================================
+  /api/v1/events:
+    get:
+      tags: [Events]
+      summary: List events
+      description: |
+        Public endpoint to list published events.
+        No authentication required.
+        Supports filtering by category, date range, and search.
+      operationId: listEvents
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/limit'
+        - name: category
+          in: query
+          schema:
+            type: string
+          description: Filter by category
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter events starting on or after this date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Filter events starting on or before this date
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search in title and description
+        - name: past
+          in: query
+          schema:
+            type: string
+            enum: ["true", "false"]
+          description: Include past events
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+
+  /api/v1/events/{id}:
+    get:
+      tags: [Events]
+      summary: Get event details
+      description: Get details of a specific published event.
+      operationId: getEvent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetail'
+        '404':
+          description: Event not found
+
+  /api/v1/events/{id}/register:
+    post:
+      tags: [Events]
+      summary: Register for event
+      description: Register the current user for an event.
+      operationId: registerForEvent
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ticketTierId:
+                  type: string
+                  format: uuid
+                guestCount:
+                  type: integer
+      responses:
+        '201':
+          description: Registration created
+        '400':
+          description: Invalid registration data
+        '401':
+          description: Not authenticated
+        '404':
+          description: Event not found
+        '422':
+          description: Capacity exceeded
+
+  /api/v1/events/{id}/status:
+    get:
+      tags: [Events]
+      summary: Get event status
+      description: Get current status and availability for an event.
+      operationId: getEventStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event status
+        '404':
+          description: Event not found
+
+  /api/v1/events/{id}/postmortem:
+    get:
+      tags: [Events]
+      summary: Get event postmortem
+      description: Get the chair notebook/postmortem for a completed event.
+      operationId: getEventPostmortem
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Postmortem data
+        '401':
+          description: Not authenticated
+        '403':
+          description: Not authorized
+        '404':
+          description: Not found
+    post:
+      tags: [Events]
+      summary: Create event postmortem
+      description: Create a chair notebook for a completed event. Event chairs only.
+      operationId: createEventPostmortem
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Postmortem created
+        '401':
+          description: Not authenticated
+        '403':
+          description: Not authorized
+    patch:
+      tags: [Events]
+      summary: Update event postmortem
+      description: Update the chair notebook. Event chairs only, DRAFT/UNLOCKED status.
+      operationId: updateEventPostmortem
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Postmortem updated
+        '401':
+          description: Not authenticated
+        '403':
+          description: Not authorized
+
+  /api/v1/events/{id}/postmortem/submit:
+    post:
+      tags: [Events]
+      summary: Submit postmortem for review
+      description: Submit postmortem for VP review. Event chairs only.
+      operationId: submitEventPostmortem
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Submitted for review
+        '401':
+          description: Not authenticated
+        '403':
+          description: Not authorized
+
+  /api/v1/events/{id}/postmortem/approve:
+    post:
+      tags: [Events]
+      summary: Approve postmortem
+      description: VP approves the postmortem. VP Activities only.
+      operationId: approveEventPostmortem
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Approved
+        '401':
+          description: Not authenticated
+        '403':
+          description: Not authorized
+
+  /api/v1/events/{id}/postmortem/return:
+    post:
+      tags: [Events]
+      summary: Return postmortem for revision
+      description: VP returns postmortem for revision. VP Activities only.
+      operationId: returnEventPostmortem
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Returned for revision
+        '401':
+          description: Not authenticated
+        '403':
+          description: Not authorized
+
+  /api/v1/events/{id}/postmortem/unlock:
+    post:
+      tags: [Events]
+      summary: Unlock approved postmortem
+      description: VP unlocks an approved postmortem for further editing.
+      operationId: unlockEventPostmortem
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Unlocked
+        '401':
+          description: Not authenticated
+        '403':
+          description: Not authorized
+
+  /api/events:
+    get:
+      tags: [Events]
+      summary: Legacy list events
+      description: Legacy endpoint for listing events.
+      operationId: legacyListEvents
+      responses:
+        '200':
+          description: List of events
+
+  # ===========================================
+  # COMMITTEES ENDPOINTS
+  # ===========================================
+  /api/v1/committees:
+    get:
+      tags: [Committees]
+      summary: List committees
+      description: Public endpoint to list active committees.
+      operationId: listCommittees
+      responses:
+        '200':
+          description: List of committees
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  committees:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Committee'
+
+  # ===========================================
+  # FILES ENDPOINTS
+  # ===========================================
+  /api/v1/files:
+    get:
+      tags: [Files]
+      summary: List files
+      description: List files accessible to the current user.
+      operationId: listFiles
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of files
+        '401':
+          description: Not authenticated
+    post:
+      tags: [Files]
+      summary: Upload file
+      description: Upload a new file.
+      operationId: uploadFile
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: File uploaded
+        '401':
+          description: Not authenticated
+
+  /api/v1/files/{id}:
+    get:
+      tags: [Files]
+      summary: Get file metadata
+      description: Get metadata for a specific file.
+      operationId: getFile
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File metadata
+        '404':
+          description: File not found
+    delete:
+      tags: [Files]
+      summary: Delete file
+      description: Delete a file.
+      operationId: deleteFile
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: File deleted
+        '404':
+          description: File not found
+
+  /api/v1/files/{id}/url:
+    get:
+      tags: [Files]
+      summary: Get file download URL
+      description: Get a signed URL for downloading the file.
+      operationId: getFileUrl
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Download URL
+        '404':
+          description: File not found
+
+  # ===========================================
+  # ADMIN/MEMBERS ENDPOINTS
+  # ===========================================
+  /api/v1/admin/members:
+    get:
+      tags: [Admin/Members]
+      summary: Admin list members
+      description: List all members with full admin details. Requires members:view capability.
+      operationId: adminListMembers
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: Paginated list of members
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMemberListResponse'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/members/{id}:
+    get:
+      tags: [Admin/Members]
+      summary: Admin get member
+      description: Get full member details. Requires members:view capability.
+      operationId: adminGetMember
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Member details
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Member not found
+    patch:
+      tags: [Admin/Members]
+      summary: Admin update member
+      description: Update member information. Requires users:manage capability.
+      operationId: adminUpdateMember
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Member updated
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/members/{id}/status:
+    patch:
+      tags: [Admin/Members]
+      summary: Update member status
+      description: Update member membership status.
+      operationId: adminUpdateMemberStatus
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status updated
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/members/{id}/lifecycle:
+    get:
+      tags: [Admin/Members]
+      summary: Get member lifecycle
+      description: Get member lifecycle/status history.
+      operationId: adminGetMemberLifecycle
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lifecycle history
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/members/{id}/history:
+    get:
+      tags: [Admin/Members]
+      summary: Get member history
+      description: Get member activity history.
+      operationId: adminGetMemberHistory
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Member history
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/members/{id}/service-history:
+    get:
+      tags: [Admin/Members]
+      summary: Get member service history
+      description: Get member's volunteer/leadership service history.
+      operationId: adminGetMemberServiceHistory
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Service history
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/admin/members:
+    get:
+      tags: [Admin/Members]
+      summary: Legacy admin list members
+      description: Legacy endpoint for admin member listing.
+      operationId: legacyAdminListMembers
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of members
+
+  /api/admin/members/{id}:
+    get:
+      tags: [Admin/Members]
+      summary: Legacy admin get member
+      description: Legacy endpoint for getting member details.
+      operationId: legacyAdminGetMember
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Member details
+
+  /api/admin/members/{id}/history:
+    get:
+      tags: [Admin/Members]
+      summary: Legacy admin member history
+      description: Legacy endpoint for member history.
+      operationId: legacyAdminGetMemberHistory
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Member history
+
+  # ===========================================
+  # ADMIN/EVENTS ENDPOINTS
+  # ===========================================
+  /api/v1/admin/events:
+    get:
+      tags: [Admin/Events]
+      summary: Admin list events
+      description: List all events including unpublished. Requires events:view capability.
+      operationId: adminListEvents
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/pageSize'
+      responses:
+        '200':
+          description: List of events
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+    post:
+      tags: [Admin/Events]
+      summary: Create event
+      description: Create a new event. Requires events:edit capability.
+      operationId: adminCreateEvent
+      security:
+        - cookieAuth: []
+        - testToken: []
+      responses:
+        '201':
+          description: Event created
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/events/{id}:
+    get:
+      tags: [Admin/Events]
+      summary: Admin get event
+      description: Get full event details including registrations.
+      operationId: adminGetEvent
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event details
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+        '404':
+          description: Event not found
+    patch:
+      tags: [Admin/Events]
+      summary: Admin update event
+      description: Update event information.
+      operationId: adminUpdateEvent
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event updated
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+    delete:
+      tags: [Admin/Events]
+      summary: Admin delete event
+      description: Delete an event. Requires events:delete capability.
+      operationId: adminDeleteEvent
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Event deleted
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/events/{id}/cancel:
+    post:
+      tags: [Admin/Events]
+      summary: Cancel event
+      description: Cancel an event (soft delete).
+      operationId: adminCancelEvent
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event cancelled
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/events/{id}/duplicate:
+    post:
+      tags: [Admin/Events]
+      summary: Duplicate event
+      description: Clone an event for reuse.
+      operationId: adminDuplicateEvent
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Event duplicated
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/admin/events:
+    get:
+      tags: [Admin/Events]
+      summary: Legacy admin list events
+      description: Legacy endpoint for admin event listing.
+      operationId: legacyAdminListEvents
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of events
+
+  /api/admin/events/{id}:
+    get:
+      tags: [Admin/Events]
+      summary: Legacy admin get event
+      description: Legacy endpoint for getting event details.
+      operationId: legacyAdminGetEvent
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event details
+
+  # ===========================================
+  # ADMIN/REGISTRATIONS ENDPOINTS
+  # ===========================================
+  /api/v1/admin/registrations:
+    get:
+      tags: [Admin/Registrations]
+      summary: Admin list registrations
+      description: List all registrations. Requires registrations:view capability.
+      operationId: adminListRegistrations
+      security:
+        - cookieAuth: []
+        - testToken: []
+      responses:
+        '200':
+          description: List of registrations
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/registrations/pending:
+    get:
+      tags: [Admin/Registrations]
+      summary: Get pending registrations
+      description: Get registrations awaiting action.
+      operationId: adminGetPendingRegistrations
+      security:
+        - cookieAuth: []
+        - testToken: []
+      responses:
+        '200':
+          description: Pending registrations
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/registrations/{id}:
+    get:
+      tags: [Admin/Registrations]
+      summary: Admin get registration
+      description: Get registration details.
+      operationId: adminGetRegistration
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Registration details
+        '404':
+          description: Registration not found
+    patch:
+      tags: [Admin/Registrations]
+      summary: Admin update registration
+      description: Update registration status.
+      operationId: adminUpdateRegistration
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Registration updated
+        '404':
+          description: Registration not found
+
+  /api/v1/admin/registrations/{id}/promote:
+    post:
+      tags: [Admin/Registrations]
+      summary: Promote waitlist registration
+      description: Promote a waitlisted registration to confirmed.
+      operationId: adminPromoteRegistration
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Registration promoted
+        '404':
+          description: Registration not found
+
+  /api/admin/registrations:
+    get:
+      tags: [Admin/Registrations]
+      summary: Legacy admin list registrations
+      description: Legacy endpoint for registration listing.
+      operationId: legacyAdminListRegistrations
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of registrations
+
+  /api/admin/registrations/{id}:
+    get:
+      tags: [Admin/Registrations]
+      summary: Legacy admin get registration
+      description: Legacy endpoint for registration details.
+      operationId: legacyAdminGetRegistration
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Registration details
+
+  /api/admin/registrations/search:
+    get:
+      tags: [Admin/Registrations]
+      summary: Search registrations
+      description: Search registrations by member name or event.
+      operationId: adminSearchRegistrations
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+
+  /api/registrations:
+    get:
+      tags: [Admin/Registrations]
+      summary: Legacy list registrations
+      description: Legacy endpoint.
+      operationId: legacyListRegistrations
+      responses:
+        '200':
+          description: List of registrations
+
+  # ===========================================
+  # ADMIN/SERVICE-HISTORY ENDPOINTS
+  # ===========================================
+  /api/v1/admin/service-history:
+    get:
+      tags: [Admin/Members]
+      summary: List service history
+      description: List all member service history records.
+      operationId: adminListServiceHistory
+      security:
+        - cookieAuth: []
+        - testToken: []
+      responses:
+        '200':
+          description: Service history records
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+    post:
+      tags: [Admin/Members]
+      summary: Create service history
+      description: Create a service history record.
+      operationId: adminCreateServiceHistory
+      security:
+        - cookieAuth: []
+        - testToken: []
+      responses:
+        '201':
+          description: Record created
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/service-history/{id}/close:
+    post:
+      tags: [Admin/Members]
+      summary: Close service history
+      description: Close an open service history record.
+      operationId: adminCloseServiceHistory
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Record closed
+        '404':
+          description: Record not found
+
+  # ===========================================
+  # ADMIN/TRANSITIONS ENDPOINTS
+  # ===========================================
+  /api/v1/admin/transitions:
+    get:
+      tags: [Admin/Transitions]
+      summary: List transitions
+      description: List leadership transition plans.
+      operationId: adminListTransitions
+      security:
+        - cookieAuth: []
+        - testToken: []
+      responses:
+        '200':
+          description: List of transitions
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+    post:
+      tags: [Admin/Transitions]
+      summary: Create transition
+      description: Create a new transition plan.
+      operationId: adminCreateTransition
+      security:
+        - cookieAuth: []
+        - testToken: []
+      responses:
+        '201':
+          description: Transition created
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/v1/admin/transitions/widget:
+    get:
+      tags: [Admin/Transitions]
+      summary: Transition widget data
+      description: Get data for transition dashboard widget.
+      operationId: adminGetTransitionWidget
+      security:
+        - cookieAuth: []
+        - testToken: []
+      responses:
+        '200':
+          description: Widget data
+        '401':
+          description: Not authenticated
+
+  /api/v1/admin/transitions/{id}:
+    get:
+      tags: [Admin/Transitions]
+      summary: Get transition
+      description: Get transition plan details.
+      operationId: adminGetTransition
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transition details
+        '404':
+          description: Transition not found
+    patch:
+      tags: [Admin/Transitions]
+      summary: Update transition
+      description: Update transition plan.
+      operationId: adminUpdateTransition
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transition updated
+        '404':
+          description: Transition not found
+
+  /api/v1/admin/transitions/{id}/submit:
+    post:
+      tags: [Admin/Transitions]
+      summary: Submit transition for approval
+      description: Submit transition plan for approval.
+      operationId: adminSubmitTransition
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transition submitted
+
+  /api/v1/admin/transitions/{id}/approve:
+    post:
+      tags: [Admin/Transitions]
+      summary: Approve transition
+      description: Approve a transition plan.
+      operationId: adminApproveTransition
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transition approved
+
+  /api/v1/admin/transitions/{id}/apply:
+    post:
+      tags: [Admin/Transitions]
+      summary: Apply transition
+      description: Apply an approved transition.
+      operationId: adminApplyTransition
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transition applied
+
+  /api/v1/admin/transitions/{id}/cancel:
+    post:
+      tags: [Admin/Transitions]
+      summary: Cancel transition
+      description: Cancel a transition plan.
+      operationId: adminCancelTransition
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transition cancelled
+
+  /api/v1/admin/transitions/{id}/detect-outgoing:
+    post:
+      tags: [Admin/Transitions]
+      summary: Detect outgoing assignments
+      description: Detect roles to be vacated in transition.
+      operationId: adminDetectOutgoing
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Outgoing assignments detected
+
+  /api/v1/admin/transitions/{id}/assignments:
+    get:
+      tags: [Admin/Transitions]
+      summary: Get transition assignments
+      description: Get role assignments in a transition.
+      operationId: adminGetTransitionAssignments
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Assignments list
+    post:
+      tags: [Admin/Transitions]
+      summary: Add transition assignment
+      description: Add a role assignment to transition.
+      operationId: adminAddTransitionAssignment
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Assignment added
+
+  /api/v1/admin/transitions/{id}/assignments/{aid}:
+    delete:
+      tags: [Admin/Transitions]
+      summary: Delete transition assignment
+      description: Remove a role assignment from transition.
+      operationId: adminDeleteTransitionAssignment
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: aid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Assignment deleted
+
+  /api/admin/transitions/summary:
+    get:
+      tags: [Admin/Transitions]
+      summary: Legacy transition summary
+      description: Legacy endpoint for transition summary.
+      operationId: legacyAdminTransitionSummary
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Summary
+
+  # ===========================================
+  # ADMIN/USERS (PASSKEYS) ENDPOINTS
+  # ===========================================
+  /api/v1/admin/users/{id}/passkeys:
+    get:
+      tags: [Admin/Members]
+      summary: Admin list user passkeys
+      description: List passkeys for a user. Admin only.
+      operationId: adminListUserPasskeys
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of passkeys
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+    delete:
+      tags: [Admin/Members]
+      summary: Admin revoke user passkeys
+      description: Revoke all passkeys for a user.
+      operationId: adminRevokeUserPasskeys
+      security:
+        - cookieAuth: []
+        - testToken: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Passkeys revoked
+
+  # ===========================================
+  # ADMIN/DASHBOARD ENDPOINTS
+  # ===========================================
+  /api/admin/dashboard:
+    get:
+      tags: [Admin/Dashboard]
+      summary: Get dashboard data
+      description: Get admin dashboard summary data.
+      operationId: getAdminDashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+
+  /api/admin/summary:
+    get:
+      tags: [Admin/Dashboard]
+      summary: Get admin summary
+      description: Get admin summary statistics.
+      operationId: getAdminSummary
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Summary data
+
+  /api/admin/activity:
+    get:
+      tags: [Admin/Dashboard]
+      summary: Get recent activity
+      description: Get recent activity log.
+      operationId: getAdminActivity
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Activity log
+
+  /api/admin/search:
+    get:
+      tags: [Admin/Dashboard]
+      summary: Admin search
+      description: Search across members, events, registrations.
+      operationId: adminSearch
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+
+  # ===========================================
+  # ADMIN/CONTENT ENDPOINTS
+  # ===========================================
+  /api/admin/content/pages:
+    get:
+      tags: [Admin/Content]
+      summary: List pages
+      description: List content pages.
+      operationId: adminListPages
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of pages
+    post:
+      tags: [Admin/Content]
+      summary: Create page
+      description: Create a new content page.
+      operationId: adminCreatePage
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Page created
+
+  /api/admin/content/pages/{id}:
+    get:
+      tags: [Admin/Content]
+      summary: Get page
+      description: Get a content page.
+      operationId: adminGetPage
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Page data
+    patch:
+      tags: [Admin/Content]
+      summary: Update page
+      description: Update a content page.
+      operationId: adminUpdatePage
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Page updated
+    delete:
+      tags: [Admin/Content]
+      summary: Delete page
+      description: Delete a content page.
+      operationId: adminDeletePage
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Page deleted
+
+  /api/admin/content/pages/{id}/blocks:
+    get:
+      tags: [Admin/Content]
+      summary: Get page blocks
+      description: Get content blocks for a page.
+      operationId: adminGetPageBlocks
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of blocks
+    post:
+      tags: [Admin/Content]
+      summary: Add block to page
+      description: Add a content block to a page.
+      operationId: adminAddPageBlock
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Block added
+
+  /api/admin/content/pages/{id}/blocks/{blockId}:
+    patch:
+      tags: [Admin/Content]
+      summary: Update page block
+      description: Update a content block.
+      operationId: adminUpdatePageBlock
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: blockId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Block updated
+    delete:
+      tags: [Admin/Content]
+      summary: Delete page block
+      description: Delete a content block.
+      operationId: adminDeletePageBlock
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: blockId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Block deleted
+
+  /api/admin/content/templates:
+    get:
+      tags: [Admin/Content]
+      summary: List templates
+      description: List content templates.
+      operationId: adminListTemplates
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of templates
+
+  /api/admin/content/themes:
+    get:
+      tags: [Admin/Content]
+      summary: List themes
+      description: List content themes.
+      operationId: adminListThemes
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of themes
+
+  # ===========================================
+  # ADMIN/COMMS ENDPOINTS
+  # ===========================================
+  /api/admin/comms/campaigns:
+    get:
+      tags: [Admin/Comms]
+      summary: List campaigns
+      description: List email campaigns.
+      operationId: adminListCampaigns
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of campaigns
+    post:
+      tags: [Admin/Comms]
+      summary: Create campaign
+      description: Create an email campaign.
+      operationId: adminCreateCampaign
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Campaign created
+
+  /api/admin/comms/campaigns/{id}:
+    get:
+      tags: [Admin/Comms]
+      summary: Get campaign
+      description: Get campaign details.
+      operationId: adminGetCampaign
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Campaign details
+    patch:
+      tags: [Admin/Comms]
+      summary: Update campaign
+      description: Update a campaign.
+      operationId: adminUpdateCampaign
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Campaign updated
+    delete:
+      tags: [Admin/Comms]
+      summary: Delete campaign
+      description: Delete a campaign.
+      operationId: adminDeleteCampaign
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Campaign deleted
+
+  /api/admin/comms/templates:
+    get:
+      tags: [Admin/Comms]
+      summary: List email templates
+      description: List email templates.
+      operationId: adminListEmailTemplates
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of templates
+
+  /api/admin/comms/lists:
+    get:
+      tags: [Admin/Comms]
+      summary: List mailing lists
+      description: List mailing lists.
+      operationId: adminListMailingLists
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of mailing lists
+
+  /api/admin/comms/audience-rules:
+    get:
+      tags: [Admin/Comms]
+      summary: List audience rules
+      description: List audience targeting rules.
+      operationId: adminListAudienceRules
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of rules
+
+  # ===========================================
+  # ADMIN/EXPORT ENDPOINTS
+  # ===========================================
+  /api/admin/export/members:
+    get:
+      tags: [Admin/Export]
+      summary: Export members
+      description: Export member data. Requires exports:access capability.
+      operationId: adminExportMembers
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: CSV/JSON export
+
+  /api/admin/export/events:
+    get:
+      tags: [Admin/Export]
+      summary: Export events
+      description: Export event data.
+      operationId: adminExportEvents
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: CSV/JSON export
+
+  /api/admin/export/registrations:
+    get:
+      tags: [Admin/Export]
+      summary: Export registrations
+      description: Export registration data.
+      operationId: adminExportRegistrations
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: CSV/JSON export
+
+  /api/admin/export/activity:
+    get:
+      tags: [Admin/Export]
+      summary: Export activity log
+      description: Export activity/audit log.
+      operationId: adminExportActivity
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: CSV/JSON export
+
+  # ===========================================
+  # ADMIN/FILES ENDPOINTS
+  # ===========================================
+  /api/admin/files:
+    get:
+      tags: [Admin/Files]
+      summary: Admin list files
+      description: List all files with admin details.
+      operationId: adminListFiles
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of files
+    post:
+      tags: [Admin/Files]
+      summary: Admin upload file
+      description: Upload a file with admin privileges.
+      operationId: adminUploadFile
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: File uploaded
+
+  /api/admin/files/{id}:
+    get:
+      tags: [Admin/Files]
+      summary: Admin get file
+      description: Get file with admin details.
+      operationId: adminGetFile
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: File details
+    delete:
+      tags: [Admin/Files]
+      summary: Admin delete file
+      description: Delete a file.
+      operationId: adminDeleteFile
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: File deleted
+
+  /api/admin/files/authorized:
+    get:
+      tags: [Admin/Files]
+      summary: Get authorized file URL
+      description: Get authorized URL for file access.
+      operationId: adminGetAuthorizedFileUrl
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Authorized URL
+
+  # ===========================================
+  # ADMIN/DEBUG ENDPOINTS
+  # ===========================================
+  /api/admin/debug/effective-permissions:
+    get:
+      tags: [Admin/Debug]
+      summary: Get effective permissions
+      description: Debug endpoint to view current user's effective permissions.
+      operationId: adminGetEffectivePermissions
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Permissions info
+
+  # ===========================================
+  # ADMIN/DEMO ENDPOINTS
+  # ===========================================
+  /api/admin/demo/status:
+    get:
+      tags: [Admin/Demo]
+      summary: Get demo status
+      description: Get demo environment status.
+      operationId: adminGetDemoStatus
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Demo status
+
+  /api/admin/demo/scenarios:
+    get:
+      tags: [Admin/Demo]
+      summary: List demo scenarios
+      description: List available demo scenarios.
+      operationId: adminListDemoScenarios
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of scenarios
+    post:
+      tags: [Admin/Demo]
+      summary: Run demo scenario
+      description: Execute a demo scenario.
+      operationId: adminRunDemoScenario
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Scenario executed
+
+  /api/admin/demo/member-list:
+    get:
+      tags: [Admin/Demo]
+      summary: Get demo member list
+      description: Get list of demo members.
+      operationId: adminGetDemoMemberList
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Demo members
+
+  /api/admin/demo/lifecycle-members:
+    get:
+      tags: [Admin/Demo]
+      summary: Get lifecycle demo members
+      description: Get members for lifecycle demo.
+      operationId: adminGetLifecycleDemoMembers
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Lifecycle demo members
+
+  /api/admin/demo/work-queue:
+    get:
+      tags: [Admin/Demo]
+      summary: Get demo work queue
+      description: Get demo work queue items.
+      operationId: adminGetDemoWorkQueue
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Work queue items
+
+  # ===========================================
+  # ADMIN/IMPERSONATION ENDPOINTS
+  # ===========================================
+  /api/admin/impersonate/start:
+    post:
+      tags: [Admin/Impersonation]
+      summary: Start impersonation
+      description: |
+        Start viewing as another member. Requires admin:full capability.
+        Creates audit log entry. Dangerous capabilities are blocked during impersonation.
+      operationId: startImpersonation
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberId]
+              properties:
+                memberId:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Impersonation started
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient permissions
+
+  /api/admin/impersonate/end:
+    post:
+      tags: [Admin/Impersonation]
+      summary: End impersonation
+      description: End current impersonation session.
+      operationId: endImpersonation
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Impersonation ended
+
+  /api/admin/impersonate/status:
+    get:
+      tags: [Admin/Impersonation]
+      summary: Get impersonation status
+      description: Get current impersonation status including role badges.
+      operationId: getImpersonationStatus
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Impersonation status
+
+  # ===========================================
+  # ADMIN/EMAIL-HEALTH ENDPOINTS
+  # ===========================================
+  /api/v1/admin/email-health:
+    get:
+      tags: [Admin/Dashboard]
+      summary: Get email health
+      description: Get email system health status.
+      operationId: adminGetEmailHealth
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Email health status
+
+  /api/v1/admin/email-health/config:
+    get:
+      tags: [Admin/Dashboard]
+      summary: Get email config
+      description: Get email configuration (sanitized).
+      operationId: adminGetEmailConfig
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Email config
+
+  # ===========================================
+  # ADMIN/IMPORT ENDPOINTS
+  # ===========================================
+  /api/v1/admin/import/status:
+    get:
+      tags: [Admin/Dashboard]
+      summary: Get import status
+      description: Get data import status.
+      operationId: adminGetImportStatus
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Import status
+
+  # ===========================================
+  # OFFICER/SECRETARY ENDPOINTS
+  # ===========================================
+  /api/v1/officer/secretary/dashboard:
+    get:
+      tags: [Officer/Secretary]
+      summary: Secretary dashboard
+      description: |
+        Get dashboard data for Secretary role.
+        Returns drafts, awaiting review, ready to publish, recently published.
+      operationId: getSecretaryDashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecretaryDashboard'
+        '401':
+          description: Not authenticated
+
+  # ===========================================
+  # OFFICER/PARLIAMENTARIAN ENDPOINTS
+  # ===========================================
+  /api/v1/officer/parliamentarian/dashboard:
+    get:
+      tags: [Officer/Parliamentarian]
+      summary: Parliamentarian dashboard
+      description: Get dashboard data for Parliamentarian role.
+      operationId: getParliamentarianDashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+        '401':
+          description: Not authenticated
+
+  # ===========================================
+  # OFFICER/VP-ACTIVITIES ENDPOINTS
+  # ===========================================
+  /api/v1/officer/vp-activities/dashboard:
+    get:
+      tags: [Officer/VP-Activities]
+      summary: VP Activities dashboard
+      description: Get dashboard data for VP Activities role.
+      operationId: getVPActivitiesDashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+        '401':
+          description: Not authenticated
+
+  /api/v1/officer/events/dashboard:
+    get:
+      tags: [Officer/VP-Activities]
+      summary: Events dashboard
+      description: Get events dashboard for officers.
+      operationId: getOfficerEventsDashboard
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dashboard data
+        '401':
+          description: Not authenticated
+
+  /api/v1/officer/events/my-events:
+    get:
+      tags: [Officer/VP-Activities]
+      summary: My events
+      description: Get events assigned to current officer.
+      operationId: getMyOfficerEvents
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of events
+        '401':
+          description: Not authenticated
+
+  # ===========================================
+  # OFFICER/MEETINGS ENDPOINTS
+  # ===========================================
+  /api/v1/officer/meetings:
+    get:
+      tags: [Officer/Meetings]
+      summary: List meetings
+      description: List governance meetings.
+      operationId: listMeetings
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of meetings
+        '401':
+          description: Not authenticated
+    post:
+      tags: [Officer/Meetings]
+      summary: Create meeting
+      description: Create a new governance meeting.
+      operationId: createMeeting
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Meeting created
+        '401':
+          description: Not authenticated
+
+  /api/v1/officer/meetings/{id}:
+    get:
+      tags: [Officer/Meetings]
+      summary: Get meeting
+      description: Get meeting details.
+      operationId: getMeeting
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Meeting details
+        '404':
+          description: Meeting not found
+    patch:
+      tags: [Officer/Meetings]
+      summary: Update meeting
+      description: Update meeting details.
+      operationId: updateMeeting
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Meeting updated
+
+  /api/v1/officer/meetings/{id}/minutes:
+    get:
+      tags: [Officer/Meetings]
+      summary: Get meeting minutes
+      description: Get minutes for a meeting.
+      operationId: getMeetingMinutes
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Minutes data
+        '404':
+          description: Not found
+
+  # ===========================================
+  # OFFICER/GOVERNANCE ENDPOINTS
+  # ===========================================
+  /api/v1/officer/governance/meetings:
+    get:
+      tags: [Officer/Governance]
+      summary: List governance meetings
+      description: List governance meetings.
+      operationId: listGovernanceMeetings
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of meetings
+    post:
+      tags: [Officer/Governance]
+      summary: Create governance meeting
+      description: Create a governance meeting.
+      operationId: createGovernanceMeeting
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Meeting created
+
+  /api/v1/officer/governance/meetings/{id}:
+    get:
+      tags: [Officer/Governance]
+      summary: Get governance meeting
+      description: Get governance meeting details.
+      operationId: getGovernanceMeeting
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Meeting details
+
+  /api/v1/officer/governance/minutes:
+    get:
+      tags: [Officer/Governance]
+      summary: List minutes
+      description: List governance minutes.
+      operationId: listGovernanceMinutes
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of minutes
+    post:
+      tags: [Officer/Governance]
+      summary: Create minutes
+      description: Create governance minutes.
+      operationId: createGovernanceMinutes
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Minutes created
+
+  /api/v1/officer/governance/minutes/{id}:
+    get:
+      tags: [Officer/Governance]
+      summary: Get minutes
+      description: Get governance minutes details.
+      operationId: getGovernanceMinutes
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Minutes details
+    patch:
+      tags: [Officer/Governance]
+      summary: Update minutes
+      description: Update governance minutes.
+      operationId: updateGovernanceMinutes
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Minutes updated
+
+  /api/v1/officer/governance/motions:
+    get:
+      tags: [Officer/Governance]
+      summary: List motions
+      description: List governance motions.
+      operationId: listGovernanceMotions
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of motions
+    post:
+      tags: [Officer/Governance]
+      summary: Create motion
+      description: Create a governance motion.
+      operationId: createGovernanceMotion
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Motion created
+
+  /api/v1/officer/governance/motions/{id}:
+    get:
+      tags: [Officer/Governance]
+      summary: Get motion
+      description: Get motion details.
+      operationId: getGovernanceMotion
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Motion details
+    patch:
+      tags: [Officer/Governance]
+      summary: Update motion
+      description: Update a motion.
+      operationId: updateGovernanceMotion
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Motion updated
+
+  /api/v1/officer/governance/annotations:
+    get:
+      tags: [Officer/Governance]
+      summary: List annotations
+      description: List governance annotations.
+      operationId: listGovernanceAnnotations
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of annotations
+    post:
+      tags: [Officer/Governance]
+      summary: Create annotation
+      description: Create a governance annotation.
+      operationId: createGovernanceAnnotation
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Annotation created
+
+  /api/v1/officer/governance/annotations/{id}:
+    get:
+      tags: [Officer/Governance]
+      summary: Get annotation
+      description: Get annotation details.
+      operationId: getGovernanceAnnotation
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Annotation details
+    patch:
+      tags: [Officer/Governance]
+      summary: Update annotation
+      description: Update an annotation.
+      operationId: updateGovernanceAnnotation
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Annotation updated
+    delete:
+      tags: [Officer/Governance]
+      summary: Delete annotation
+      description: Delete an annotation.
+      operationId: deleteGovernanceAnnotation
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Annotation deleted
+
+  /api/v1/officer/governance/flags:
+    get:
+      tags: [Officer/Governance]
+      summary: List flags
+      description: List governance review flags.
+      operationId: listGovernanceFlags
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of flags
+    post:
+      tags: [Officer/Governance]
+      summary: Create flag
+      description: Create a governance review flag.
+      operationId: createGovernanceFlag
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Flag created
+
+  /api/v1/officer/governance/flags/{id}:
+    get:
+      tags: [Officer/Governance]
+      summary: Get flag
+      description: Get flag details.
+      operationId: getGovernanceFlag
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Flag details
+    patch:
+      tags: [Officer/Governance]
+      summary: Update flag
+      description: Update a flag.
+      operationId: updateGovernanceFlag
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Flag updated
+
+  /api/v1/officer/governance/rules-guidance:
+    get:
+      tags: [Officer/Governance]
+      summary: List rules guidance
+      description: List rules and guidance documents.
+      operationId: listRulesGuidance
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of guidance
+    post:
+      tags: [Officer/Governance]
+      summary: Create rules guidance
+      description: Create a rules guidance document.
+      operationId: createRulesGuidance
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Guidance created
+
+  /api/v1/officer/governance/rules-guidance/{id}:
+    get:
+      tags: [Officer/Governance]
+      summary: Get rules guidance
+      description: Get rules guidance details.
+      operationId: getRulesGuidance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Guidance details
+    patch:
+      tags: [Officer/Governance]
+      summary: Update rules guidance
+      description: Update rules guidance.
+      operationId: updateRulesGuidance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Guidance updated
+    delete:
+      tags: [Officer/Governance]
+      summary: Delete rules guidance
+      description: Delete rules guidance.
+      operationId: deleteRulesGuidance
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Guidance deleted
+
+  # ===========================================
+  # OFFICER/BOARD-RECORDS ENDPOINTS
+  # ===========================================
+  /api/v1/officer/board-records:
+    get:
+      tags: [Officer/Board-Records]
+      summary: List board records
+      description: List board records.
+      operationId: listBoardRecords
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: List of records
+    post:
+      tags: [Officer/Board-Records]
+      summary: Create board record
+      description: Create a board record.
+      operationId: createBoardRecord
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Record created
+
+  /api/v1/officer/board-records/{id}:
+    get:
+      tags: [Officer/Board-Records]
+      summary: Get board record
+      description: Get board record details.
+      operationId: getBoardRecord
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Record details
+    patch:
+      tags: [Officer/Board-Records]
+      summary: Update board record
+      description: Update a board record.
+      operationId: updateBoardRecord
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Record updated
+    delete:
+      tags: [Officer/Board-Records]
+      summary: Delete board record
+      description: Delete a board record.
+      operationId: deleteBoardRecord
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Record deleted
+
+  # ===========================================
+  # PAYMENTS ENDPOINTS
+  # ===========================================
+  /api/payments/intents:
+    post:
+      tags: [Payments]
+      summary: Create payment intent
+      description: Create a payment intent for checkout.
+      operationId: createPaymentIntent
+      security:
+        - cookieAuth: []
+      responses:
+        '201':
+          description: Payment intent created
+        '401':
+          description: Not authenticated
+
+  /api/payments/fake/checkout:
+    post:
+      tags: [Payments]
+      summary: Fake checkout (dev only)
+      description: Fake checkout for development/testing.
+      operationId: fakeCheckout
+      responses:
+        '200':
+          description: Fake checkout processed
+
+  /api/payments/fake/complete:
+    post:
+      tags: [Payments]
+      summary: Fake complete payment (dev only)
+      description: Fake payment completion for development/testing.
+      operationId: fakeComplete
+      responses:
+        '200':
+          description: Fake payment completed
+
+  /api/payments/fake/webhook:
+    post:
+      tags: [Payments]
+      summary: Fake webhook (dev only)
+      description: Fake webhook receiver for development/testing.
+      operationId: fakeWebhook
+      responses:
+        '200':
+          description: Webhook processed
+
+  # ===========================================
+  # CRON ENDPOINTS
+  # ===========================================
+  /api/cron/transitions:
+    post:
+      tags: [Cron]
+      summary: Process transitions
+      description: Internal cron endpoint to process pending transitions.
+      operationId: processCronTransitions
+      security:
+        - cronSecret: []
+      responses:
+        '200':
+          description: Transitions processed
+
+  # ===========================================
+  # WEBHOOKS ENDPOINTS
+  # ===========================================
+  /api/webhooks/email:
+    post:
+      tags: [Webhooks]
+      summary: Email webhook
+      description: Receive email delivery notifications from email provider.
+      operationId: emailWebhook
+      responses:
+        '200':
+          description: Webhook processed
+
+  # ===========================================
+  # EMAIL ENDPOINTS
+  # ===========================================
+  /api/email/log:
+    get:
+      tags: [Email]
+      summary: Get email log
+      description: Get email delivery log.
+      operationId: getEmailLog
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Email log
+
+  /api/email/test:
+    post:
+      tags: [Email]
+      summary: Send test email
+      description: Send a test email (dev/admin only).
+      operationId: sendTestEmail
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Test email sent
+
+  # ===========================================
+  # SMS ENDPOINTS
+  # ===========================================
+  /api/sms/test:
+    post:
+      tags: [SMS]
+      summary: Send test SMS
+      description: Send a test SMS (dev/admin only).
+      operationId: sendTestSms
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Test SMS sent
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: clubos_session
+      description: |
+        Session cookie set after authentication.
+        In development, you can also use `clubos_dev_session`.
+
+    testToken:
+      type: apiKey
+      in: header
+      name: x-admin-test-token
+      description: |
+        Test token for E2E testing (development only).
+        Default: `dev-admin-token`
+        Set via ADMIN_E2E_TOKEN environment variable.
+
+    cronSecret:
+      type: apiKey
+      in: header
+      name: x-cron-secret
+      description: Secret token for cron job authentication.
+
+  parameters:
+    page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Page number for pagination
+
+    pageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Number of items per page
+
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Maximum number of items to return
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        checks:
+          type: object
+          properties:
+            database:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [ok, error, skipped]
+                latencyMs:
+                  type: integer
+                  nullable: true
+
+    MemberProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        joinedAt:
+          type: string
+          format: date-time
+        memberSince:
+          type: string
+          description: Human-readable tenure (e.g., "2 years, 3 months")
+        membershipStatus:
+          type: object
+          properties:
+            code:
+              type: string
+            label:
+              type: string
+        membershipTier:
+          type: object
+          nullable: true
+          properties:
+            code:
+              type: string
+            name:
+              type: string
+        upcomingRegistrations:
+          type: integer
+        globalRole:
+          type: string
+
+    EventListResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventSummary'
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+        categories:
+          type: array
+          items:
+            type: string
+
+    EventSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        category:
+          type: string
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        capacity:
+          type: integer
+          nullable: true
+        registeredCount:
+          type: integer
+        spotsRemaining:
+          type: integer
+          nullable: true
+        isWaitlistOpen:
+          type: boolean
+
+    EventDetail:
+      type: object
+      allOf:
+        - $ref: '#/components/schemas/EventSummary'
+        - type: object
+          properties:
+            isPublished:
+              type: boolean
+            eventChair:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                name:
+                  type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalItems:
+          type: integer
+        totalPages:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrev:
+          type: boolean
+
+    AdminMemberListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminMemberListItem'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        totalItems:
+          type: integer
+        totalPages:
+          type: integer
+
+    AdminMemberListItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        joinedAt:
+          type: string
+          format: date-time
+        registrationCount:
+          type: integer
+        waitlistedCount:
+          type: integer
+
+    Committee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    SecretaryDashboard:
+      type: object
+      properties:
+        visible:
+          type: boolean
+        upcomingMeeting:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            date:
+              type: string
+              format: date-time
+            dateFormatted:
+              type: string
+            type:
+              type: string
+            title:
+              type: string
+              nullable: true
+            hasMinutes:
+              type: boolean
+        draftsInProgress:
+          type: array
+          items:
+            $ref: '#/components/schemas/MinutesSummary'
+        awaitingReview:
+          type: array
+          items:
+            $ref: '#/components/schemas/MinutesSummary'
+        readyToPublish:
+          type: array
+          items:
+            $ref: '#/components/schemas/MinutesSummary'
+        recentlyPublished:
+          type: array
+          items:
+            $ref: '#/components/schemas/MinutesSummary'
+        capabilities:
+          type: object
+          properties:
+            canCreateDraft:
+              type: boolean
+            canEditDraft:
+              type: boolean
+            canSubmit:
+              type: boolean
+            canPublish:
+              type: boolean
+
+    MinutesSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        meetingId:
+          type: string
+          format: uuid
+        meetingDate:
+          type: string
+          format: date-time
+        meetingDateFormatted:
+          type: string
+        meetingType:
+          type: string
+        meetingTitle:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [DRAFT, SUBMITTED, REVISED, APPROVED, PUBLISHED, ARCHIVED]
+        statusLabel:
+          type: string
+        version:
+          type: integer
+        updatedAt:
+          type: string
+          format: date-time
+        lastEditedBy:
+          type: string
+          nullable: true
+        auditTrailUrl:
+          type: string
+
+    ApiError:
+      type: object
+      properties:
+        code:
+          type: string
+          enum:
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - RESOURCE_NOT_FOUND
+            - METHOD_NOT_ALLOWED
+            - CONFLICT
+            - CAPACITY_EXCEEDED
+            - RATE_LIMITED
+            - INTERNAL_ERROR
+            - SERVICE_UNAVAILABLE
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

@@ -1,3 +1,17 @@
+/**
+ * Admin Events API - Single Event Operations
+ *
+ * GET /api/admin/events/:id - Get event details with registrations
+ * PATCH /api/admin/events/:id - Update event (with clone safeguards)
+ * DELETE /api/admin/events/:id - Delete event
+ *
+ * Clone Safeguards (Charter P6):
+ * - Cloned events with placeholder dates (epoch) cannot be submitted or published
+ * - Cloned events must have explicit startTime set before workflow actions
+ *
+ * Copyright (c) Santa Barbara Newcomers Club
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
@@ -5,6 +19,17 @@ import {
   requireEventEditAccess,
   requireEventDeleteAccess,
 } from "@/lib/eventAuth";
+import { EventStatus } from "@prisma/client";
+
+// Epoch date used as placeholder for cloned events
+const EPOCH_DATE = new Date(0).getTime();
+
+/**
+ * Check if a date is the placeholder epoch date (1970-01-01)
+ */
+function isPlaceholderDate(date: Date): boolean {
+  return date.getTime() === EPOCH_DATE;
+}
 
 type EventDetailResponse = {
   event: {
@@ -18,6 +43,11 @@ type EventDetailResponse = {
     capacity: number | null;
     isPublished: boolean;
     eventChairId: string | null;
+    status: EventStatus;
+    // Clone tracking
+    clonedFromId: string | null;
+    clonedAt: string | null;
+    isClonedDraft: boolean; // True if cloned with placeholder dates
     registrations: Array<{
       id: string;
       memberId: string;
@@ -73,6 +103,12 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Determine if this is a cloned draft with placeholder dates
+  const isClonedDraft =
+    !!event.clonedFromId &&
+    event.status === EventStatus.DRAFT &&
+    isPlaceholderDate(event.startTime);
+
   const response: EventDetailResponse = {
     event: {
       id: event.id,
@@ -85,6 +121,10 @@ export async function GET(
       capacity: event.capacity,
       isPublished: event.isPublished,
       eventChairId: event.eventChairId,
+      status: event.status,
+      clonedFromId: event.clonedFromId,
+      clonedAt: event.clonedAt?.toISOString() ?? null,
+      isClonedDraft,
       registrations: event.registrations.map((r) => ({
         id: r.id,
         memberId: r.memberId,
@@ -116,6 +156,62 @@ export async function PATCH(
 
   const body = await req.json();
 
+  // Fetch current event to check clone status and dates
+  const currentEvent = await prisma.event.findUnique({
+    where: { id },
+    select: {
+      startTime: true,
+      clonedFromId: true,
+      status: true,
+    },
+  });
+
+  if (!currentEvent) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // Clone safeguards (Charter P6)
+  // Cloned events with placeholder dates cannot be submitted/published
+  const isClonedEvent = !!currentEvent.clonedFromId;
+  const hasPlaceholderDate = isPlaceholderDate(currentEvent.startTime);
+  const newStartTime = body.startTime ? new Date(body.startTime) : null;
+  const willHavePlaceholderDate = newStartTime
+    ? isPlaceholderDate(newStartTime)
+    : hasPlaceholderDate;
+
+  // Check status transitions
+  const requestedStatus = body.status as EventStatus | undefined;
+  const requestedPublish = body.isPublished as boolean | undefined;
+
+  // Statuses that require valid dates (cannot advance with placeholder)
+  const WORKFLOW_STATUSES: EventStatus[] = [
+    EventStatus.PENDING_APPROVAL,
+    EventStatus.APPROVED,
+    EventStatus.PUBLISHED,
+  ];
+
+  // Block publishing or status advancement if cloned event has placeholder date
+  if (isClonedEvent && willHavePlaceholderDate) {
+    const isAdvancingStatus =
+      requestedStatus && WORKFLOW_STATUSES.includes(requestedStatus);
+
+    const isPublishing = requestedPublish === true;
+
+    if (isAdvancingStatus || isPublishing) {
+      return NextResponse.json(
+        {
+          error: "Cloned event requires explicit dates",
+          message:
+            "This event was cloned and still has placeholder dates. " +
+            "You must set a valid start time before submitting for approval or publishing.",
+          code: "CLONE_REQUIRES_DATES",
+          isCloned: true,
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   // Only allow updating specific fields
   const allowedFields = [
     "title",
@@ -126,13 +222,22 @@ export async function PATCH(
     "endTime",
     "capacity",
     "isPublished",
+    "status",
+    "eventChairId",
+    "registrationDeadline",
+    "publishAt",
   ];
 
   const updateData: Record<string, unknown> = {};
   for (const field of allowedFields) {
     if (field in body) {
       // Convert date strings to Date objects
-      if ((field === "startTime" || field === "endTime") && body[field]) {
+      if (
+        ["startTime", "endTime", "registrationDeadline", "publishAt"].includes(
+          field
+        ) &&
+        body[field]
+      ) {
         updateData[field] = new Date(body[field]);
       } else {
         updateData[field] = body[field];
@@ -157,6 +262,8 @@ export async function PATCH(
       capacity: updatedEvent.capacity,
       isPublished: updatedEvent.isPublished,
       eventChairId: updatedEvent.eventChairId,
+      status: updatedEvent.status,
+      clonedFromId: updatedEvent.clonedFromId,
     },
   });
 }

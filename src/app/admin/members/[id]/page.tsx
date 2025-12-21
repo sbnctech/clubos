@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import MemberHistoryPanel from "./MemberHistoryPanel";
+import LifecycleExplainerPanel from "./LifecycleExplainerPanel";
 
 // Server-to-server auth for API calls (only in dev mode, with default fallback)
 const adminHeaders =
@@ -154,6 +155,9 @@ export default async function MemberDetailPage({ params }: PageProps) {
 
       {/* History Tab - client component, permission-gated */}
       <MemberHistoryPanel memberId={member.id} />
+
+      {/* Lifecycle Explainer - read-only panel for demo visibility */}
+      <LifecycleExplainerPanel memberId={member.id} />
     </div>
   );
 }

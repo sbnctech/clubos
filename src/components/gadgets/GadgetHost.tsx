@@ -72,22 +72,36 @@ export default function GadgetHost({ gadgetId, slot }: GadgetHostProps) {
       data-slot={slot}
       style={{
         backgroundColor: "#ffffff",
-        border: isUnknown ? "2px dashed #ef4444" : "1px solid #e5e7eb",
-        borderRadius: "8px",
-        padding: "20px",
+        border: isUnknown ? "2px dashed #ef4444" : "1px solid #e2e8f0",
+        borderRadius: "16px",
+        padding: "24px",
+        boxShadow: isUnknown ? "none" : "0 1px 3px rgba(0,0,0,0.05)",
+        transition: "box-shadow 0.2s, transform 0.2s",
       }}
     >
       {/* Gadget title */}
       <h3
         data-test-id={`gadget-title-${gadgetId}`}
         style={{
-          fontSize: "18px",
+          fontSize: "17px",
           fontWeight: 600,
           marginTop: 0,
-          marginBottom: "12px",
-          color: isUnknown ? "#ef4444" : "#1f2937",
+          marginBottom: "16px",
+          color: isUnknown ? "#ef4444" : "#1e293b",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
         }}
       >
+        <span
+          style={{
+            display: "inline-block",
+            width: "4px",
+            height: "20px",
+            background: isUnknown ? "#ef4444" : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            borderRadius: "2px",
+          }}
+        />
         {title}
       </h3>
 
@@ -100,9 +114,11 @@ export default function GadgetHost({ gadgetId, slot }: GadgetHostProps) {
           // Render placeholder for unknown or unimplemented gadgets
           <p
             style={{
-              color: isUnknown ? "#ef4444" : "#6b7280",
+              color: isUnknown ? "#ef4444" : "#64748b",
               fontStyle: "italic",
               margin: 0,
+              padding: "20px 0",
+              textAlign: "center",
             }}
           >
             {isUnknown ? `Unknown gadget: ${gadgetId}` : "Coming soon..."}

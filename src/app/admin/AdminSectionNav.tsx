@@ -6,6 +6,7 @@ const navItems = [
   { label: "Registrations Explorer", href: "/admin/registrations", testId: "admin-nav-registrations-explorer" },
   { label: "Service History", href: "/admin/service-history", testId: "admin-nav-service-history" },
   { label: "Transitions", href: "/admin/transitions", testId: "admin-nav-transitions" },
+  { label: "eNews Dashboard", href: "/admin/communications", testId: "admin-nav-communications" },
   { label: "Members", href: "#admin-members-section", testId: "admin-nav-members" },
   { label: "Events", href: "#admin-events-section", testId: "admin-nav-events" },
   { label: "Registrations", href: "#admin-registrations-section", testId: "admin-nav-registrations" },
