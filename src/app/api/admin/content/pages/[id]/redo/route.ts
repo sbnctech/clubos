@@ -15,13 +15,14 @@ type RouteParams = {
 
 // POST /api/admin/content/pages/[id]/redo - Apply redo
 // Requires publishing:manage capability
+// A8: Includes optimistic locking for concurrency protection
 export async function POST(req: NextRequest, { params }: RouteParams) {
   const auth = await requireCapability(req, "publishing:manage");
   if (!auth.ok) return auth.response;
 
   const { id } = await params;
 
-  // Get the page
+  // Get the page with updatedAt for optimistic locking
   const page = await prisma.page.findUnique({
     where: { id },
     select: {
@@ -29,6 +30,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       slug: true,
       status: true,
       content: true,
+      updatedAt: true, // A8: For optimistic locking
     },
   });
 
@@ -47,6 +49,9 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     );
   }
 
+  // A8: Store expected updatedAt for optimistic lock
+  const expectedUpdatedAt = page.updatedAt;
+
   // Apply redo
   const currentContent = page.content as PageContent;
   const result = await applyRedo(id, currentContent);
@@ -58,14 +63,28 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     );
   }
 
-  // Update the page content
-  await prisma.page.update({
-    where: { id },
+  // A8: Update with optimistic lock check
+  const updated = await prisma.page.updateMany({
+    where: {
+      id,
+      updatedAt: expectedUpdatedAt, // Optimistic lock
+    },
     data: {
       content: result.content as object,
       updatedById: auth.context.memberId === "e2e-admin" ? null : auth.context.memberId,
     },
   });
+
+  // A8: If no rows updated, concurrent mutation detected
+  if (updated.count === 0) {
+    return NextResponse.json(
+      {
+        error: "Conflict",
+        message: "Action unavailable while changes are being saved. Try again.",
+      },
+      { status: 409 }
+    );
+  }
 
   // Create audit log entry
   await createAuditLog({

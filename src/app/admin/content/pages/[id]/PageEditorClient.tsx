@@ -71,9 +71,20 @@ export default function PageEditorClient({ pageId, initialBlocks, lifecycle: ini
     fetchRevisionState();
   }, [pageId]);
 
-  // A7: Keyboard shortcuts for undo/redo
+  // A7/A8: Keyboard shortcuts for undo/redo
+  // A8: Skip shortcuts when focus is in input/textarea/contenteditable
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
+      // A8: Don't intercept shortcuts when user is typing in a form field
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
       // Cmd+Z or Ctrl+Z for undo
       if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
         if (revisionState.canUndo && !undoRedoLoading && !saving) {
@@ -625,13 +636,13 @@ export default function PageEditorClient({ pageId, initialBlocks, lifecycle: ini
             </button>
           </div>
 
-          {/* Revision indicator */}
-          {revisionState.totalRevisions > 0 && (
+          {/* A8: Revision indicator - show Undo: N  Redo: M when either > 0 */}
+          {(revisionState.undoCount > 0 || revisionState.redoCount > 0) && (
             <span
               data-test-id="revision-indicator"
               style={{ fontSize: "12px", color: "#666" }}
             >
-              {revisionState.undoCount} undo{revisionState.undoCount !== 1 ? "s" : ""} available
+              Undo: {revisionState.undoCount}  Redo: {revisionState.redoCount}
             </span>
           )}
 

@@ -29,6 +29,27 @@ export interface RevisionState {
 }
 
 /**
+ * A8: Normalize revision state to guarantee consistent values
+ *
+ * Ensures all counts are non-negative integers and derives
+ * boolean flags from the counts for consistency.
+ */
+export function normalizeRevisionState(raw: Partial<RevisionState>): RevisionState {
+  const undoCount = Math.max(0, Math.floor(Number(raw.undoCount) || 0));
+  const redoCount = Math.max(0, Math.floor(Number(raw.redoCount) || 0));
+  const totalRevisions = Math.max(0, Math.floor(Number(raw.totalRevisions) || 0));
+
+  return {
+    undoCount,
+    redoCount,
+    canUndo: undoCount > 0,
+    canRedo: redoCount > 0,
+    currentPosition: 0,
+    totalRevisions,
+  };
+}
+
+/**
  * Result of an undo/redo operation
  */
 export interface UndoRedoResult {
@@ -96,6 +117,7 @@ export async function createRevision(params: {
 
 /**
  * Get the current revision state for a page
+ * A8: Uses normalizeRevisionState for consistent values
  */
 export async function getRevisionState(pageId: string): Promise<RevisionState> {
   const revisions = await prisma.pageRevision.findMany({
@@ -106,14 +128,11 @@ export async function getRevisionState(pageId: string): Promise<RevisionState> {
   const undoCount = revisions.filter((r) => r.stackPosition > 0).length;
   const redoCount = revisions.filter((r) => r.stackPosition < 0).length;
 
-  return {
-    canUndo: undoCount > 0,
-    canRedo: redoCount > 0,
+  return normalizeRevisionState({
     undoCount,
     redoCount,
-    currentPosition: 0,
     totalRevisions: revisions.length,
-  };
+  });
 }
 
 /**

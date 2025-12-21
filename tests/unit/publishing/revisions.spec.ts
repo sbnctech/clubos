@@ -6,6 +6,7 @@ import {
   getActionSummary,
   RevisionAction,
   MAX_REVISIONS,
+  normalizeRevisionState,
 } from "@/lib/publishing/revisions";
 
 // Mock prisma for database tests
@@ -129,5 +130,109 @@ describe("RevisionAction type", () => {
     expect(actions).toContain("add_block");
     expect(actions).toContain("remove_block");
     expect(actions).toContain("edit_metadata");
+  });
+});
+
+// A8: Tests for normalizeRevisionState helper
+describe("normalizeRevisionState (A8)", () => {
+  it("normalizes valid counts correctly", () => {
+    const result = normalizeRevisionState({
+      undoCount: 3,
+      redoCount: 2,
+      totalRevisions: 5,
+    });
+
+    expect(result.undoCount).toBe(3);
+    expect(result.redoCount).toBe(2);
+    expect(result.totalRevisions).toBe(5);
+    expect(result.canUndo).toBe(true);
+    expect(result.canRedo).toBe(true);
+    expect(result.currentPosition).toBe(0);
+  });
+
+  it("clamps negative counts to zero", () => {
+    const result = normalizeRevisionState({
+      undoCount: -5,
+      redoCount: -3,
+      totalRevisions: -1,
+    });
+
+    expect(result.undoCount).toBe(0);
+    expect(result.redoCount).toBe(0);
+    expect(result.totalRevisions).toBe(0);
+    expect(result.canUndo).toBe(false);
+    expect(result.canRedo).toBe(false);
+  });
+
+  it("floors floating point counts", () => {
+    const result = normalizeRevisionState({
+      undoCount: 3.9,
+      redoCount: 2.1,
+      totalRevisions: 5.5,
+    });
+
+    expect(result.undoCount).toBe(3);
+    expect(result.redoCount).toBe(2);
+    expect(result.totalRevisions).toBe(5);
+  });
+
+  it("handles NaN and undefined values", () => {
+    const result = normalizeRevisionState({
+      undoCount: NaN,
+      redoCount: undefined,
+      totalRevisions: undefined,
+    });
+
+    expect(result.undoCount).toBe(0);
+    expect(result.redoCount).toBe(0);
+    expect(result.totalRevisions).toBe(0);
+    expect(result.canUndo).toBe(false);
+    expect(result.canRedo).toBe(false);
+  });
+
+  it("handles string coercion", () => {
+    const result = normalizeRevisionState({
+      undoCount: "3" as unknown as number,
+      redoCount: "2" as unknown as number,
+      totalRevisions: "5" as unknown as number,
+    });
+
+    expect(result.undoCount).toBe(3);
+    expect(result.redoCount).toBe(2);
+    expect(result.totalRevisions).toBe(5);
+  });
+
+  it("handles empty object", () => {
+    const result = normalizeRevisionState({});
+
+    expect(result.undoCount).toBe(0);
+    expect(result.redoCount).toBe(0);
+    expect(result.totalRevisions).toBe(0);
+    expect(result.canUndo).toBe(false);
+    expect(result.canRedo).toBe(false);
+    expect(result.currentPosition).toBe(0);
+  });
+
+  it("derives canUndo from undoCount correctly", () => {
+    expect(normalizeRevisionState({ undoCount: 0 }).canUndo).toBe(false);
+    expect(normalizeRevisionState({ undoCount: 1 }).canUndo).toBe(true);
+    expect(normalizeRevisionState({ undoCount: 100 }).canUndo).toBe(true);
+  });
+
+  it("derives canRedo from redoCount correctly", () => {
+    expect(normalizeRevisionState({ redoCount: 0 }).canRedo).toBe(false);
+    expect(normalizeRevisionState({ redoCount: 1 }).canRedo).toBe(true);
+    expect(normalizeRevisionState({ redoCount: 100 }).canRedo).toBe(true);
+  });
+
+  it("always sets currentPosition to 0", () => {
+    // Even if passed a different value, currentPosition should be 0
+    const result = normalizeRevisionState({
+      undoCount: 5,
+      redoCount: 3,
+      currentPosition: 999,
+    } as { undoCount: number; redoCount: number; currentPosition?: number });
+
+    expect(result.currentPosition).toBe(0);
   });
 });
