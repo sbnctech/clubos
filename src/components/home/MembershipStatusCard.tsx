@@ -4,123 +4,217 @@
  * Displays renewal status, expiration warnings, and quick actions.
  * Part of the "My SBNC" member home page utility column.
  *
+ * Fetches real data from /api/v1/me/profile.
+ *
  * Copyright (c) Santa Barbara Newcomers Club
  */
 
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import SectionCard from "@/components/layout/SectionCard";
 
-type MembershipStatus = "active" | "expiring" | "expired" | "pending";
+type MembershipStatusType = "active" | "expiring" | "expired" | "pending" | "lapsed";
 
-interface MembershipStatusCardProps {
-  /** Current membership status */
-  status?: MembershipStatus;
-  /** Membership expiration date */
-  expiresAt?: string;
-  /** Member since date */
-  memberSince?: string;
+interface ProfileFromAPI {
+  membershipStatus: {
+    code: string;
+    label: string;
+  };
+  memberSince: string;
+  joinedAt: string;
 }
 
-const statusConfig: Record<MembershipStatus, {
+const statusConfig: Record<string, {
   label: string;
   color: string;
   bgColor: string;
+  type: MembershipStatusType;
 }> = {
   active: {
     label: "Active",
     color: "var(--token-color-success)",
     bgColor: "#dcfce7",
+    type: "active",
   },
-  expiring: {
-    label: "Expiring Soon",
-    color: "var(--token-color-warning)",
-    bgColor: "#fef3c7",
+  active_newbie: {
+    label: "Active (Newbie)",
+    color: "var(--token-color-success)",
+    bgColor: "#dcfce7",
+    type: "active",
   },
-  expired: {
-    label: "Expired",
+  active_extended: {
+    label: "Active (Extended)",
+    color: "var(--token-color-success)",
+    bgColor: "#dcfce7",
+    type: "active",
+  },
+  lapsed: {
+    label: "Lapsed",
     color: "var(--token-color-danger)",
     bgColor: "#fee2e2",
+    type: "lapsed",
   },
-  pending: {
-    label: "Pending",
+  pending_new: {
+    label: "Pending Approval",
+    color: "var(--token-color-warning)",
+    bgColor: "#fef3c7",
+    type: "pending",
+  },
+  suspended: {
+    label: "Suspended",
+    color: "var(--token-color-danger)",
+    bgColor: "#fee2e2",
+    type: "expired",
+  },
+  unknown: {
+    label: "Unknown",
     color: "var(--token-color-text-muted)",
     bgColor: "#f3f4f6",
+    type: "pending",
   },
 };
 
-export default function MembershipStatusCard({
-  status = "active",
-  expiresAt = "March 31, 2025",
-  memberSince = "2022",
-}: MembershipStatusCardProps) {
-  const config = statusConfig[status];
-  const showRenewButton = status === "expiring" || status === "expired";
+const defaultConfig = {
+  label: "Active",
+  color: "var(--token-color-success)",
+  bgColor: "#dcfce7",
+  type: "active" as MembershipStatusType,
+};
+
+export default function MembershipStatusCard() {
+  const [profile, setProfile] = useState<ProfileFromAPI | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchProfile() {
+      try {
+        const response = await fetch("/api/v1/me/profile");
+        if (response.status === 401) {
+          setProfile(null);
+          return;
+        }
+        if (!response.ok) throw new Error("Failed to load");
+        const data = await response.json();
+        setProfile(data.profile);
+      } catch {
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProfile();
+  }, []);
+
+  const statusCode = profile?.membershipStatus?.code || "active";
+  const config = statusConfig[statusCode] || defaultConfig;
+  const memberSince = profile?.memberSince || "";
+  const showRenewButton = config.type === "lapsed" || config.type === "expired";
 
   return (
     <SectionCard
       title="Membership"
       testId="membership-status-card"
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--token-space-sm)" }}>
-        {/* Status badge */}
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--token-space-sm)" }}>
-          <span
-            data-test-id="membership-status-badge"
+      {loading ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--token-space-sm)" }}>
+          <div
             style={{
-              display: "inline-block",
-              padding: "2px 8px",
-              backgroundColor: config.bgColor,
-              color: config.color,
+              width: "80px",
+              height: "24px",
+              backgroundColor: "var(--token-color-surface-2)",
               borderRadius: "var(--token-radius-lg)",
-              fontSize: "var(--token-text-sm)",
-              fontWeight: 600,
+              animation: "pulse 1.5s ease-in-out infinite",
             }}
-          >
-            {config.label}
-          </span>
-          <span
+          />
+          <div
             style={{
-              fontSize: "var(--token-text-sm)",
-              color: "var(--token-color-text-muted)",
-            }}
-          >
-            Member since {memberSince}
-          </span>
-        </div>
-
-        {/* Expiration info */}
-        <div
-          style={{
-            fontSize: "var(--token-text-sm)",
-            color: status === "expiring" ? config.color : "var(--token-color-text-muted)",
-          }}
-        >
-          {status === "expired" ? "Expired on" : "Expires"}: {expiresAt}
-        </div>
-
-        {/* Renew button */}
-        {showRenewButton && (
-          <Link
-            href="/member/renew"
-            data-test-id="membership-renew-button"
-            style={{
-              display: "inline-block",
-              padding: "var(--token-space-xs) var(--token-space-md)",
-              backgroundColor: "var(--token-color-primary)",
-              color: "#fff",
+              width: "120px",
+              height: "16px",
+              backgroundColor: "var(--token-color-surface-2)",
               borderRadius: "var(--token-radius-lg)",
-              fontSize: "var(--token-text-sm)",
-              textDecoration: "none",
-              textAlign: "center",
-              marginTop: "var(--token-space-xs)",
+              animation: "pulse 1.5s ease-in-out infinite",
             }}
-          >
-            Renew Membership
-          </Link>
-        )}
-      </div>
+          />
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--token-space-sm)" }}>
+          {/* Status badge */}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--token-space-sm)", flexWrap: "wrap" }}>
+            <span
+              data-test-id="membership-status-badge"
+              style={{
+                display: "inline-block",
+                padding: "2px 8px",
+                backgroundColor: config.bgColor,
+                color: config.color,
+                borderRadius: "var(--token-radius-lg)",
+                fontSize: "var(--token-text-sm)",
+                fontWeight: 600,
+              }}
+            >
+              {config.label}
+            </span>
+            {memberSince && (
+              <span
+                style={{
+                  fontSize: "var(--token-text-sm)",
+                  color: "var(--token-color-text-muted)",
+                }}
+              >
+                Member since {memberSince}
+              </span>
+            )}
+          </div>
+
+          {/* Status-specific messaging */}
+          {config.type === "lapsed" && (
+            <p
+              style={{
+                fontSize: "var(--token-text-sm)",
+                color: "var(--token-color-text-muted)",
+                margin: 0,
+              }}
+            >
+              Your membership has lapsed. Renew to regain access to member benefits.
+            </p>
+          )}
+
+          {config.type === "pending" && (
+            <p
+              style={{
+                fontSize: "var(--token-text-sm)",
+                color: "var(--token-color-text-muted)",
+                margin: 0,
+              }}
+            >
+              Your application is being reviewed. We&apos;ll be in touch soon!
+            </p>
+          )}
+
+          {/* Renew button */}
+          {showRenewButton && (
+            <Link
+              href="/member/renew"
+              data-test-id="membership-renew-button"
+              style={{
+                display: "inline-block",
+                padding: "var(--token-space-xs) var(--token-space-md)",
+                backgroundColor: "var(--token-color-primary)",
+                color: "#fff",
+                borderRadius: "var(--token-radius-lg)",
+                fontSize: "var(--token-text-sm)",
+                textDecoration: "none",
+                textAlign: "center",
+                marginTop: "var(--token-space-xs)",
+              }}
+            >
+              Renew Membership
+            </Link>
+          )}
+        </div>
+      )}
     </SectionCard>
   );
 }

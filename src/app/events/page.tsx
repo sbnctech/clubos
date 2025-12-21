@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { HeroStripe } from "@/components/stripes";
 import { getCurrentSession } from "@/lib/passkey";
+import { GIFT_CERTIFICATE_URL } from "@/lib/config/externalLinks";
 import EventsDiscovery from "./EventsDiscovery";
 
 export const metadata = {
@@ -48,7 +49,7 @@ export default async function EventsPage() {
         >
           SBNC
         </Link>
-        <nav style={{ display: "flex", gap: "var(--token-space-md)" }}>
+        <nav style={{ display: "flex", alignItems: "center", gap: "var(--token-space-md)" }}>
           {isLoggedIn && (
             <Link
               href="/my"
@@ -72,6 +73,23 @@ export default async function EventsPage() {
           >
             Events
           </Link>
+          <a
+            href={GIFT_CERTIFICATE_URL}
+            data-test-id="gift-certificate-link"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: "var(--token-text-sm)",
+              color: "var(--token-color-text)",
+              textDecoration: "none",
+              padding: "6px 12px",
+              backgroundColor: "var(--token-color-surface-2)",
+              borderRadius: "var(--token-radius-lg)",
+              border: "1px solid var(--token-color-border)",
+            }}
+          >
+            Gift Certificates
+          </a>
           {!isLoggedIn && (
             <Link
               href="/login"

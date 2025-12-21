@@ -9,7 +9,6 @@
 
 "use client";
 
-import Link from "next/link";
 import SectionCard from "@/components/layout/SectionCard";
 
 interface Photo {
@@ -52,18 +51,6 @@ export default function PhotoStreamCard() {
     <SectionCard
       title="Recent Photos"
       testId="photo-stream-card"
-      headerActions={
-        <Link
-          href="/member/photos"
-          style={{
-            fontSize: "var(--token-text-sm)",
-            color: "var(--token-color-primary)",
-            textDecoration: "none",
-          }}
-        >
-          View All
-        </Link>
-      }
     >
       <div
         style={{

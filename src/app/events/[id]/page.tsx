@@ -32,6 +32,11 @@ interface EventDetail {
     id: string;
     name: string;
   } | null;
+  // Registration scheduling (SBNC policy: Sunday announce, Tuesday open)
+  requiresRegistration: boolean;
+  registrationOpensAt: string | null;
+  registrationState: "NOT_REQUIRED" | "SCHEDULED" | "OPEN" | "CLOSED";
+  registrationOpensMessage: string | null;
 }
 
 async function getEvent(id: string): Promise<EventDetail | null> {
