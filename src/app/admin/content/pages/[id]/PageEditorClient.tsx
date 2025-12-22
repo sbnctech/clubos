@@ -1,1241 +1,353 @@
-// Copyright (c) Santa Barbara Newcomers Club
-// Page editor client component - block list with ordering and editing controls
-// A3: Schema-driven validation and improved editors
-// A4: Lifecycle controls for Draft/Published state management
-
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { Block, BlockType } from "@/lib/publishing/blocks";
-import { BLOCK_METADATA } from "@/lib/publishing/blocks";
-import {
-  validateBlockData,
-  getBlockFieldMetadata,
-  EDITABLE_BLOCK_TYPES,
-  READONLY_BLOCK_TYPES,
-} from "@/lib/publishing/blockSchemas";
-import { PageLifecycleState, LifecycleAction } from "@/lib/publishing/pageLifecycle";
-import { formatDateLocale, formatClubDate } from "@/lib/timezone";
+// Copyright (c) Santa Barbara Newcomers Club
+// Page editor client component with full editing capabilities
 
-// A7: Revision state for undo/redo
-type RevisionState = {
-  canUndo: boolean;
-  canRedo: boolean;
-  undoCount: number;
-  redoCount: number;
-  currentPosition: number;
-  totalRevisions: number;
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { PageContent, createDefaultPageContent } from "@/lib/publishing/blocks";
+import PageEditor from "@/components/editor/PageEditor";
+
+type PageData = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+  visibility: "PUBLIC" | "MEMBERS_ONLY" | "ROLE_RESTRICTED";
+  content: PageContent;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  publishedAt: string | null;
+  updatedAt: string;
+  template: { id: string; name: string; slug: string } | null;
+  theme: { id: string; name: string; slug: string } | null;
 };
 
-type Props = {
+type PageEditorClientProps = {
   pageId: string;
-  initialBlocks: Block[];
-  lifecycle: PageLifecycleState;
 };
 
-export default function PageEditorClient({ pageId, initialBlocks, lifecycle: initialLifecycle }: Props) {
-  const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
-  const [lifecycle, setLifecycle] = useState<PageLifecycleState>(initialLifecycle);
+export default function PageEditorClient({ pageId }: PageEditorClientProps) {
+  const [page, setPage] = useState<PageData | null>(null);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingBlockId, setEditingBlockId] = useState<string | null>(null);
-  const [editingData, setEditingData] = useState<Record<string, unknown> | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<LifecycleAction | null>(null);
-  const [lifecycleLoading, setLifecycleLoading] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // A7: Undo/redo state
-  const [revisionState, setRevisionState] = useState<RevisionState>({
-    canUndo: false,
-    canRedo: false,
-    undoCount: 0,
-    redoCount: 0,
-    currentPosition: 0,
-    totalRevisions: 0,
-  });
-  const [undoRedoLoading, setUndoRedoLoading] = useState(false);
+  // Form state
+  const [title, setTitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [description, setDescription] = useState("");
+  const [visibility, setVisibility] = useState<"PUBLIC" | "MEMBERS_ONLY" | "ROLE_RESTRICTED">("PUBLIC");
+  const [content, setContent] = useState<PageContent>(createDefaultPageContent());
 
-  // A7: Fetch revision state on mount
+  // Preview state
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Load page data
   useEffect(() => {
-    async function fetchRevisionState() {
+    async function loadPage() {
       try {
-        const res = await fetch(`/api/admin/content/pages/${pageId}/revisions`);
-        if (res.ok) {
-          const data = await res.json();
-          setRevisionState(data);
+        const res = await fetch(`/api/admin/content/pages/${pageId}`);
+        if (!res.ok) {
+          if (res.status === 404) {
+            setError("Page not found");
+          } else {
+            setError("Failed to load page");
+          }
+          return;
         }
-      } catch {
-        // Silently fail - undo/redo will just be disabled
-      }
-    }
-    fetchRevisionState();
-  }, [pageId]);
-
-  // A7: Keyboard shortcuts for undo/redo
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      // Cmd+Z or Ctrl+Z for undo
-      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
-        if (revisionState.canUndo && !undoRedoLoading && !saving) {
-          e.preventDefault();
-          handleUndo();
-        }
-      }
-      // Cmd+Shift+Z or Ctrl+Shift+Z for redo
-      if ((e.metaKey || e.ctrlKey) && e.key === "z" && e.shiftKey) {
-        if (revisionState.canRedo && !undoRedoLoading && !saving) {
-          e.preventDefault();
-          handleRedo();
-        }
-      }
-      // Cmd+Y or Ctrl+Y for redo (Windows style)
-      if ((e.metaKey || e.ctrlKey) && e.key === "y") {
-        if (revisionState.canRedo && !undoRedoLoading && !saving) {
-          e.preventDefault();
-          handleRedo();
-        }
-      }
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [revisionState, undoRedoLoading, saving]);
-
-  // A7: Undo API call
-  async function handleUndo() {
-    if (!revisionState.canUndo || undoRedoLoading || saving) return;
-    setUndoRedoLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/content/pages/${pageId}/undo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || "Failed to undo. Please try again.");
-        return;
-      }
-
-      const data = await res.json();
-      if (data.success && data.content) {
-        setBlocks(data.content.blocks || []);
-        if (data.revisionState) {
-          setRevisionState(data.revisionState);
-        }
-      }
-    } catch {
-      setError("Failed to undo. Please try again.");
-    } finally {
-      setUndoRedoLoading(false);
-    }
-  }
-
-  // A7: Redo API call
-  async function handleRedo() {
-    if (!revisionState.canRedo || undoRedoLoading || saving) return;
-    setUndoRedoLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/content/pages/${pageId}/redo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || "Failed to redo. Please try again.");
-        return;
-      }
-
-      const data = await res.json();
-      if (data.success && data.content) {
-        setBlocks(data.content.blocks || []);
-        if (data.revisionState) {
-          setRevisionState(data.revisionState);
-        }
-      }
-    } catch {
-      setError("Failed to redo. Please try again.");
-    } finally {
-      setUndoRedoLoading(false);
-    }
-  }
-
-  // Reorder API call
-  async function saveBlockOrder(newBlocks: Block[], previousBlocks: Block[]) {
-    setSaving(true);
-    setError(null);
-    try {
-      const blockIds = newBlocks.map((b) => b.id);
-      const res = await fetch(`/api/admin/content/pages/${pageId}/blocks?action=reorder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blockIds }),
-      });
-
-      if (!res.ok) {
-        setBlocks(previousBlocks);
-        setError("Failed to save block order. Please try again.");
-      } else {
-        // A7: Update revision state from response
         const data = await res.json();
-        if (data.revisionState) {
-          setRevisionState(data.revisionState);
-        }
-      }
-    } catch {
-      setBlocks(previousBlocks);
-      setError("Failed to save block order. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // Update block data API call
-  async function saveBlockData(blockId: string, data: Record<string, unknown>, previousBlocks: Block[]) {
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/content/pages/${pageId}/blocks?action=update`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blockId, data }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        setBlocks(previousBlocks);
-        setError(errorData.message || "Failed to save block. Please try again.");
-        return false;
-      }
-
-      // A7: Update revision state from response
-      const responseData = await res.json();
-      if (responseData.revisionState) {
-        setRevisionState(responseData.revisionState);
-      }
-      return true;
-    } catch {
-      setBlocks(previousBlocks);
-      setError("Failed to save block. Please try again.");
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  // Move block up (swap with previous)
-  function handleMoveUp(index: number) {
-    if (index <= 0 || saving) return;
-
-    const previousBlocks = blocks;
-    const newBlocks = [...blocks];
-    [newBlocks[index - 1], newBlocks[index]] = [newBlocks[index], newBlocks[index - 1]];
-    const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
-
-    setBlocks(reordered);
-    saveBlockOrder(reordered, previousBlocks);
-  }
-
-  // Move block down (swap with next)
-  function handleMoveDown(index: number) {
-    if (index >= blocks.length - 1 || saving) return;
-
-    const previousBlocks = blocks;
-    const newBlocks = [...blocks];
-    [newBlocks[index], newBlocks[index + 1]] = [newBlocks[index + 1], newBlocks[index]];
-    const reordered = newBlocks.map((b, i) => ({ ...b, order: i }));
-
-    setBlocks(reordered);
-    saveBlockOrder(reordered, previousBlocks);
-  }
-
-  // Start editing a block
-  function handleEdit(block: Block) {
-    if (saving) return;
-    setEditingBlockId(block.id);
-    setEditingData({ ...block.data });
-    setError(null);
-    setValidationError(null);
-  }
-
-  // Cancel editing
-  function handleCancelEdit() {
-    setEditingBlockId(null);
-    setEditingData(null);
-    setValidationError(null);
-  }
-
-  // Save edited block with client-side validation
-  async function handleSaveEdit() {
-    if (!editingBlockId || !editingData || saving) return;
-
-    // Find the block type
-    const block = blocks.find((b) => b.id === editingBlockId);
-    if (!block) return;
-
-    // Client-side validation using schema
-    const validation = validateBlockData(block.type, editingData);
-    if (!validation.ok) {
-      setValidationError(validation.error);
-      return;
-    }
-
-    setValidationError(null);
-    const previousBlocks = blocks;
-
-    // Optimistic update with validated data
-    const newBlocks = blocks.map((b) =>
-      b.id === editingBlockId
-        ? ({ ...b, data: validation.data as typeof b.data } as Block)
-        : b
-    );
-    setBlocks(newBlocks);
-
-    const success = await saveBlockData(editingBlockId, validation.data as Record<string, unknown>, previousBlocks);
-    if (success) {
-      setEditingBlockId(null);
-      setEditingData(null);
-    }
-  }
-
-  // Update a field in the editing data
-  const updateField = useCallback((field: string, value: unknown) => {
-    setEditingData((prev) => (prev ? { ...prev, [field]: value } : null));
-    setValidationError(null); // Clear validation error on change
-  }, []);
-
-  // Lifecycle action API call
-  async function handleLifecycleAction(action: LifecycleAction) {
-    setLifecycleLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/content/pages/${pageId}?action=${action}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        setError(errorData.message || `Failed to ${action}. Please try again.`);
-        return;
-      }
-
-      // Reload the page to get fresh data
-      window.location.reload();
-    } catch {
-      setError(`Failed to ${action}. Please try again.`);
-    } finally {
-      setLifecycleLoading(false);
-      setConfirmAction(null);
-    }
-  }
-
-  // Handle confirm dialog
-  function handleConfirmLifecycleAction() {
-    if (confirmAction) {
-      handleLifecycleAction(confirmAction);
-    }
-  }
-
-  // Get action confirmation text
-  function getConfirmText(action: LifecycleAction): { title: string; message: string } {
-    switch (action) {
-      case "publish":
-        return {
-          title: "Publish Page",
-          message: "Are you sure you want to publish this page? It will become visible to users.",
-        };
-      case "unpublish":
-        return {
-          title: "Unpublish Page",
-          message: "Are you sure you want to unpublish this page? It will no longer be visible to users.",
-        };
-      case "discardDraft":
-        return {
-          title: "Discard Draft Changes",
-          message: "Are you sure you want to discard all draft changes? This will restore the page to its last published state.",
-        };
-      case "archive":
-        return {
-          title: "Archive Page",
-          message: "Are you sure you want to archive this page?",
-        };
-    }
-  }
-
-  // Format date for display
-  function formatDate(date: Date | null): string {
-    if (!date) return "";
-    return formatDateLocale(date, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
-  return (
-    <div data-test-id="page-editor-blocks">
-      {/* Lifecycle Status Banner */}
-      <div
-        data-test-id="page-lifecycle-banner"
-        style={{
-          padding: "12px 16px",
-          marginBottom: "16px",
-          backgroundColor: lifecycle.status === "PUBLISHED" ? "#e8f5e9" : lifecycle.status === "ARCHIVED" ? "#f5f5f5" : "#fff3e0",
-          border: `1px solid ${lifecycle.status === "PUBLISHED" ? "#4caf50" : lifecycle.status === "ARCHIVED" ? "#9e9e9e" : "#ff9800"}`,
-          borderRadius: "6px",
-        }}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span
-                data-test-id="page-status-badge"
-                style={{
-                  display: "inline-block",
-                  padding: "4px 10px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  borderRadius: "4px",
-                  backgroundColor: lifecycle.status === "PUBLISHED" ? "#4caf50" : lifecycle.status === "ARCHIVED" ? "#9e9e9e" : "#ff9800",
-                  color: "#fff",
-                }}
-              >
-                {lifecycle.status}
-              </span>
-              {lifecycle.hasDraftChanges && (
-                <span
-                  data-test-id="draft-changes-indicator"
-                  style={{
-                    display: "inline-block",
-                    padding: "4px 10px",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    borderRadius: "4px",
-                    backgroundColor: "#fff3e0",
-                    border: "1px solid #ff9800",
-                    color: "#e65100",
-                  }}
-                >
-                  Unsaved draft changes
-                </span>
-              )}
-            </div>
-            {lifecycle.publishedAt && (
-              <div style={{ marginTop: "4px", fontSize: "13px", color: "#666" }}>
-                Last published: {formatDate(lifecycle.publishedAt)}
-              </div>
-            )}
-          </div>
-
-          {/* Lifecycle Action Buttons */}
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {lifecycle.canPublish && (
-              <button
-                type="button"
-                data-test-id="lifecycle-publish-btn"
-                onClick={() => setConfirmAction("publish")}
-                disabled={lifecycleLoading || saving}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  cursor: lifecycleLoading || saving ? "not-allowed" : "pointer",
-                  opacity: lifecycleLoading || saving ? 0.6 : 1,
-                  border: "none",
-                  borderRadius: "4px",
-                  backgroundColor: "#4caf50",
-                  color: "#fff",
-                }}
-              >
-                {lifecycle.hasDraftChanges ? "Publish Changes" : "Publish"}
-              </button>
-            )}
-            {lifecycle.canDiscardDraft && (
-              <button
-                type="button"
-                data-test-id="lifecycle-discard-btn"
-                onClick={() => setConfirmAction("discardDraft")}
-                disabled={lifecycleLoading || saving}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  cursor: lifecycleLoading || saving ? "not-allowed" : "pointer",
-                  opacity: lifecycleLoading || saving ? 0.6 : 1,
-                  border: "1px solid #f44336",
-                  borderRadius: "4px",
-                  backgroundColor: "#fff",
-                  color: "#f44336",
-                }}
-              >
-                Discard Draft
-              </button>
-            )}
-            {lifecycle.canUnpublish && (
-              <button
-                type="button"
-                data-test-id="lifecycle-unpublish-btn"
-                onClick={() => setConfirmAction("unpublish")}
-                disabled={lifecycleLoading || saving}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  cursor: lifecycleLoading || saving ? "not-allowed" : "pointer",
-                  opacity: lifecycleLoading || saving ? 0.6 : 1,
-                  border: "1px solid #666",
-                  borderRadius: "4px",
-                  backgroundColor: "#fff",
-                  color: "#666",
-                }}
-              >
-                Unpublish
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Confirmation Modal */}
-      {confirmAction && (
-        <div
-          data-test-id="lifecycle-confirm-modal"
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#fff",
-              padding: "24px",
-              borderRadius: "8px",
-              maxWidth: "400px",
-              width: "90%",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-            }}
-          >
-            <h3 style={{ margin: "0 0 12px 0", fontSize: "18px" }}>
-              {getConfirmText(confirmAction).title}
-            </h3>
-            <p style={{ margin: "0 0 20px 0", color: "#666", fontSize: "14px" }}>
-              {getConfirmText(confirmAction).message}
-            </p>
-            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-              <button
-                type="button"
-                data-test-id="lifecycle-confirm-cancel"
-                onClick={() => setConfirmAction(null)}
-                disabled={lifecycleLoading}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  cursor: lifecycleLoading ? "not-allowed" : "pointer",
-                  border: "1px solid #ccc",
-                  borderRadius: "4px",
-                  backgroundColor: "#fff",
-                  color: "#333",
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                data-test-id="lifecycle-confirm-ok"
-                onClick={handleConfirmLifecycleAction}
-                disabled={lifecycleLoading}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "14px",
-                  cursor: lifecycleLoading ? "not-allowed" : "pointer",
-                  opacity: lifecycleLoading ? 0.6 : 1,
-                  border: "none",
-                  borderRadius: "4px",
-                  backgroundColor: confirmAction === "discardDraft" ? "#f44336" : "#4caf50",
-                  color: "#fff",
-                }}
-              >
-                {lifecycleLoading ? "Processing..." : "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-        <h2 style={{ fontSize: "18px", margin: 0 }}>Blocks ({blocks.length})</h2>
-
-        {/* A7: Undo/Redo controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <div
-            data-test-id="undo-redo-controls"
-            style={{ display: "flex", gap: "4px", alignItems: "center" }}
-          >
-            <button
-              type="button"
-              data-test-id="undo-btn"
-              onClick={handleUndo}
-              disabled={!revisionState.canUndo || undoRedoLoading || saving}
-              title={`Undo (Cmd+Z)${revisionState.canUndo ? "" : " - Nothing to undo"}`}
-              aria-label="Undo"
-              style={{
-                padding: "6px 10px",
-                fontSize: "13px",
-                cursor: !revisionState.canUndo || undoRedoLoading || saving ? "not-allowed" : "pointer",
-                opacity: !revisionState.canUndo || undoRedoLoading || saving ? 0.4 : 1,
-                border: "1px solid #ccc",
-                borderRadius: "4px 0 0 4px",
-                backgroundColor: "#fff",
-              }}
-            >
-              Undo
-            </button>
-            <button
-              type="button"
-              data-test-id="redo-btn"
-              onClick={handleRedo}
-              disabled={!revisionState.canRedo || undoRedoLoading || saving}
-              title={`Redo (Cmd+Shift+Z)${revisionState.canRedo ? "" : " - Nothing to redo"}`}
-              aria-label="Redo"
-              style={{
-                padding: "6px 10px",
-                fontSize: "13px",
-                cursor: !revisionState.canRedo || undoRedoLoading || saving ? "not-allowed" : "pointer",
-                opacity: !revisionState.canRedo || undoRedoLoading || saving ? 0.4 : 1,
-                border: "1px solid #ccc",
-                borderLeft: "none",
-                borderRadius: "0 4px 4px 0",
-                backgroundColor: "#fff",
-              }}
-            >
-              Redo
-            </button>
-          </div>
-
-          {/* Revision indicator */}
-          {revisionState.totalRevisions > 0 && (
-            <span
-              data-test-id="revision-indicator"
-              style={{ fontSize: "12px", color: "#666" }}
-            >
-              {revisionState.undoCount} undo{revisionState.undoCount !== 1 ? "s" : ""} available
-            </span>
-          )}
-
-          {(saving || undoRedoLoading) && (
-            <span data-test-id="page-editor-saving" style={{ fontSize: "13px", color: "#666" }}>
-              {undoRedoLoading ? (revisionState.canRedo ? "Redoing..." : "Undoing...") : "Saving..."}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <div
-          data-test-id="page-editor-error"
-          style={{
-            padding: "8px 12px",
-            marginBottom: "12px",
-            backgroundColor: "#fee",
-            border: "1px solid #c00",
-            borderRadius: "4px",
-            color: "#900",
-            fontSize: "13px",
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      {blocks.length === 0 ? (
-        <p data-test-id="page-editor-empty" style={{ color: "#666", fontStyle: "italic" }}>
-          No blocks yet. Add a block to get started.
-        </p>
-      ) : (
-        <ul
-          data-test-id="page-editor-block-list"
-          style={{ listStyle: "none", margin: 0, padding: 0 }}
-        >
-          {blocks.map((block, index) => {
-            const meta = BLOCK_METADATA[block.type];
-            const isFirst = index === 0;
-            const isLast = index === blocks.length - 1;
-            const isEditing = editingBlockId === block.id;
-            const isEditable = EDITABLE_BLOCK_TYPES.includes(block.type);
-            const isReadonly = READONLY_BLOCK_TYPES.includes(block.type);
-
-            return (
-              <li
-                key={block.id}
-                data-test-id="page-editor-block-item"
-                data-block-id={block.id}
-                data-block-type={block.type}
-                style={{
-                  marginBottom: "8px",
-                  backgroundColor: "#f9f9f9",
-                  border: isEditing ? "2px solid #0066cc" : "1px solid #e0e0e0",
-                  borderRadius: "4px",
-                }}
-              >
-                {/* Block header row */}
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    padding: "12px",
-                  }}
-                >
-                  {/* Order controls */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <button
-                      type="button"
-                      data-test-id="block-move-up"
-                      onClick={() => handleMoveUp(index)}
-                      disabled={isFirst || saving}
-                      aria-label={`Move ${meta?.label || block.type} up`}
-                      style={{
-                        padding: "4px 8px",
-                        fontSize: "12px",
-                        cursor: isFirst || saving ? "not-allowed" : "pointer",
-                        opacity: isFirst || saving ? 0.4 : 1,
-                        border: "1px solid #ccc",
-                        borderRadius: "3px",
-                        backgroundColor: "#fff",
-                      }}
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      data-test-id="block-move-down"
-                      onClick={() => handleMoveDown(index)}
-                      disabled={isLast || saving}
-                      aria-label={`Move ${meta?.label || block.type} down`}
-                      style={{
-                        padding: "4px 8px",
-                        fontSize: "12px",
-                        cursor: isLast || saving ? "not-allowed" : "pointer",
-                        opacity: isLast || saving ? 0.4 : 1,
-                        border: "1px solid #ccc",
-                        borderRadius: "3px",
-                        backgroundColor: "#fff",
-                      }}
-                    >
-                      ▼
-                    </button>
-                  </div>
-
-                  {/* Block info */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 500, fontSize: "14px" }}>
-                      {meta?.label || block.type}
-                      {isReadonly && (
-                        <span
-                          style={{
-                            marginLeft: "8px",
-                            fontSize: "11px",
-                            padding: "2px 6px",
-                            backgroundColor: "#e0e0e0",
-                            borderRadius: "3px",
-                            color: "#666",
-                          }}
-                        >
-                          Read-only
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#666" }}>
-                      {meta?.description || `Block type: ${block.type}`}
-                    </div>
-                  </div>
-
-                  {/* Edit button */}
-                  <button
-                    type="button"
-                    data-test-id="block-edit"
-                    onClick={() => (isEditing ? handleCancelEdit() : handleEdit(block))}
-                    disabled={saving}
-                    style={{
-                      padding: "6px 12px",
-                      fontSize: "13px",
-                      cursor: saving ? "not-allowed" : "pointer",
-                      opacity: saving ? 0.6 : 1,
-                      border: "1px solid #0066cc",
-                      borderRadius: "4px",
-                      backgroundColor: isEditing ? "#0066cc" : "#fff",
-                      color: isEditing ? "#fff" : "#0066cc",
-                    }}
-                  >
-                    {isEditing ? "Cancel" : isReadonly ? "View" : "Edit"}
-                  </button>
-
-                  {/* Order indicator */}
-                  <div
-                    data-test-id="block-order-indicator"
-                    style={{ fontSize: "12px", color: "#999", minWidth: "40px", textAlign: "right" }}
-                  >
-                    #{index + 1}
-                  </div>
-                </div>
-
-                {/* Editor panel */}
-                {isEditing && (
-                  <div
-                    data-test-id="block-editor-panel"
-                    style={{
-                      padding: "16px",
-                      borderTop: "1px solid #e0e0e0",
-                      backgroundColor: "#fff",
-                    }}
-                  >
-                    {/* Validation error */}
-                    {validationError && (
-                      <div
-                        data-test-id="block-editor-validation-error"
-                        style={{
-                          padding: "8px 12px",
-                          marginBottom: "12px",
-                          backgroundColor: "#fff3cd",
-                          border: "1px solid #ffc107",
-                          borderRadius: "4px",
-                          color: "#856404",
-                          fontSize: "13px",
-                        }}
-                      >
-                        {validationError}
-                      </div>
-                    )}
-
-                    {isReadonly ? (
-                      <ReadOnlyBlockViewer data={block.data} blockType={block.type} />
-                    ) : (
-                      <SchemaBlockEditor
-                        blockType={block.type}
-                        data={editingData || {}}
-                        onChange={updateField}
-                        disabled={saving}
-                      />
-                    )}
-
-                    {/* Save/Cancel buttons for editable blocks */}
-                    {isEditable && (
-                      <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
-                        <button
-                          type="button"
-                          data-test-id="block-editor-save"
-                          onClick={handleSaveEdit}
-                          disabled={saving}
-                          style={{
-                            padding: "8px 16px",
-                            fontSize: "14px",
-                            cursor: saving ? "not-allowed" : "pointer",
-                            opacity: saving ? 0.6 : 1,
-                            border: "none",
-                            borderRadius: "4px",
-                            backgroundColor: "#0066cc",
-                            color: "#fff",
-                          }}
-                        >
-                          {saving ? "Saving..." : "Save"}
-                        </button>
-                        <button
-                          type="button"
-                          data-test-id="block-editor-cancel"
-                          onClick={handleCancelEdit}
-                          disabled={saving}
-                          style={{
-                            padding: "8px 16px",
-                            fontSize: "14px",
-                            cursor: saving ? "not-allowed" : "pointer",
-                            opacity: saving ? 0.6 : 1,
-                            border: "1px solid #ccc",
-                            borderRadius: "4px",
-                            backgroundColor: "#fff",
-                            color: "#333",
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {/* Audit Log Panel */}
-      <AuditLogPanel pageId={pageId} />
-    </div>
-  );
-}
-
-// ============================================================================
-// Audit Log Panel
-// ============================================================================
-
-type AuditLogEntry = {
-  id: string;
-  action: string;
-  timestamp: string;
-  actor: {
-    id: string | null;
-    name: string;
-  };
-  summary: string;
-};
-
-function AuditLogPanel({ pageId }: { pageId: string }) {
-  const [entries, setEntries] = useState<AuditLogEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
-
-  useEffect(() => {
-    async function fetchAuditLog() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/admin/content/pages/${pageId}/audit?limit=10`);
-        if (res.ok) {
-          const data = await res.json();
-          setEntries(data.entries || []);
-        } else {
-          setError("Failed to load audit log");
-        }
+        const p = data.page as PageData;
+        setPage(p);
+        setTitle(p.title);
+        setSlug(p.slug);
+        setDescription(p.description || "");
+        setVisibility(p.visibility);
+        setContent(p.content || createDefaultPageContent());
       } catch {
-        setError("Failed to load audit log");
+        setError("Failed to load page");
       } finally {
         setLoading(false);
       }
     }
-    fetchAuditLog();
+    loadPage();
   }, [pageId]);
 
-  const getActionColor = (action: string): string => {
-    switch (action) {
-      case "CREATE":
-        return "#28a745";
-      case "PUBLISH":
-        return "#007bff";
-      case "UNPUBLISH":
-        return "#6c757d";
-      case "ARCHIVE":
-        return "#6c757d";
-      case "UPDATE":
-        return "#17a2b8";
-      case "DISCARD_DRAFT":
-        return "#dc3545";
-      case "DELETE":
-        return "#dc3545";
-      case "UNDO":
-        return "#9c27b0"; // Purple for undo
-      case "REDO":
-        return "#673ab7"; // Deep purple for redo
-      default:
-        return "#6c757d";
-    }
-  };
+  // Track unsaved changes
+  useEffect(() => {
+    if (!page) return;
+    const hasChanges =
+      title !== page.title ||
+      slug !== page.slug ||
+      description !== (page.description || "") ||
+      visibility !== page.visibility ||
+      JSON.stringify(content) !== JSON.stringify(page.content);
+    setHasUnsavedChanges(hasChanges);
+  }, [page, title, slug, description, visibility, content]);
 
-  return (
-    <div
-      data-test-id="audit-log-panel"
-      style={{
-        marginTop: "24px",
-        borderTop: "1px solid #e0e0e0",
-        paddingTop: "16px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "12px",
-        }}
-      >
-        <h3 style={{ fontSize: "16px", margin: 0 }}>
-          Activity Log
-        </h3>
-        <button
-          type="button"
-          data-test-id="audit-log-toggle"
-          onClick={() => setExpanded(!expanded)}
-          style={{
-            padding: "4px 10px",
-            fontSize: "13px",
-            border: "1px solid #ccc",
-            borderRadius: "4px",
-            backgroundColor: "#fff",
-            cursor: "pointer",
-          }}
-        >
-          {expanded ? "Collapse" : "Expand"}
-        </button>
-      </div>
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
-      {expanded && (
-        <div data-test-id="audit-log-content">
-          {loading && (
-            <p style={{ color: "#666", fontSize: "13px" }}>Loading...</p>
-          )}
-          {error && (
-            <p style={{ color: "#c00", fontSize: "13px" }}>{error}</p>
-          )}
-          {!loading && !error && entries.length === 0 && (
-            <p style={{ color: "#666", fontSize: "13px", fontStyle: "italic" }}>
-              No activity recorded yet.
-            </p>
-          )}
-          {!loading && !error && entries.length > 0 && (
-            <ul
-              data-test-id="audit-log-list"
-              style={{ listStyle: "none", margin: 0, padding: 0 }}
-            >
-              {entries.map((entry) => (
-                <li
-                  key={entry.id}
-                  data-test-id="audit-log-entry"
-                  style={{
-                    padding: "8px 0",
-                    borderBottom: "1px solid #eee",
-                    fontSize: "13px",
-                    display: "flex",
-                    gap: "12px",
-                    alignItems: "flex-start",
-                  }}
-                >
-                  <span
-                    data-test-id="audit-log-action"
-                    style={{
-                      display: "inline-block",
-                      padding: "2px 6px",
-                      borderRadius: "3px",
-                      fontSize: "11px",
-                      fontWeight: 500,
-                      backgroundColor: getActionColor(entry.action),
-                      color: "#fff",
-                      minWidth: "60px",
-                      textAlign: "center",
-                    }}
-                  >
-                    {entry.action}
-                  </span>
-                  <span style={{ flex: 1, color: "#333" }}>
-                    {entry.summary}
-                  </span>
-                  <span style={{ color: "#666", whiteSpace: "nowrap" }}>
-                    {entry.actor.name}
-                  </span>
-                  <span
-                    data-test-id="audit-log-timestamp"
-                    style={{ color: "#999", whiteSpace: "nowrap" }}
-                  >
-                    {formatClubDate(new Date(entry.timestamp))}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+  const handleSave = useCallback(async () => {
+    if (!page) return;
 
-// ============================================================================
-// Read-only block viewer for complex types
-// ============================================================================
+    setSaving(true);
+    setError(null);
 
-type ReadOnlyBlockViewerProps = {
-  data: unknown;
-  blockType: BlockType;
-};
-
-function ReadOnlyBlockViewer({ data, blockType }: ReadOnlyBlockViewerProps) {
-  const [expanded, setExpanded] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const jsonString = JSON.stringify(data, null, 2);
-  const lines = jsonString.split("\n");
-  const isLong = lines.length > 10;
-  const displayText = expanded || !isLong ? jsonString : lines.slice(0, 10).join("\n") + "\n...";
-
-  const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(jsonString);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // Clipboard API not available
+      const res = await fetch(`/api/admin/content/pages/${pageId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          slug,
+          description: description || null,
+          visibility,
+          content,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to save page");
+      }
+
+      const data = await res.json();
+      setPage((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: data.page.title,
+              slug: data.page.slug,
+              description: data.page.description,
+              visibility: data.page.visibility,
+              content: content,
+              updatedAt: data.page.updatedAt,
+            }
+          : null
+      );
+      setHasUnsavedChanges(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save page");
+    } finally {
+      setSaving(false);
     }
-  };
+  }, [page, pageId, title, slug, description, visibility, content]);
 
-  return (
-    <div data-test-id="block-editor-readonly">
-      <div style={{ marginBottom: "8px", color: "#666", fontSize: "13px" }}>
-        This block type ({blockType}) requires advanced editing. Full editing support coming soon.
-      </div>
-      <div
-        style={{
-          position: "relative",
-          backgroundColor: "#f5f5f5",
-          border: "1px solid #e0e0e0",
-          borderRadius: "4px",
-          padding: "12px",
-        }}
-      >
-        <pre
-          data-test-id="block-editor-json"
-          style={{
-            margin: 0,
-            fontSize: "12px",
-            fontFamily: "monospace",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            maxHeight: expanded ? "none" : "300px",
-            overflow: "auto",
-          }}
-        >
-          {displayText}
-        </pre>
-        <div style={{ marginTop: "8px", display: "flex", gap: "8px" }}>
-          {isLong && (
-            <button
-              type="button"
-              data-test-id="block-editor-toggle-expand"
-              onClick={() => setExpanded(!expanded)}
-              style={{
-                padding: "4px 8px",
-                fontSize: "12px",
-                border: "1px solid #ccc",
-                borderRadius: "3px",
-                backgroundColor: "#fff",
-                cursor: "pointer",
-              }}
-            >
-              {expanded ? "Show less" : "Show more"}
-            </button>
-          )}
-          <button
-            type="button"
-            data-test-id="block-editor-copy"
-            onClick={handleCopy}
-            style={{
-              padding: "4px 8px",
-              fontSize: "12px",
-              border: "1px solid #ccc",
-              borderRadius: "3px",
-              backgroundColor: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            {copied ? "Copied!" : "Copy JSON"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+  const handlePublish = useCallback(async () => {
+    if (!page || hasUnsavedChanges) return;
 
-// ============================================================================
-// Schema-driven block editor
-// ============================================================================
+    setSaving(true);
+    setError(null);
 
-type SchemaBlockEditorProps = {
-  blockType: BlockType;
-  data: Record<string, unknown>;
-  onChange: (field: string, value: unknown) => void;
-  disabled: boolean;
-};
+    try {
+      const res = await fetch(`/api/admin/content/pages/${pageId}?action=publish`, {
+        method: "POST",
+      });
 
-function SchemaBlockEditor({ blockType, data, onChange, disabled }: SchemaBlockEditorProps) {
-  const fields = getBlockFieldMetadata(blockType);
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to publish page");
+      }
 
-  const inputStyle = {
-    width: "100%",
-    padding: "8px",
-    fontSize: "14px",
-    border: "1px solid #ccc",
-    borderRadius: "4px",
-    marginTop: "4px",
-  };
+      const data = await res.json();
+      setPage((prev) => (prev ? { ...prev, status: "PUBLISHED", publishedAt: data.page.publishedAt } : null));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to publish page");
+    } finally {
+      setSaving(false);
+    }
+  }, [page, pageId, hasUnsavedChanges]);
 
-  const labelStyle = {
-    display: "block",
-    marginBottom: "12px",
-  };
+  const handleUnpublish = useCallback(async () => {
+    if (!page) return;
 
-  const labelTextStyle = {
-    fontSize: "13px",
-    fontWeight: 500 as const,
-    color: "#333",
-  };
+    setSaving(true);
+    setError(null);
 
-  if (fields.length === 0) {
+    try {
+      const res = await fetch(`/api/admin/content/pages/${pageId}?action=unpublish`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to unpublish page");
+      }
+
+      setPage((prev) => (prev ? { ...prev, status: "DRAFT" } : null));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to unpublish page");
+    } finally {
+      setSaving(false);
+    }
+  }, [page, pageId]);
+
+  const handleArchive = useCallback(async () => {
+    if (!page) return;
+    if (!confirm("Are you sure you want to archive this page? It will no longer be visible.")) return;
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/admin/content/pages/${pageId}?action=archive`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || "Failed to archive page");
+      }
+
+      setPage((prev) => (prev ? { ...prev, status: "ARCHIVED" } : null));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to archive page");
+    } finally {
+      setSaving(false);
+    }
+  }, [page, pageId]);
+
+  const handleContentChange = useCallback((newContent: PageContent) => {
+    setContent(newContent);
+  }, []);
+
+  if (loading) {
     return (
-      <div style={{ color: "#666", fontStyle: "italic" }}>
-        No editor available for {blockType} blocks.
+      <div style={{ padding: "20px" }}>
+        <p>Loading page...</p>
       </div>
     );
   }
 
+  if (error && !page) {
+    return (
+      <div style={{ padding: "20px" }}>
+        <p style={{ color: "#c00" }}>{error}</p>
+        <Link href="/admin/content/pages" style={{ color: "#0066cc" }}>
+          Back to pages
+        </Link>
+      </div>
+    );
+  }
+
+  if (!page) {
+    return null;
+  }
+
+  const statusBadgeStyle = {
+    DRAFT: { bg: "#fff3e0", text: "#995500" },
+    PUBLISHED: { bg: "#e6ffe6", text: "#006600" },
+    ARCHIVED: { bg: "#f0f0f0", text: "#666666" },
+  }[page.status];
+
   return (
-    <div data-test-id={`block-editor-${blockType}`}>
-      {fields.map((field) => (
-        <label key={field.name} style={labelStyle}>
-          <span style={labelTextStyle}>
-            {field.label}
-            {field.required && " *"}
+    <div data-test-id="page-editor-root" style={{ padding: "20px", maxWidth: "1400px" }}>
+      {/* Header */}
+      <div style={{ marginBottom: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+          <Link href="/admin/content/pages" style={{ color: "#666", textDecoration: "none", fontSize: "14px" }}>
+            ← Pages
+          </Link>
+          <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "12px", backgroundColor: statusBadgeStyle.bg, color: statusBadgeStyle.text }}>
+            {page.status}
           </span>
-          {field.type === "textarea" ? (
-            <textarea
-              value={(data[field.name] as string) || ""}
-              onChange={(e) => onChange(field.name, e.target.value)}
-              disabled={disabled}
-              rows={6}
-              style={{ ...inputStyle, resize: "vertical" as const }}
-            />
-          ) : field.type === "select" && field.options ? (
-            <select
-              value={(data[field.name] as string) || field.options[0] || ""}
-              onChange={(e) => onChange(field.name, e.target.value)}
-              disabled={disabled}
-              style={inputStyle}
-            >
-              {field.options.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type={field.type === "url" ? "url" : "text"}
-              value={(data[field.name] as string) || ""}
-              onChange={(e) => onChange(field.name, e.target.value)}
-              disabled={disabled}
-              style={inputStyle}
-            />
+          {hasUnsavedChanges && (
+            <span style={{ fontSize: "12px", color: "#c60" }}>• Unsaved changes</span>
           )}
-        </label>
-      ))}
+        </div>
+        <h1 style={{ margin: "0 0 4px 0", fontSize: "24px" }}>{page.title}</h1>
+        <p style={{ margin: 0, fontSize: "13px", color: "#666" }}>URL: /{page.slug}</p>
+      </div>
+
+      {/* Action bar */}
+      <div style={{ display: "flex", gap: "8px", marginBottom: "20px", padding: "12px 16px", backgroundColor: "#f5f5f5", borderRadius: "6px", alignItems: "center", flexWrap: "wrap" }}>
+        <button data-test-id="save-page-button" onClick={handleSave} disabled={saving || !hasUnsavedChanges} style={{ padding: "8px 16px", fontSize: "14px", fontWeight: 500, backgroundColor: hasUnsavedChanges ? "#0066cc" : "#ccc", color: "#fff", border: "none", borderRadius: "4px", cursor: saving || !hasUnsavedChanges ? "not-allowed" : "pointer" }}>
+          {saving ? "Saving..." : "Save"}
+        </button>
+
+        <button data-test-id="preview-page-button" onClick={() => setShowPreview(!showPreview)} style={{ padding: "8px 16px", fontSize: "14px", backgroundColor: "#fff", color: "#333", border: "1px solid #ddd", borderRadius: "4px", cursor: "pointer" }}>
+          {showPreview ? "Hide Preview" : "Preview"}
+        </button>
+
+        <div style={{ flex: 1 }} />
+
+        {page.status === "DRAFT" && (
+          <button data-test-id="publish-page-button" onClick={handlePublish} disabled={saving || hasUnsavedChanges} title={hasUnsavedChanges ? "Save changes first" : "Publish page"} style={{ padding: "8px 16px", fontSize: "14px", fontWeight: 500, backgroundColor: hasUnsavedChanges ? "#ccc" : "#060", color: "#fff", border: "none", borderRadius: "4px", cursor: saving || hasUnsavedChanges ? "not-allowed" : "pointer" }}>
+            Publish
+          </button>
+        )}
+
+        {page.status === "PUBLISHED" && (
+          <button data-test-id="unpublish-page-button" onClick={handleUnpublish} disabled={saving} style={{ padding: "8px 16px", fontSize: "14px", backgroundColor: "#fff", color: "#c60", border: "1px solid #c60", borderRadius: "4px", cursor: saving ? "not-allowed" : "pointer" }}>
+            Unpublish
+          </button>
+        )}
+
+        {page.status !== "ARCHIVED" && (
+          <button data-test-id="archive-page-button" onClick={handleArchive} disabled={saving} style={{ padding: "8px 16px", fontSize: "14px", backgroundColor: "#fff", color: "#666", border: "1px solid #ddd", borderRadius: "4px", cursor: saving ? "not-allowed" : "pointer" }}>
+            Archive
+          </button>
+        )}
+      </div>
+
+      {/* Error message */}
+      {error && (
+        <div style={{ padding: "12px 16px", backgroundColor: "#fee", color: "#c00", borderRadius: "4px", marginBottom: "16px", fontSize: "14px" }}>
+          {error}
+        </div>
+      )}
+
+      {/* Preview mode */}
+      {showPreview && (
+        <div data-test-id="page-preview" style={{ marginBottom: "24px", border: "1px solid #ddd", borderRadius: "8px", overflow: "hidden" }}>
+          <div style={{ padding: "8px 12px", backgroundColor: "#f5f5f5", borderBottom: "1px solid #ddd", fontSize: "12px", color: "#666" }}>
+            Preview (live changes) — <a href={`/${slug}`} target="_blank" rel="noopener noreferrer" style={{ color: "#0066cc" }}>Open in new tab</a>
+          </div>
+          <iframe src={`/${slug}?preview=true`} style={{ width: "100%", height: "500px", border: "none", backgroundColor: "#fff" }} title="Page preview" />
+        </div>
+      )}
+
+      {/* Page settings */}
+      <div style={{ display: "flex", gap: "24px", marginBottom: "24px" }}>
+        <div style={{ flex: "1 1 300px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: 500, marginBottom: "4px", color: "#555" }}>Title</label>
+          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} data-test-id="page-title-input" style={{ width: "100%", padding: "8px 10px", fontSize: "14px", border: "1px solid #ddd", borderRadius: "4px", boxSizing: "border-box" }} />
+        </div>
+        <div style={{ flex: "1 1 200px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: 500, marginBottom: "4px", color: "#555" }}>URL Slug</label>
+          <input type="text" value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} data-test-id="page-slug-input" style={{ width: "100%", padding: "8px 10px", fontSize: "14px", border: "1px solid #ddd", borderRadius: "4px", boxSizing: "border-box", fontFamily: "monospace" }} />
+        </div>
+        <div style={{ flex: "1 1 150px" }}>
+          <label style={{ display: "block", fontSize: "12px", fontWeight: 500, marginBottom: "4px", color: "#555" }}>Visibility</label>
+          <select value={visibility} onChange={(e) => setVisibility(e.target.value as "PUBLIC" | "MEMBERS_ONLY" | "ROLE_RESTRICTED")} data-test-id="page-visibility-select" style={{ width: "100%", padding: "8px 10px", fontSize: "14px", border: "1px solid #ddd", borderRadius: "4px", boxSizing: "border-box", backgroundColor: "#fff" }}>
+            <option value="PUBLIC">Public</option>
+            <option value="MEMBERS_ONLY">Members Only</option>
+            <option value="ROLE_RESTRICTED">Role Restricted</option>
+          </select>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: "24px" }}>
+        <label style={{ display: "block", fontSize: "12px", fontWeight: 500, marginBottom: "4px", color: "#555" }}>Description (SEO)</label>
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} data-test-id="page-description-input" style={{ width: "100%", padding: "8px 10px", fontSize: "14px", border: "1px solid #ddd", borderRadius: "4px", boxSizing: "border-box", minHeight: "60px", resize: "vertical" }} placeholder="Brief description for search engines..." />
+      </div>
+
+      {/* Block editor */}
+      <div style={{ marginBottom: "24px" }}>
+        <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "12px" }}>Page Content</h2>
+        <PageEditor initialContent={content} onChange={handleContentChange} disabled={saving} />
+      </div>
     </div>
   );
 }

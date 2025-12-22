@@ -1,133 +1,102 @@
 "use client";
 
 // Copyright (c) Santa Barbara Newcomers Club
-// Block palette for adding new blocks to the page
+// Block palette component for adding new blocks to a page
 
-import { BLOCK_METADATA, type BlockType } from "@/lib/publishing/blocks";
-
-// v1 supported block types (as specified in PAGE_EDITOR_V1.md)
-const V1_BLOCK_TYPES: BlockType[] = [
-  "text",
-  "image",
-  "hero",
-  "cta",
-  "divider",
-  "spacer",
-];
+import { BlockType, BLOCK_METADATA } from "@/lib/publishing/blocks";
 
 type BlockPaletteProps = {
   onAddBlock: (type: BlockType) => void;
   disabled?: boolean;
 };
 
-// Simple icon components
-const icons: Record<string, React.ReactNode> = {
-  type: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M4 7V4h16v3M9 20h6M12 4v16" />
-    </svg>
-  ),
-  image: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <circle cx="8.5" cy="8.5" r="1.5" />
-      <path d="M21 15l-5-5L5 21" />
-    </svg>
-  ),
-  "mouse-pointer": (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
-      <path d="M13 13l6 6" />
-    </svg>
-  ),
-  minus: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  ),
-  "move-vertical": (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="8 18 12 22 16 18" />
-      <polyline points="8 6 12 2 16 6" />
-      <line x1="12" y1="2" x2="12" y2="22" />
-    </svg>
-  ),
+const BLOCK_ICONS: Record<BlockType, string> = {
+  hero: "⬜",
+  text: "📝",
+  image: "🖼️",
+  cards: "🃏",
+  "event-list": "📅",
+  gallery: "🖼️",
+  faq: "❓",
+  contact: "✉️",
+  cta: "👆",
+  divider: "➖",
+  spacer: "↕️",
 };
 
-function getIcon(iconName: string): React.ReactNode {
-  return icons[iconName] || icons.type;
-}
+const CATEGORIES = ["content", "media", "interactive", "layout"] as const;
+const CATEGORY_LABELS: Record<string, string> = {
+  content: "Content",
+  media: "Media",
+  interactive: "Interactive",
+  layout: "Layout",
+};
 
 export default function BlockPalette({ onAddBlock, disabled }: BlockPaletteProps) {
-  const categories = {
-    content: V1_BLOCK_TYPES.filter(
-      (t) => BLOCK_METADATA[t].category === "content"
-    ),
-    media: V1_BLOCK_TYPES.filter(
-      (t) => BLOCK_METADATA[t].category === "media"
-    ),
-    interactive: V1_BLOCK_TYPES.filter(
-      (t) => BLOCK_METADATA[t].category === "interactive"
-    ),
-    layout: V1_BLOCK_TYPES.filter(
-      (t) => BLOCK_METADATA[t].category === "layout"
-    ),
-  };
-
-  const categoryLabels: Record<string, string> = {
-    content: "Content",
-    media: "Media",
-    interactive: "Interactive",
-    layout: "Layout",
-  };
+  const blocksByCategory = CATEGORIES.map((category) => ({
+    category,
+    label: CATEGORY_LABELS[category],
+    blocks: (Object.entries(BLOCK_METADATA) as [BlockType, typeof BLOCK_METADATA[BlockType]][])
+      .filter(([, meta]) => meta.category === category),
+  }));
 
   return (
-    <div className="p-4" data-testid="block-palette">
-      <h3 className="text-sm font-semibold text-gray-700 mb-3">Add Block</h3>
-
-      {Object.entries(categories).map(
-        ([category, blockTypes]) =>
-          blockTypes.length > 0 && (
-            <div key={category} className="mb-4">
-              <h4 className="text-xs font-medium text-gray-500 uppercase mb-2">
-                {categoryLabels[category]}
-              </h4>
-              <div className="space-y-1">
-                {blockTypes.map((type) => {
-                  const meta = BLOCK_METADATA[type];
-                  return (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => onAddBlock(type)}
-                      disabled={disabled}
-                      className={`
-                        w-full flex items-center p-2 rounded-md text-left
-                        ${disabled
-                          ? "opacity-50 cursor-not-allowed"
-                          : "hover:bg-gray-100 cursor-pointer"
-                        }
-                      `}
-                      data-testid={`add-block-${type}`}
-                    >
-                      <span className="text-gray-500 mr-3">
-                        {getIcon(meta.icon)}
-                      </span>
-                      <div>
-                        <span className="text-sm font-medium text-gray-900">
-                          {meta.label}
-                        </span>
-                        <p className="text-xs text-gray-500">
-                          {meta.description}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )
-      )}
+    <div
+      data-test-id="block-palette"
+      style={{
+        backgroundColor: "#f9f9f9",
+        borderRadius: "8px",
+        padding: "16px",
+        marginBottom: "16px",
+      }}
+    >
+      <h3 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 600, color: "#333" }}>
+        Add Block
+      </h3>
+      {blocksByCategory.map(({ category, label, blocks }) => (
+        <div key={category} style={{ marginBottom: "12px" }}>
+          <div style={{ fontSize: "11px", color: "#666", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            {label}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {blocks.map(([type, meta]) => (
+              <button
+                key={type}
+                data-test-id={`add-block-${type}`}
+                onClick={() => onAddBlock(type)}
+                disabled={disabled}
+                title={meta.description}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  padding: "6px 10px",
+                  fontSize: "12px",
+                  backgroundColor: "#fff",
+                  border: "1px solid #ddd",
+                  borderRadius: "4px",
+                  cursor: disabled ? "not-allowed" : "pointer",
+                  opacity: disabled ? 0.5 : 1,
+                  transition: "all 0.15s ease",
+                }}
+                onMouseOver={(e) => {
+                  if (!disabled) {
+                    e.currentTarget.style.backgroundColor = "#f0f0f0";
+                    e.currentTarget.style.borderColor = "#bbb";
+                  }
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.backgroundColor = "#fff";
+                  e.currentTarget.style.borderColor = "#ddd";
+                }}
+              >
+                <span>{BLOCK_ICONS[type]}</span>
+                <span>{meta.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
