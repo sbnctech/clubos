@@ -19,13 +19,12 @@ Select ONE classification for this PR:
 - [ ] Build passes (`npm run build`).
 
 ### Prisma / DB (required if Prisma or data model changes)
+- [ ] I have read [docs/CI/PRISMA_RULES.md](../docs/CI/PRISMA_RULES.md) (schema-first rule).
 - [ ] `schema.prisma` updated for all new models/fields/enums used in code.
 - [ ] Migration created and committed under `prisma/migrations/`.
 - [ ] `prisma validate` passes.
 - [ ] `prisma generate` passes.
 - [ ] Code does not reference Prisma models/fields/enums that are not in `schema.prisma`.
-
-Note: CI requires DATABASE_URL during npm ci because postinstall runs prisma generate.
 
 ### Deployment / Preview sanity
 - [ ] Netlify/Vercel previews are green (or not applicable and explained).
