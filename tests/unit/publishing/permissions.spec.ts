@@ -316,7 +316,6 @@ describe("Permission System", () => {
       visibility: "PUBLIC" as const,
       content: {},
       publishedContent: null,
-      publishedContent: {},
       templateId: null,
       themeId: null,
       audienceRuleId: null,
