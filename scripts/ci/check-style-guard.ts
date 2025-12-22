@@ -5,6 +5,8 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 
+const IGNORE_FILE_RE = /^(src\/styles\/themes\/|src\/styles\/tokens\/|src\/app\/globals\.css$)/;
+
 const INCLUDE_DIRS = [
   "src/app",
   "src/components",
