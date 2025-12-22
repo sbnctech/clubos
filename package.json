@@ -22,7 +22,9 @@
     "test:unit": "vitest run",
     "test:unit:coverage": "vitest run --coverage",
     "green": "npm run typecheck && npm run lint && npm run test:unit && npm run db:seed && npm run test-admin:stable && npm run test-api:stable",
-    "ci:style-guard": "node --no-warnings --loader tsx scripts/ci/check-style-guard.ts"
+    "ci:style-guard": "node --no-warnings --loader tsx scripts/ci/check-style-guard.ts",
+    "ci:style-guard:count": "npx -y tsx scripts/ci/check-style-guard.ts 2>&1 | rg -c ' HEX_COLOR | INLINE_STYLE ' || true",
+    "ci:style-guard:baseline": "STYLE_GUARD_FINDINGS_COUNT=$(npm run -s ci:style-guard:count) npx -y tsx scripts/ci/check-style-guard-baseline.ts"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

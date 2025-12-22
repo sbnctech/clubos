@@ -82,12 +82,12 @@ export default async function MemberPage({ params }: RouteParams) {
   if (!canView) {
     // User doesn't have permission to view this page
     return (
-      <main data-test-id="member-page-forbidden" style={{ padding: "40px", textAlign: "center" }}>
-        <h1 style={{ fontSize: "24px", marginBottom: "16px" }}>Access Restricted</h1>
-        <p style={{ color: "#666" }}>
+      <main data-test-id="member-page-forbidden" className="py-10 text-center">
+        <h1 className="text-2xl mb-4">Access Restricted</h1>
+        <p className="text-[var(--token-color-text-muted)]">
           You don&apos;t have permission to view this page.
         </p>
-        <Link href="/member" style={{ color: "#0066cc", marginTop: "16px", display: "inline-block" }}>
+        <Link href="/member" className="mt-4 inline-block text-[var(--token-color-primary)] hover:underline">
           Return to member dashboard
         </Link>
       </main>
