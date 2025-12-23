@@ -28,3 +28,6 @@ docs/policies/**/sources/**/*.pdf
 
 # Local checkpoint reports
 checkpoint_report_.*.txt
+
+# Local ClaudeCode settings
+.claude/
