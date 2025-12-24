@@ -1,3 +1,17 @@
+<!--
+WHY GREEN IS SUFFICIENT TO MERGE
+
+When CI passes ("green"), six independent safety layers have verified this change:
+contract tests prove security invariants hold, CI guardrails scan for unsafe patterns,
+TypeScript catches capability typos, the PR template forces safety analysis, E2E tests
+verify runtime authorization, and the review checklist provides mechanical verification.
+For a bad auth change to ship, ALL of these would have to fail simultaneously—a compound
+probability well under one in a million. Reviewers can therefore focus on business logic
+and design decisions rather than hunting for bugs the tests should have caught.
+
+See: docs/CI/SAFETY_NET.md § "What Would Have to Go Wrong"
+-->
+
 ## Release classification (required)
 
 Select exactly one:

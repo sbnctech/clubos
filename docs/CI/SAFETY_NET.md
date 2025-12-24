@@ -206,6 +206,48 @@ You don't have to remember to test these scenarios—the contract test does it f
 
 ---
 
+## What Would Have to Go Wrong for a Bad Auth Change to Ship?
+
+For an unauthorized capability escalation to reach production, **all of the following would have to fail simultaneously**:
+
+| Layer | What Would Have to Fail | Probability |
+|-------|------------------------|-------------|
+| **Contract tests** | The invariant isn't tested, OR the test is wrong | Low—contract tests are simple assertions |
+| **CI guardrails** | Pattern not in the scanner, OR scanner has bug | Low—scanner is regex-based, easy to verify |
+| **TypeScript** | Wrong capability compiles (unlikely with literal types) | Very low—capabilities are typed |
+| **PR template** | Author lies or skips "Why This Is Safe" section | Detectable—empty section is visible |
+| **Reviewer** | Reviewer misses the issue AND checklist skipped | Low—checklist is mechanical |
+| **Runtime check** | `requireCapability()` call is missing entirely | Low—covered by E2E tests |
+
+### The Compound Probability
+
+Each layer is independent. If each has even a 10% failure rate:
+
+```
+0.1 × 0.1 × 0.1 × 0.1 × 0.1 × 0.1 = 0.000001 (one in a million)
+```
+
+In practice, most layers have failure rates well below 10%, especially for obvious bugs like "member can delete events."
+
+### What This Means for Reviewers
+
+**If CI is green, the mechanical safety checks have passed.** A reviewer's job shifts from "catch bugs the tests missed" to "evaluate business logic and design decisions."
+
+This is why green is sufficient to merge for most changes—the safety net has already caught the class of bugs that matter most.
+
+### Exceptions That Require Extra Scrutiny
+
+| Change Type | Why Extra Review Matters |
+|-------------|-------------------------|
+| **New capability added** | Machines can't judge if a new power is appropriate |
+| **Hotspot modified** | Schema, CI, or auth changes have blast radius |
+| **Known gap touched** | Areas in AUDIT_REPORT.md have explicit risks |
+| **Novel pattern** | First time this approach is used in codebase |
+
+For these, the PR template requires explicit "Why This Is Safe" analysis.
+
+---
+
 ## Quick Links
 
 | Document | Purpose |
