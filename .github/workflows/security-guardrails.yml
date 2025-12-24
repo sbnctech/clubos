@@ -1,0 +1,51 @@
+name: Security Guardrails
+
+# ==============================================================================
+# SECURITY INVARIANTS CHECK
+# ==============================================================================
+# This workflow enforces security invariants on every PR:
+#   1. Impersonation safety: dangerous capabilities use requireCapabilitySafe
+#   2. Admin auth guards: all admin routes have authentication
+#   3. Blocked capabilities sync: list stays consistent across codebase
+#
+# Fast check (~5-10 seconds) - runs on every PR.
+# See: docs/CI/INVARIANTS.md
+# ==============================================================================
+
+on:
+  pull_request:
+    paths:
+      - 'src/app/api/**'
+      - 'src/lib/auth*.ts'
+      - 'scripts/ci/check-auth-guardrails.ts'
+      - '.github/workflows/security-guardrails.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/app/api/**'
+      - 'src/lib/auth*.ts'
+
+concurrency:
+  group: security-guardrails-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guardrails:
+    name: Security Guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security guardrails
+        run: npm run test:guardrails
