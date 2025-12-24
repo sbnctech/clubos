@@ -255,6 +255,47 @@ For checks that need database or browser:
 
 ---
 
+## Seeing Red Is OK When...
+
+Not all red signals require immediate action. Here's how to interpret CI status:
+
+### Lane 1 (PR Gate) - Red is NOT OK
+
+**This must be green to merge.** If it's red:
+- Fix the issue in your PR
+- This is a real problem that blocks merge
+
+### Lane 2 (Full Suite) - Red may be expected
+
+The full suite may show failures for:
+- **Known integration issues** (e.g., timezone/scheduling tests with environment differences)
+- **Transient infrastructure issues** (database connection, browser startup)
+- **Tests pending fixes** (tracked in backlog)
+
+**What to do:**
+- Check if the failure is in your PR's changed files
+- If yes: investigate and fix
+- If no: check GitHub issues for known problems
+
+### Lane 3 (Flaky Quarantine) - Red is informational
+
+Flaky tests fail intermittently by definition:
+- **Pass**: Consider removing `@flaky` tag
+- **Fail**: Normal; check the linked issue for status
+
+### Known Documented Failures
+
+These failures are tracked and NOT regressions:
+
+| Test Area | Issue | Status |
+|-----------|-------|--------|
+| Timezone tests | Environment-dependent | Tracked |
+| Scheduling integration | Depends on system clock | Tracked |
+
+**Rule**: If a failure is known, it should have a GitHub issue. If it doesn't, create one.
+
+---
+
 ## Design Principles
 
 1. **Fast PR gate**: Under 60 seconds, so developers run it often
