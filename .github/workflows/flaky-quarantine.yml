@@ -41,6 +41,10 @@ jobs:
   validate-backlog:
     name: validate-flaky-backlog
     runs-on: ubuntu-latest
+    # DATABASE_URL is required at job level because npm ci runs postinstall
+    # which includes prisma generate. Step-level env vars are too late.
+    env:
+      DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=public"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
