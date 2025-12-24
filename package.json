@@ -25,7 +25,8 @@
     "test-contracts:unit": "vitest run tests/contracts --reporter=verbose",
     "test-contracts:api": "playwright test tests/contracts --grep-invert @quarantine --workers=2",
     "test:guardrails": "npx tsx scripts/ci/check-auth-guardrails.ts",
-    "green": "npm run typecheck && npm run lint && npm run test:guardrails && npm run test:unit && npm run db:seed && npm run test-admin:stable && npm run test-api:stable"
+    "green": "npm run typecheck && npm run lint && npm run test:guardrails && npm run test:unit && npm run db:seed && npm run test-admin:stable && npm run test-api:stable",
+    "reviewer:quickcheck": "echo '\n=== Reviewer Quickcheck ===\n\n📋 What to verify in the PR:\n   1. Risk level selected (Low/Medium/High)\n   2. For Medium/High: Invariants section completed\n   3. For Medium/High: Proof of safety section completed\n   4. Hotspot plan if hotspots touched\n\n🔍 Key docs:\n   - docs/CI/REVIEWER_QUICKSTART.md (2-min guide)\n   - docs/CI/SAFETY_NET.md (defense layers)\n   - docs/CI/PR_REVIEW_CHECKLIST.md (full checklist)\n   - docs/CI/INVARIANTS.md (security invariants)\n\n🛠️  Commands to run:\n   npm run green           # Full verification\n   npm run test:guardrails # Security checks only\n   npm run test-contracts  # Contract tests only\n   npm run typecheck       # Type check only\n'"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
