@@ -109,97 +109,127 @@ export interface EventForStatus {
 // ============================================================================
 
 /**
+ * Helper to get date parts (year, month, day, dayOfWeek) in Pacific timezone.
+ * Uses Intl API which works consistently regardless of local timezone.
+ */
+function getPacificDateParts(date: Date): { year: number; month: number; day: number; dayOfWeek: number } {
+  const parts = makeDateFormatter("en-US", {
+    timeZone: SBNC_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  }).formatToParts(date);
+
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekdayStr = parts.find(p => p.type === "weekday")?.value ?? "Mon";
+
+  return {
+    year: parseInt(parts.find(p => p.type === "year")?.value ?? "2024"),
+    month: parseInt(parts.find(p => p.type === "month")?.value ?? "1"),
+    day: parseInt(parts.find(p => p.type === "day")?.value ?? "1"),
+    dayOfWeek: dayNames.indexOf(weekdayStr),
+  };
+}
+
+/**
+ * Helper to get Pacific offset in hours for a given date.
+ * Returns positive value (e.g., 8 for PST, 7 for PDT).
+ */
+function getPacificOffsetHours(date: Date): number {
+  const tzPart = makeDateFormatter("en-US", {
+    timeZone: SBNC_TIMEZONE,
+    timeZoneName: "shortOffset",
+  }).formatToParts(date).find(p => p.type === "timeZoneName");
+  const offsetStr = tzPart?.value ?? "GMT-8";
+  // Parse "GMT-8" or "GMT-7" format
+  const match = offsetStr.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?$/);
+  if (!match) return 8; // Default to PST
+  const hours = parseInt(match[2], 10);
+  const mins = parseInt(match[3] ?? "0", 10);
+  // Return absolute offset (Pacific is always behind UTC)
+  return hours + mins / 60;
+}
+
+/**
+ * Create a Date representing midnight Pacific on a given year/month/day.
+ * Works correctly regardless of local timezone.
+ */
+function createPacificMidnight(year: number, month: number, day: number): Date {
+  // Create a date at noon UTC on that day (noon avoids DST edge cases)
+  const noonUtc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+  // Get Pacific offset for that date
+  const offsetHours = getPacificOffsetHours(noonUtc);
+  // Midnight Pacific = 00:00 PT = offsetHours:00 UTC
+  return new Date(Date.UTC(year, month - 1, day, offsetHours, 0, 0, 0));
+}
+
+/**
  * Get the next Sunday at midnight Pacific time.
- * If today is Sunday, returns today.
+ * If today is Sunday and it's past midnight Pacific, returns next Sunday.
  */
 export function getNextSunday(fromDate: Date = new Date()): Date {
-  // Get day of week in Pacific timezone
-  const dayOfWeekPart = makeDateFormatter("en-US", {
-    timeZone: SBNC_TIMEZONE,
-    weekday: "short",
-  }).formatToParts(fromDate).find(p => p.type === "weekday");
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const dayOfWeek = dayNames.indexOf(dayOfWeekPart?.value ?? "Mon");
+  // Get current date parts in Pacific timezone
+  const { year, month, day, dayOfWeek } = getPacificDateParts(fromDate);
 
   // Days until next Sunday (0 if today is Sunday)
   const daysUntilSunday = dayOfWeek === 0 ? 0 : 7 - dayOfWeek;
 
-  // Create date at midnight Pacific by calculating offset
-  const nextSunday = new Date(fromDate);
-  nextSunday.setDate(nextSunday.getDate() + daysUntilSunday);
-  nextSunday.setHours(0, 0, 0, 0);
+  // Calculate target day (may overflow into next month)
+  const targetDay = day + daysUntilSunday;
+  const tempDate = new Date(Date.UTC(year, month - 1, targetDay, 12, 0, 0, 0));
+  const { year: targetYear, month: targetMonth, day: finalDay } = getPacificDateParts(tempDate);
 
-  // Adjust for Pacific timezone
-  const utcDate = new Date(nextSunday.getTime() + nextSunday.getTimezoneOffset() * 60000);
-  const offsetMs = getTimezoneOffsetMs(utcDate);
-  const pacificMidnight = new Date(utcDate.getTime() + offsetMs);
+  // Create midnight Pacific for that Sunday
+  const pacificMidnight = createPacificMidnight(targetYear, targetMonth, finalDay);
 
   // If today is Sunday but it's past midnight Pacific, use next Sunday
   if (daysUntilSunday === 0 && fromDate.getTime() > pacificMidnight.getTime()) {
-    pacificMidnight.setDate(pacificMidnight.getDate() + 7);
+    const nextWeek = new Date(pacificMidnight.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const { year: nYear, month: nMonth, day: nDay } = getPacificDateParts(nextWeek);
+    return createPacificMidnight(nYear, nMonth, nDay);
   }
 
   return pacificMidnight;
 }
 
 /**
- * Helper to get timezone offset in milliseconds for Pacific time.
- */
-function getTimezoneOffsetMs(date: Date): number {
-  const tzPart = makeDateFormatter("en-US", {
-    timeZone: SBNC_TIMEZONE,
-    timeZoneName: "shortOffset",
-  }).formatToParts(date).find(p => p.type === "timeZoneName");
-  const offsetStr = tzPart?.value ?? "GMT-8";
-  const match = offsetStr.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?$/);
-  if (!match) return -8 * 60 * 60 * 1000; // Default to PST
-  const sign = match[1] === "-" ? -1 : 1;
-  const hours = parseInt(match[2], 10);
-  const mins = parseInt(match[3] ?? "0", 10);
-  return sign * (hours * 60 + mins) * 60 * 1000;
-}
-
-/**
  * Get the Tuesday following a given Sunday at 8:00 AM Pacific.
+ * Expects `sunday` to already be at midnight Pacific (as returned by getNextSunday).
  */
 export function getFollowingTuesday(sunday: Date): Date {
-  const tuesday = new Date(sunday);
-  tuesday.setDate(sunday.getDate() + 2); // Sunday + 2 = Tuesday
-  tuesday.setHours(DEFAULT_REGISTRATION_OPEN_HOUR, 0, 0, 0);
-  return tuesday;
+  // sunday is already at midnight Pacific (e.g., 08:00 UTC in winter)
+  // Add 2 days (48 hours) to get to Tuesday midnight Pacific
+  const tuesdayMidnight = new Date(sunday.getTime() + 2 * 24 * 60 * 60 * 1000);
+  // Add 8 hours to get to 8 AM Pacific
+  const tuesdayEight = new Date(tuesdayMidnight.getTime() + DEFAULT_REGISTRATION_OPEN_HOUR * 60 * 60 * 1000);
+  return tuesdayEight;
 }
 
 /**
  * Get Sunday of the current week (for display purposes).
  */
 export function getThisWeekSunday(fromDate: Date = new Date()): Date {
-  // Get day of week in Pacific timezone
-  const dayOfWeekPart = makeDateFormatter("en-US", {
-    timeZone: SBNC_TIMEZONE,
-    weekday: "short",
-  }).formatToParts(fromDate).find(p => p.type === "weekday");
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const dayOfWeek = dayNames.indexOf(dayOfWeekPart?.value ?? "Sun");
+  // Get current date parts in Pacific timezone
+  const { year, month, day, dayOfWeek } = getPacificDateParts(fromDate);
 
-  const thisSunday = new Date(fromDate);
-  thisSunday.setDate(thisSunday.getDate() - dayOfWeek);
-  thisSunday.setHours(0, 0, 0, 0);
+  // Calculate target day (Sunday of this week)
+  const targetDay = day - dayOfWeek;
+  const tempDate = new Date(Date.UTC(year, month - 1, targetDay, 12, 0, 0, 0));
+  const { year: targetYear, month: targetMonth, day: finalDay } = getPacificDateParts(tempDate);
 
-  // Adjust for Pacific timezone
-  const utcDate = new Date(thisSunday.getTime() + thisSunday.getTimezoneOffset() * 60000);
-  const offsetMs = getTimezoneOffsetMs(utcDate);
-
-  return new Date(utcDate.getTime() + offsetMs);
+  return createPacificMidnight(targetYear, targetMonth, finalDay);
 }
 
 /**
  * Get the end of the week (Saturday 11:59:59 PM Pacific).
+ * Expects `sunday` to be at midnight Pacific (as returned by getThisWeekSunday).
  */
 export function getEndOfWeek(sunday: Date): Date {
-  const saturday = new Date(sunday);
-  saturday.setDate(sunday.getDate() + 6);
-  saturday.setHours(23, 59, 59, 999);
-  return saturday;
+  // sunday is at midnight Pacific (e.g., 08:00 UTC in winter)
+  // Add 7 days minus 1 ms to get to end of Saturday Pacific
+  // (6 days gets to Saturday midnight, then add 24 hours - 1ms)
+  return new Date(sunday.getTime() + 7 * 24 * 60 * 60 * 1000 - 1);
 }
 
 // ============================================================================
