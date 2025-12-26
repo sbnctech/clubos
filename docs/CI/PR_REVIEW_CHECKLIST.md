@@ -12,6 +12,7 @@ Before deep review, answer these questions:
 - [ ] **Does this PR touch impersonation logic?** → Complete the Impersonation Safety section
 - [ ] **Does this PR modify state transitions?** → Complete the Lifecycle Changes section
 - [ ] **Does this PR add/modify API endpoints?** → Complete all sections
+- [ ] **Does this PR touch trust-model docs?** → Complete the [Trust Surface Checklist](./TRUST_SURFACE_REVIEW_CHECKLIST.md)
 
 If none apply, skip to the Tests and Observability sections.
 
@@ -266,3 +267,4 @@ Before approving:
 - **Threat Model**: `docs/SECURITY/THREAT_MODEL.md`
 - **Security Invariants**: `docs/CI/INVARIANTS.md`
 - **Charter Principles**: `docs/ARCHITECTURAL_CHARTER.md`
+- **Trust Surface Checklist**: `docs/CI/TRUST_SURFACE_REVIEW_CHECKLIST.md`
