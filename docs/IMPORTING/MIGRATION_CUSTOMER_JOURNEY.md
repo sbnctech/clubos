@@ -63,7 +63,7 @@ ClubOS treats migration as a trust-building exercise. Every step is designed to 
 
 - **Parallel operation**: Both systems can run simultaneously during transition
 - **Dry run first**: Full preview before any real changes
-- **Rollback available**: Recovery procedures exist for every phase
+- **Abort available**: Before commit, you can stop and discard all migration work; after commit, recovery procedures exist
 - **Operator partnership**: A human guide accompanies every step
 
 ---
@@ -161,7 +161,7 @@ No blocking errors found.
 
 - **Warnings are normal**: Every migration has some data quality findings
 - **Nothing happened yet**: Dry run made no changes—this is purely informational
-- **Same code path**: Real sync uses identical logic as dry run
+- **Same logic path**: Real sync uses identical decision logic as dry run
 - **Operator reviews too**: ClubOS staff review all warnings before recommending proceed
 - **Can repeat**: Run dry runs as many times as needed
 
@@ -201,11 +201,11 @@ No blocking errors found.
 
 ### Reassurance Points
 
-- **Transactional safety**: Sync either completes fully or rolls back entirely
+- **Failure recovery**: If sync fails due to a technical error, the database transaction is discarded (no partial state); you decide whether to retry
 - **Wild Apricot unchanged**: Source system is read-only during migration
 - **Progress visibility**: Can monitor sync progress in real time
-- **Resumable**: If interrupted, can resume from checkpoint
-- **Recovery documented**: Rollback procedures ready if needed
+- **Idempotent**: Re-running sync is safe if needed (operations can be repeated without harm)
+- **Recovery documented**: Procedures ready if needed
 
 ---
 
@@ -350,7 +350,7 @@ After cutover:
 
 | Fear | Reassurance Mechanism |
 |------|----------------------|
-| Data loss | Dry run preview, transactional sync, rollback procedures |
+| Data loss | Dry run preview, idempotent sync, abort before commit / recovery after |
 | Member disruption | Parallel operation, soft launch option, communication templates |
 | Operational downtime | Wild Apricot continues until explicit cutover |
 | Complexity overwhelm | Operator guides every step, plain-English documentation |
@@ -362,7 +362,7 @@ ClubOS migration builds trust through:
 
 1. **Visibility**: Customer sees exactly what will happen before it happens
 2. **Control**: Every consequential step requires explicit approval
-3. **Reversibility**: Rollback documented for every phase
+3. **Reversibility**: Abort before commit discards all work; recovery procedures documented for after commit
 4. **Partnership**: Operator accompanies—never operates behind the scenes
 5. **Patience**: No artificial time pressure on decisions
 

@@ -11,9 +11,11 @@ Purpose: Explain how ClubOS handles organizational identity during migration
 
 > **ClubOS helps your organization arrive intact.**
 
-When you migrate from Wild Apricot to ClubOS, we do not just move your data. We help you bring your organization's identity - how you present yourselves to your members and the world.
+When you migrate from Wild Apricot to ClubOS, we do not just move your data. We help you bring your organization's identity - how you present yourselves to your members.
 
-Your website, your pages, your navigation - these are not just files. They represent years of decisions about who you are and how you want to be seen. We treat that with care.
+Your member-facing content, your navigation structure, your event descriptions - these are not just files. They represent years of decisions about who you are and how you want to be seen. We treat that with care.
+
+**Note:** ClubOS is a membership management platform, not a general-purpose website builder. We migrate your member-facing content and data, not your entire public website.
 
 ---
 
@@ -45,8 +47,8 @@ Your current website is the clearest signal of how you want your organization to
 
 We do not ask you to start from a blank page. Instead, we:
 
-1. **Discover** - We analyze your Wild Apricot site to understand your current structure
-2. **Suggest** - We generate draft pages and navigation based on what we find
+1. **Discover** - We analyze your Wild Apricot site to understand your current member content and structure
+2. **Suggest** - We generate draft ClubOS content pages based on what we find (this is not a website clone)
 3. **Review** - You see exactly what we are proposing before anything happens
 4. **Approve** - Nothing changes until you say yes
 
@@ -69,8 +71,8 @@ We do not automate consequential decisions. We automate the tedious work so you 
 
 Before anything is published, you can:
 
-- See exactly how your organization will look in ClubOS
-- Compare side-by-side with your Wild Apricot site
+- See how your member-facing content will appear in ClubOS
+- Compare key elements with your Wild Apricot site (appearance will differ; ClubOS has its own design system)
 - Request changes before committing
 - Walk away if it does not feel right
 
@@ -94,7 +96,7 @@ Wild Apricot pages are built with their own technology. We cannot and do not sim
 
 ### Not Cloning Themes
 
-Wild Apricot themes are proprietary. We do not replicate them pixel-for-pixel. Instead, we preserve your visual intent - your colors, your layout patterns, your priorities - using ClubOS templates.
+Wild Apricot themes are proprietary. We do not replicate them pixel-for-pixel. Instead, we approximate your visual intent - your general color choices, your content priorities - using ClubOS templates. The result will look different; our goal is recognizable, not identical.
 
 ### Not Locking You In
 
@@ -151,10 +153,10 @@ Presentation reconstruction is not a "later phase" or "nice to have."
 It is part of what we consider a successful migration. When we say your migration is complete, we mean:
 
 - Your data is in ClubOS
-- Your organization is recognizable in ClubOS
-- Your members can find what they expect to find
+- Your member-facing content is recognizable in ClubOS (though styled differently)
+- Your members can find the information they expect (events, activities, member resources)
 
-If you cannot recognize your organization in ClubOS, the migration is not complete.
+If members cannot find the core content they relied on in Wild Apricot, the migration is not complete.
 
 ---
 
