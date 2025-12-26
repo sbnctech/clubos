@@ -17,6 +17,9 @@ export default defineConfig({
     env: {
       // Set dummy DATABASE_URL for unit tests that import modules with Prisma
       DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy_test",
+      // Force Pacific timezone for deterministic scheduling tests.
+      // The scheduling helpers use America/Los_Angeles internally.
+      TZ: "America/Los_Angeles",
     },
   },
 });

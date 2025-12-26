@@ -1,7 +1,7 @@
 // Copyright (c) Santa Barbara Newcomers Club
 // Unit tests for event scheduling helpers (SBNC Sunday/Tuesday policy)
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   getNextSunday,
   getFollowingTuesday,
@@ -16,7 +16,48 @@ import {
   DEFAULT_REGISTRATION_OPEN_HOUR,
 } from "@/lib/events";
 
+/**
+ * TIME MOCKING RATIONALE:
+ *
+ * These tests use Vitest's fake timers to ensure deterministic behavior.
+ * Without mocking, tests could fail due to:
+ * - Day-of-week drift (running tests on different days)
+ * - Timezone differences (CI vs local development)
+ * - DST transitions affecting Pacific timezone calculations
+ *
+ * We fix the system time to Monday, Dec 23, 2024, 10:00 AM Pacific.
+ * All test dates are relative to this baseline to ensure consistency.
+ *
+ * The scheduling helpers internally use America/Los_Angeles timezone,
+ * so we also use Pacific timezone for day-of-week assertions.
+ */
+
+// Fixed baseline: Monday, Dec 23, 2024, 10:00 AM Pacific (18:00 UTC)
+const FIXED_NOW = new Date("2024-12-23T18:00:00.000Z");
+
+/**
+ * Get day of week in Pacific timezone (0=Sunday, 6=Saturday).
+ * Unlike Date.getDay(), this is consistent regardless of system timezone.
+ */
+function getPacificDayOfWeek(date: Date): number {
+  const dayName = new Intl.DateTimeFormat("en-US", {
+    timeZone: SBNC_TIMEZONE,
+    weekday: "short",
+  }).format(date);
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return dayNames.indexOf(dayName);
+}
+
 describe("Event Scheduling Helpers", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("getNextSunday", () => {
     it("returns next Sunday if called during the day on Sunday", () => {
       // Dec 22, 2024 is a Sunday at 10 AM
@@ -25,7 +66,7 @@ describe("Event Scheduling Helpers", () => {
       const result = getNextSunday(sunday);
 
       // Should be next Sunday (Dec 29) since we're past midnight on current Sunday
-      expect(result.getDay()).toBe(0); // Sunday
+      expect(getPacificDayOfWeek(result)).toBe(0); // Sunday
       expect(result.toISOString()).toContain("2024-12-29");
     });
 
@@ -35,7 +76,7 @@ describe("Event Scheduling Helpers", () => {
       const result = getNextSunday(monday);
 
       // Should be Dec 29, 2024 (next Sunday)
-      expect(result.getDay()).toBe(0); // Sunday
+      expect(getPacificDayOfWeek(result)).toBe(0); // Sunday
       expect(result.toISOString()).toContain("2024-12-29");
     });
 
@@ -45,7 +86,7 @@ describe("Event Scheduling Helpers", () => {
       const result = getNextSunday(saturday);
 
       // Should be Dec 29, 2024 (next day, Sunday)
-      expect(result.getDay()).toBe(0); // Sunday
+      expect(getPacificDayOfWeek(result)).toBe(0); // Sunday
       expect(result.toISOString()).toContain("2024-12-29");
     });
   });
@@ -57,7 +98,7 @@ describe("Event Scheduling Helpers", () => {
       const result = getFollowingTuesday(sunday);
 
       // Should be Dec 24, 2024 at 8 AM Pacific
-      expect(result.getDay()).toBe(2); // Tuesday
+      expect(getPacificDayOfWeek(result)).toBe(2); // Tuesday
       expect(result.toISOString()).toContain("2024-12-24");
 
       // Check it's 8 AM Pacific (16:00 UTC in winter)
@@ -76,12 +117,12 @@ describe("Event Scheduling Helpers", () => {
 
       // publishAt should be next Sunday (Dec 29)
       expect(result.publishAt.toISOString()).toContain("2024-12-29");
-      expect(result.publishAt.getDay()).toBe(0); // Sunday
+      expect(getPacificDayOfWeek(result.publishAt)).toBe(0); // Sunday
 
       // registrationOpensAt should be following Tuesday (Dec 31)
       expect(result.registrationOpensAt).not.toBeNull();
       expect(result.registrationOpensAt!.toISOString()).toContain("2024-12-31");
-      expect(result.registrationOpensAt!.getDay()).toBe(2); // Tuesday
+      expect(getPacificDayOfWeek(result.registrationOpensAt!)).toBe(2); // Tuesday
     });
 
     it("computes correct schedule for event NOT requiring registration", () => {
@@ -373,7 +414,7 @@ describe("Event Scheduling Helpers", () => {
       const { start, end } = getEnewsWeekRange(monday);
 
       // Start should be Sunday Dec 22
-      expect(start.getDay()).toBe(0); // Sunday
+      expect(getPacificDayOfWeek(start)).toBe(0); // Sunday
       expect(start.toISOString()).toContain("2024-12-22");
 
       // End should be Saturday Dec 28 (or early Sunday Dec 29)
@@ -387,7 +428,7 @@ describe("Event Scheduling Helpers", () => {
       const { start, end } = getEnewsWeekRange(sunday);
 
       // Start should be THIS Sunday (Dec 22)
-      expect(start.getDay()).toBe(0);
+      expect(getPacificDayOfWeek(start)).toBe(0);
       expect(start.toISOString()).toContain("2024-12-22");
     });
   });
