@@ -602,6 +602,8 @@ exit 1
 
 ## 8. Recovery Procedures
 
+> **Full Guide**: For comprehensive rollback and recovery procedures including failure modes, rollback levels, and audit trail requirements, see [MIGRATION_ROLLBACK_RECOVERY.md](./MIGRATION_ROLLBACK_RECOVERY.md).
+
 ### 8.1 Partial Sync Failure
 
 If sync fails partway through:
