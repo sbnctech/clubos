@@ -31,6 +31,11 @@ This is the main entry point for all ClubOS developer documentation.
 - [Importer Runbook](IMPORTING/IMPORTER_RUNBOOK.md) - Technical migration procedures
 - [WA Policy Capture](IMPORTING/WA_POLICY_CAPTURE.md) - Policy capture process
 
+### Wild Apricot Migration
+- [Widgets vs Gadgets](MIGRATION/WILD_APRICOT_WIDGETS_VS_GADGETS.md) - Terminology and discovery guide
+- [Gadget Tagging](MIGRATION/WILD_APRICOT_GADGET_TAGGING.md) - Migration classification by gadget type
+- [Migration Intake Checklist](MIGRATION/WILD_APRICOT_MIGRATION_INTAKE_CHECKLIST.md) - Discovery questions for operators
+
 ## Testing and Tooling
 - Test scripts under scripts/dev/*
 - Make targets documented in README.md
