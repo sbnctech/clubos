@@ -474,6 +474,7 @@ ClubOS does not support per-organization allowlist exceptions. All approved sour
 - [Gadget Tagging Matrix](./WILD_APRICOT_GADGET_TAGGING.md) - Classification of all WA elements
 - [Presentation Discovery Stage](./PRESENTATION_DISCOVERY_STAGE.md) - How discovery works
 - [Migration Intake Checklist](./WILD_APRICOT_MIGRATION_INTAKE_CHECKLIST.md) - Questions to ask before migration
+- [Custom HTML Migration Guide](./WILD_APRICOT_CUSTOM_HTML_MIGRATION.md) - Automagic migration and checklist
 
 ---
 

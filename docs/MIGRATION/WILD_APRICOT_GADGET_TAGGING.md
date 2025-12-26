@@ -165,3 +165,4 @@ When you encounter a WA feature not listed:
 - [Presentation Discovery Stage](./PRESENTATION_DISCOVERY_STAGE.md) - automated site crawling
 - [Widgets vs Gadgets](./WILD_APRICOT_WIDGETS_VS_GADGETS.md) - terminology guide
 - [WA Custom HTML Blocks Guide](./WILD_APRICOT_CUSTOM_HTML_BLOCKS_GUIDE.md) - detailed HTML handling
+- [WA Custom HTML Migration](./WILD_APRICOT_CUSTOM_HTML_MIGRATION.md) - automagic approach and operator checklist
