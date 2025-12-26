@@ -29,6 +29,9 @@ This is the main entry point for all ClubOS developer documentation.
 - Make targets documented in README.md
 - Playwright test suites in tests/api and tests/admin
 
+## Operator Guides
+- [Calendar Trust and Reliability](BIZ/CALENDAR_TRUST_AND_RELIABILITY.md) - How ClubOS handles dates and times (non-technical)
+
 ## Reference
 - Mock data definitions under lib/mock/*
 - Utility helpers under lib/*
