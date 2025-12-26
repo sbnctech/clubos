@@ -16,6 +16,87 @@ This document catalogs the major integration categories, what customers use them
 
 ---
 
+## Wild Apricot Integration Taxonomy
+
+Wild Apricot integrations fall into three categories:
+
+### WA Native Integrations
+
+Built into the WA platform or available through WA's marketplace.
+
+| Integration | What It Does | Admin Pain Points |
+|-------------|--------------|-------------------|
+| WA Payments (internal) | Collects dues and event fees via WA's payment processor | High fees, limited reporting, no recurring without workarounds |
+| WA Email (internal) | Sends newsletters and announcements | Poor deliverability, limited templates, no A/B testing |
+| WA Member Directory | Displays member info on site | Limited customization, privacy controls confusing |
+| WA Event Calendar | Displays events on site | Cannot filter by activity, styling limited |
+| WA Forms | Collects custom data | No conditional logic, data scattered across tables |
+
+**Risk profile:** These "just work" but admins cannot modify or extend them. When WA changes behavior, admins have no recourse.
+
+### Third-Party Platforms (Zapier, Make, etc.)
+
+Automation platforms that connect WA to external services via WA's API triggers.
+
+| Platform | Common Use Cases | Admin Pain Points |
+|----------|-----------------|-------------------|
+| Zapier | New member -> Mailchimp, Registration -> Google Sheets | Per-task pricing, debugging is opaque, triggers can miss events |
+| Make (Integromat) | Complex workflows with branching logic | Steeper learning curve, EU data residency concerns |
+| Power Automate | Microsoft-centric shops (Teams, SharePoint) | Requires M365 license, limited WA connector |
+
+**Risk profile:** Admins build these themselves but rarely document them. When the admin leaves, the workflow breaks and nobody knows how to fix it. Trigger reliability varies.
+
+### DIY Integrations (API, Webhooks, Scripts)
+
+Custom code written by tech-savvy volunteers or contractors.
+
+| Approach | Common Use Cases | Admin Pain Points |
+|----------|-----------------|-------------------|
+| WA API polling | Nightly sync to external database, custom reports | Requires developer, no webhook = must poll, rate limits |
+| Manual CSV exports | Monthly treasurer report, mail merge for invitations | Tedious, error-prone, columns change without notice |
+| ICS feed consumption | Subscribe in Google Calendar | WA ICS has timezone bugs, recurring events unreliable |
+| Custom scripts | Board eligibility checks, dues reconciliation | Undocumented, breaks when WA changes, bus factor of 1 |
+
+**Risk profile:** Highest. When the volunteer who built it graduates or loses interest, the integration becomes unmaintainable.
+
+---
+
+## Typical Club Use Cases
+
+These are the integration needs we hear most often:
+
+| Use Case | Current WA Approach | Pain Points |
+|----------|---------------------|-------------|
+| **Collect dues online** | WA Payments or PayPal | High fees, poor recurring, confusing member experience |
+| **Sync members to Mailchimp** | Zapier or manual export | Zapier costs add up, manual is tedious, unsubscribes diverge |
+| **Calendar in Google/Outlook** | ICS feed subscription | Timezone bugs, events appear on wrong day, no activity filtering |
+| **Treasurer's monthly report** | CSV export + Excel | Column order changes, dates format differently, manual cleanup |
+| **Event reminder emails** | WA built-in or Mailchimp | WA delivery unreliable, Mailchimp requires sync |
+| **Check-in at events** | Print attendee list or third-party app | No real-time updates, QR codes extra cost |
+| **Board eligibility tracking** | Manual spreadsheet | Error-prone, nobody audits, disputes at election time |
+| **New member welcome flow** | Zapier -> email sequence | Trigger misses sometimes, hard to debug, volunteer dependency |
+
+---
+
+## ClubOS Positioning: Equivalent / Non-Goal / Later
+
+| WA Capability | ClubOS v1 | Rationale |
+|---------------|-----------|-----------|
+| Online payments (dues, events) | **Equivalent** (Native Stripe) | Core capability, cannot migrate without it |
+| ICS calendar feeds | **Equivalent** (RFC 5545 compliant) | Day-one member expectation |
+| Member/event/registration CSV | **Equivalent** (Stable schemas) | Treasurer and event chair workflows |
+| Webhook event stream | **Equivalent** (Design spec below) | Enables Zapier/Make without custom code |
+| Transactional email | **Equivalent** (Native) | Confirmations and reminders expected |
+| Newsletter/marketing email | **Non-goal** | Mailchimp/Constant Contact do this better |
+| SMS messaging | **Non-goal** | TCPA compliance burden, low demand |
+| Form builder | **Non-goal** | Google Forms/Typeform/JotForm exist |
+| Direct Mailchimp sync | **Later** (v2) | Webhook covers 80% of need |
+| Direct Salesforce sync | **Later** (v2+) | Niche need, Zapier bridge works |
+| Scheduled exports | **Later** (v2) | Manual download acceptable initially |
+| Calendar widget (embed) | **Later** (v1.1) | Link to ClubOS page is acceptable workaround |
+
+---
+
 ## Integration Categories
 
 ### 1. Automation Platforms (Zapier, Make, Power Automate)
@@ -283,18 +364,16 @@ Organizations with heavily customized WA widget integrations will need to rebuil
 
 ## ClubOS Integration Roadmap
 
-This section translates the extension landscape into a prioritized roadmap. Each tier reflects migration impact: what must exist before customers can switch.
+This section translates the extension landscape into a prioritized roadmap.
 
 ### P0: Must-Have for Migration
 
-These capabilities block migration. Without them, organizations cannot operate.
-
 | Integration | Customer Goal | Approach | If Missing |
 |-------------|---------------|----------|------------|
-| **Payment collection** | "We need to collect dues and event fees online" | Native (Stripe) | Cannot operate. Migration impossible. |
-| **Calendar feeds** | "Members subscribe to our calendar in Google/Outlook" | Export (ICS) | Members lose calendar sync. High friction, many complaints. |
-| **Webhook events** | "When someone joins, our Zapier flow adds them to Mailchimp" | Webhook | Automation-dependent orgs will not migrate. Blocks mid-size clubs. |
-| **Member export** | "Our treasurer downloads the member list monthly" | Export (CSV) | Treasurer cannot reconcile. Board will block migration. |
+| **Payment collection** | "We need to collect dues online" | Native (Stripe) | Cannot operate. Migration impossible. |
+| **Calendar feeds** | "Members subscribe in Google/Outlook" | Export (ICS) | Members lose calendar sync. High friction. |
+| **Webhook events** | "Our Zapier adds new members to Mailchimp" | Webhook | Automation-dependent orgs will not migrate. |
+| **Member export** | "Treasurer downloads the member list" | Export (CSV) | Board will block migration. |
 
 **P0 commitment:** These four must work before any production migration.
 
@@ -302,15 +381,13 @@ These capabilities block migration. Without them, organizations cannot operate.
 
 ### P1: High Value, Common Need
 
-These capabilities are expected soon after cutover. Missing them creates friction but does not block operations.
-
 | Integration | Customer Goal | Approach | If Missing |
 |-------------|---------------|----------|------------|
-| **Transaction export** | "I need to import dues payments into QuickBooks" | Export (CSV) | Treasurer re-keys data manually. Time-consuming, error-prone. |
-| **Activity calendar feeds** | "Our hiking group wants their own calendar feed" | Export (ICS) | Activity chairs create manual workarounds. Complaints. |
-| **Transactional email** | "Send confirmation when someone registers" | Native | Members feel ignored. Support burden increases. |
-| **Unsubscribe handling** | "Members need to opt out of emails" | Native | Compliance risk. Spam complaints. |
-| **Registration export** | "Event chair needs attendee list for check-in" | Export (CSV) | Chair uses screenshots or manual lists. Unprofessional. |
+| **Transaction export** | "Import payments into QuickBooks" | Export (CSV) | Treasurer re-keys manually. |
+| **Activity calendar feeds** | "Hiking group wants their own feed" | Export (ICS) | Activity chairs complain. |
+| **Transactional email** | "Send confirmation on registration" | Native | Members feel ignored. |
+| **Unsubscribe handling** | "Members need to opt out" | Native | Compliance risk. |
+| **Registration export** | "Event chair needs attendee list" | Export (CSV) | Unprofessional check-in. |
 
 **P1 commitment:** Deliver within first quarter post-launch.
 
@@ -318,70 +395,128 @@ These capabilities are expected soon after cutover. Missing them creates frictio
 
 ### P2: Nice-to-Have
 
-These are conveniences. Organizations can work around them indefinitely.
-
 | Integration | Customer Goal | Approach | If Missing |
 |-------------|---------------|----------|------------|
-| **Calendar widget** | "Show our calendar on our WordPress site" | Embed (iframe) | Org links to ClubOS calendar page instead. Minor friction. |
-| **Registration form embed** | "Let people sign up from our main website" | Embed (iframe) | Org links to ClubOS registration page. Acceptable. |
-| **Public event feed** | "Our webmaster wants JSON for a custom display" | Export (JSON) | Use ICS feed or link to ClubOS. Workaround exists. |
-| **Mailchimp sync** | "Automatically update our mailing list segments" | Webhook | Manual export/import. Extra steps but manageable. |
-| **Scheduled exports** | "Email me the member list every Monday" | Export (scheduled) | Manual download. Slight inconvenience. |
+| **Calendar widget** | "Show calendar on WordPress" | Embed (iframe) | Link to ClubOS instead. |
+| **Registration form embed** | "Sign up from main website" | Embed (iframe) | Link to ClubOS. |
+| **Public event feed** | "Webmaster wants JSON" | Export (JSON) | Use ICS feed. |
+| **Mailchimp sync** | "Auto-update mailing list" | Webhook | Manual export/import. |
+| **Scheduled exports** | "Email me list every Monday" | Export (scheduled) | Manual download. |
 
-**P2 commitment:** Build as capacity allows. Not required for successful migrations.
+**P2 commitment:** Build as capacity allows.
 
 ---
 
 ### Non-Goals (v1)
 
-These are explicitly out of scope. Organizations must continue using external tools.
-
-| Integration | Customer Goal | Why Non-Goal | Workaround |
-|-------------|---------------|--------------|------------|
-| **SMS messaging** | "Text reminders to members" | TCPA compliance, per-message cost, modest demand | Continue using Twilio/EZTexting directly |
-| **Form builder** | "Custom application forms" | Deep product; strong external options exist | Use Google Forms, Typeform, JotForm |
-| **Direct CRM integration** | "Sync members to Salesforce without Zapier" | Niche need; webhook covers most cases | Use Zapier/Make as bridge |
-
-**Non-goal rationale:** These add significant scope for limited migration impact. External tools handle them well.
+| Integration | Why Non-Goal | Workaround |
+|-------------|--------------|------------|
+| **SMS messaging** | TCPA compliance, cost | Use Twilio/EZTexting directly |
+| **Form builder** | Deep product | Use Google Forms/Typeform |
+| **Direct CRM integration** | Niche need | Use Zapier as bridge |
 
 ---
 
-## Technical Requirements Summary
+## Minimum Viable Integration Surface
 
-### Required for v1 (blocking migration)
+This section specifies the technical contracts external systems can rely on.
 
-1. **Webhook event stream**
-   - Core lifecycle events with signed delivery
-   - Retry and replay capability
+### 1. Exports: CSV/JSON Stable Schemas
 
-2. **ICS calendar feeds**
-   - Proper timezone handling (VTIMEZONE with IANA tzid)
-   - Per-activity filtered feeds
+**Members Export (CSV)**
 
-3. **Stripe payment integration**
-   - One-time and recurring payments
-   - Refund handling
+| Column | Type | Description |
+|--------|------|-------------|
+| id | string | ClubOS member ID (stable, unique) |
+| email | string | Primary email address |
+| first_name | string | First name |
+| last_name | string | Last name |
+| status | enum | `active`, `lapsed`, `pending`, `alumni` |
+| tier | string | Membership tier name |
+| joined_at | ISO 8601 | Join date (UTC) |
+| expires_at | ISO 8601 | Expiration date (UTC), null if lifetime |
 
-4. **Clean data exports**
-   - Members, events, registrations, transactions
-   - CSV with stable schema
+**Events Export (CSV)**
 
-### Required for v1 (non-blocking but expected)
+| Column | Type | Description |
+|--------|------|-------------|
+| id | string | ClubOS event ID (stable, unique) |
+| title | string | Event title |
+| starts_at | ISO 8601 | Start time (UTC instant) |
+| ends_at | ISO 8601 | End time (UTC instant) |
+| timezone | IANA tzid | Display timezone (e.g., `America/Los_Angeles`) |
+| status | enum | `draft`, `published`, `cancelled`, `archived` |
 
-5. **Embeddable widgets**
-   - Calendar widget
-   - Registration form embed
+**Registrations Export (CSV)**
 
-6. **Transactional email**
-   - Confirmation and reminder delivery
-   - Unsubscribe handling
+| Column | Type | Description |
+|--------|------|-------------|
+| id | string | Registration ID (stable, unique) |
+| event_id | string | Associated event ID |
+| member_id | string | Associated member ID |
+| status | enum | `registered`, `waitlisted`, `cancelled`, `attended` |
+| guests | integer | Guest count |
 
-### Deferred (v2 or later)
+**Transactions Export (CSV)**
 
-7. **Direct CRM integrations** (Mailchimp, Salesforce)
-8. **Scheduled exports**
-9. **SMS support**
-10. **Form submission API**
+| Column | Type | Description |
+|--------|------|-------------|
+| id | string | Transaction ID (stable, unique) |
+| member_id | string | Associated member ID |
+| type | enum | `dues`, `registration`, `donation`, `refund` |
+| amount | decimal | Amount (negative for refunds) |
+| created_at | ISO 8601 | Transaction timestamp (UTC) |
+
+**Schema stability guarantee:** Column names and types are stable within a major version. New columns may be added at the end.
+
+### 2. Webhooks / Event Stream (Design Only)
+
+**Event Types**
+
+| Event | Trigger | Payload Includes |
+|-------|---------|------------------|
+| `member.created` | New member joins | member object |
+| `member.renewed` | Membership renewed | member object |
+| `member.lapsed` | Membership expired | member object |
+| `event.published` | Event published | event object |
+| `registration.created` | Member registers | registration, event |
+| `payment.completed` | Payment processed | transaction, member |
+
+**Delivery Contract**
+
+- **Format:** JSON payload over HTTPS POST
+- **Authentication:** HMAC-SHA256 signature in `X-ClubOS-Signature` header
+- **Retry policy:** Exponential backoff (1s, 5s, 30s, 5m, 1h)
+- **Idempotency:** Each event includes unique `event_id`
+- **Replay:** `/webhooks/replay` endpoint for recovery
+
+**Note:** Webhook implementation is design-only. Code implementation follows separately.
+
+### 3. ICS Calendar Feeds
+
+**Feed Endpoints**
+
+| Endpoint | Description |
+|----------|-------------|
+| `/calendar/public.ics` | All published public events |
+| `/calendar/activity/{slug}.ics` | Events for a specific activity |
+| `/calendar/member/{token}.ics` | Personalized feed (token-authenticated) |
+
+**ICS Compliance (per CALENDAR_INTEROP_GUIDE.md)**
+
+- **VTIMEZONE:** Every feed includes full VTIMEZONE component with IANA tzid
+- **DTSTART/DTEND:** Timed events use `DTSTART;TZID=America/Los_Angeles:YYYYMMDDTHHMMSS`
+- **All-day events:** Use `DTSTART;VALUE=DATE:YYYYMMDD`
+- **UID stability:** Format: `event-{id}@clubos.example.com`
+- **DTSTAMP:** Always in UTC
+
+**What this means for users:**
+
+- Events appear at correct local time regardless of subscriber's timezone
+- DST transitions are handled correctly
+- Calendar clients receive updates when events change
+
+**Feed URL stability guarantee:** Feed URLs do not change.
 
 ---
 
@@ -390,29 +525,18 @@ These are explicitly out of scope. Organizations must continue using external to
 During policy capture, ask the customer:
 
 1. What automations do you have connected to Wild Apricot?
-   - Zapier zaps, Make scenarios, Power Automate flows
-
 2. What external systems receive data from WA?
-   - CRM, accounting, email marketing, project management
-
 3. Do members subscribe to a calendar feed?
-   - How many subscribers? Which calendar apps?
-
 4. What payment methods do you accept?
-   - Online only? Check? Which processor?
-
 5. Do you embed WA widgets on external websites?
-   - Which widgets? On which platforms?
-
-Answers inform migration timing and which ClubOS features must be ready before cutover.
 
 ---
 
 ## Related Documents
 
-- [Non-Goals and Exclusions](./NON_GOALS_AND_EXCLUSIONS.md) - What ClubOS explicitly does not do
-- [Migration Risk Register](./MIGRATION_RISK_REGISTER.md) - Risk assessment for migration
-- [Implementation Backlog](./IMPLEMENTATION_BACKLOG.md) - Technical requirements backlog
+- [Non-Goals and Exclusions](./NON_GOALS_AND_EXCLUSIONS.md)
+- [Calendar Interoperability Guide](../ARCH/CALENDAR_INTEROP_GUIDE.md)
+- [Implementation Backlog](./IMPLEMENTATION_BACKLOG.md)
 
 ---
 
@@ -420,6 +544,8 @@ Answers inform migration timing and which ClubOS features must be ready before c
 
 | Date | Change |
 |------|--------|
+| 2025-12-26 | Add Minimum Viable Integration Surface (export schemas, webhook design, ICS spec) |
+| 2025-12-26 | Add WA Integration Taxonomy, Typical Club Use Cases, ClubOS Positioning table |
 | 2025-12-26 | Add ClubOS Integration Roadmap (P0/P1/P2 tiers) |
 | 2025-12-26 | Initial extension landscape |
 
