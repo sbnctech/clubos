@@ -1,274 +1,450 @@
 # Production Migration Runbook
 
-This document provides operator guidance for production Wild Apricot migrations.
+Operator-grade runbook for migrating Wild Apricot data to ClubOS in production.
 
-**Related**: Issue #202 (WA Migration), Epic #277 (Rollback & Recovery)
-
----
-
-## Table of Contents
-
-1. [Pre-Migration Preparation](#1-pre-migration-preparation)
-2. [Migration Execution](#2-migration-execution)
-3. [Post-Migration Verification](#3-post-migration-verification)
-4. [Rollback Procedures](#4-rollback-procedures)
-5. [Escalation Paths](#5-escalation-paths)
+**Status:** Production-Ready
+**Last Updated:** 2025-12-25
+**Related:** Epic #202, #275, #276, #277, #278
 
 ---
 
-## 1. Pre-Migration Preparation
+## Overview
 
-### 1.1 Checklist
+This runbook covers the complete end-to-end migration process from Wild Apricot to ClubOS. It supports two execution modes:
 
-Before running a production migration:
+| Mode | Database Writes | Artifacts | Use Case |
+|------|-----------------|-----------|----------|
+| **DRY RUN** | None | Reports, ID mappings | Validation before production |
+| **LIVE RUN** | Yes | Reports, ID mappings, run_id | Production migration |
 
-- [ ] Backup created and verified (see [MIGRATION_ROLLBACK_RECOVERY.md](./MIGRATION_ROLLBACK_RECOVERY.md))
-- [ ] Dry run completed and reviewed
-- [ ] Policy bundle validated
-- [ ] Stakeholders notified
-- [ ] Maintenance window scheduled (if applicable)
+**Key Principle:** Always run DRY RUN first. Never proceed to LIVE RUN without a successful dry run.
 
-### 1.2 Environment Verification
+---
+
+## Phase 0: Credentials and Access
+
+### Required Access
+
+| System | Access Level | Purpose |
+|--------|--------------|---------|
+| Wild Apricot | Admin | Export CSV data |
+| ClubOS Production DB | Read/Write | Execute migration |
+| ClubOS Server | SSH | Run migration scripts |
+| Backup System | Read | Verify backups exist |
+
+### Environment Setup
 
 ```bash
 # Verify environment
-echo "Database: $DATABASE_URL" | grep -o 'localhost\|prod\|staging'
+echo $DATABASE_URL  # Must point to production
+echo $NODE_ENV      # Should be "production"
 
-# Verify WA connectivity
-npx tsx scripts/importing/wa_health_check.ts
+# Verify Prisma client
+npx prisma generate
+
+# Verify migration scripts exist
+ls scripts/migration/migrate.ts
+ls scripts/migration/capture-policies.ts
+ls scripts/migration/seed-membership-tiers.ts
 ```
 
 ---
 
-## 2. Migration Execution
+## Phase 1: Pre-Flight Checklist
 
-See [IMPORTER_RUNBOOK.md](./IMPORTER_RUNBOOK.md) for detailed execution commands.
+**Complete ALL items before proceeding. Do not skip any step.**
 
-### 2.1 Recommended Flow
+### 1.1 Policy Bundle Validated
 
-1. Run dry run first
-2. Review dry run output
-3. Create database backup
-4. Execute migration
-5. Run verification immediately
+```bash
+# Generate or validate policy bundle
+npx tsx scripts/migration/capture-policies.ts \
+  --validate-only \
+  --mapping-file ./migration-input/policy.json
+
+# Expected: "Validation PASSED" with zero errors
+```
+
+**Abort if:** Policy validation fails. Fix all errors first.
+
+### 1.2 Tier Mapping Confirmed
+
+```bash
+# Verify membership tiers are seeded
+npx tsx scripts/migration/seed-membership-tiers.ts --dry-run
+
+# Expected: Shows tier mapping without errors
+```
+
+**Abort if:** Tier seeding fails or mappings are incorrect.
+
+### 1.3 Invariants Pass
+
+```bash
+# Run dry run to generate artifacts
+npx tsx scripts/migration/migrate.ts \
+  --data-dir ./wa-export \
+  --verbose
+
+# Check invariants on output
+# TODO: Add CLI command for standalone invariant check
+# For now, review migration-dry-run-*.json manually
+cat migration-reports/migration-dry-run-*.json | jq '.summary'
+```
+
+**Abort if:** Dry run has errors or invariant violations.
+
+### 1.4 Backup Confirmed
+
+```bash
+# Create timestamped backup
+pg_dump "$DATABASE_URL" > backup-pre-migration-$(date +%Y%m%d-%H%M%S).sql
+
+# Verify backup is non-empty
+ls -lh backup-pre-migration-*.sql
+wc -l backup-pre-migration-*.sql
+```
+
+**Abort if:** Backup fails or file is empty.
+
+### 1.5 Pre-Flight Sign-Off
+
+Before proceeding, confirm:
+
+- [ ] Policy bundle validation: PASSED
+- [ ] Tier mapping: VERIFIED
+- [ ] Dry run: COMPLETED with zero errors
+- [ ] Database backup: CREATED and verified
+- [ ] Merge Captain approval: OBTAINED
 
 ---
 
-## 3. Post-Migration Verification
+## Phase 2: DRY RUN Execution
 
-### 3.1 When to Run Verification
+DRY RUN produces all artifacts without writing to the database.
 
-Run verification:
-
-- **Immediately after every production migration**
-- After any migration that writes to the database (not dry runs)
-- When troubleshooting migration issues
-- Before notifying stakeholders that migration is complete
-
-### 3.2 Running the Verification Tool
+### 2.1 Execute Dry Run
 
 ```bash
-# Basic verification
-npx tsx scripts/migration/verify-migration.ts \
-  --bundle ./migration-bundle-2024-01-15 \
-  --output ./verification-report.md
-
-# JSON output for automation
-npx tsx scripts/migration/verify-migration.ts \
-  --bundle ./migration-bundle-2024-01-15 \
-  --format json \
-  --output ./verification-report.json
-
-# Verbose mode
-npx tsx scripts/migration/verify-migration.ts \
-  --bundle ./migration-bundle-2024-01-15 \
+npx tsx scripts/migration/migrate.ts \
+  --data-dir ./wa-export \
+  --members members/wa-members-export.csv \
+  --events events/wa-events-export.csv \
+  --registrations events/wa-registrations-export.csv \
+  --output-report ./migration-reports \
   --verbose
 ```
 
-### 3.3 What Success Looks Like
+### 2.2 Verify Dry Run Output
 
-A successful verification produces:
+```bash
+# Check summary
+cat migration-reports/migration-dry-run-*.json | jq '.summary'
 
-```
-============================================================
-  Post-Migration Verification
-  Started: 2024-01-15T14:30:00.000Z
-  Bundle: ./migration-bundle-2024-01-15
-============================================================
+# Expected output structure:
+# {
+#   "totalRecords": N,
+#   "created": N,
+#   "updated": N,
+#   "skipped": N,
+#   "errors": 0,    <-- MUST be zero
+#   "duration_ms": N
+# }
 
-[1/4] Loading migration bundle...
-  - Run ID: run-20240115-143000
-  - Dry run: false
-  - Completed: 2024-01-15T14:28:00.000Z
+# Check ID mapping
+cat migration-reports/id-map-dry-run-*.json | jq '.members.counts, .events.counts'
 
-[2/4] Connecting to database...
-  - Members: 2147
-  - Events: 523
-  - Registrations: 8603
-
-[3/4] Running verification checks...
-  [PASS] Member Count: Member count matches: 2147
-  [PASS] Event Count: Event count matches: 523
-  [PASS] Registration Count: Registration count matches: 8603
-  [PASS] Tier Distribution: Tier distribution: NEWCOMER: 500, FIRST_YEAR: 800...
-  [PASS] Tier Coverage: Tier coverage: 98.5% (2115/2147)
-  [PASS] Orphaned Registrations: No orphaned registrations found
-  [PASS] Duplicate ID Mappings: No duplicate ID mappings found
-  [PASS] Run ID Match: Run ID matches: run-20240115-143000
-
-[4/4] Generating verification report...
-  - Report written to: ./verification-report.md
-
-============================================================
-  Verification PASSED
-  Checks: 8 passed, 0 failed, 0 warnings
-  Duration: 1523ms
-============================================================
+# Check for duplicates (must be empty)
+cat migration-reports/id-map-dry-run-*.json | jq '.members.duplicateWaIds, .events.duplicateWaIds'
 ```
 
-**Exit code 0** indicates all checks passed.
+### 2.3 Dry Run Abort Criteria
 
-### 3.4 What Failures Mean
+**STOP and do not proceed to LIVE RUN if:**
 
-| Check | Failure Meaning | Action |
-|-------|-----------------|--------|
-| Member Count | Members missing or extra | Compare bundle vs DB, check for errors |
-| Event Count | Events missing or extra | Review event import logs |
-| Registration Count | Registrations lost | Check member/event mappings |
-| Tier Distribution | All in one tier | Verify tier mapping config |
-| Tier Coverage | Many null tiers | Check tier seeding, mapping |
-| Orphaned Registrations | Data integrity issue | Review foreign key relationships |
-| Duplicate Mappings | ID collision | Check for re-runs without cleanup |
-| Run ID Match | Different migration | Verify correct bundle used |
-
-### 3.5 Interpreting the Report
-
-The verification report contains:
-
-| Section | Purpose |
-|---------|---------|
-| Summary | Pass/fail counts at a glance |
-| Count Comparison | Bundle vs database record counts |
-| Tier Distribution | How members are distributed across tiers |
-| Verification Checks | Detailed pass/fail for each check |
-| Policy Verification | Whether policies match expectations |
-
-### 3.6 Common Verification Issues
-
-#### Issue: Count Mismatch
-
-```
-[FAIL] Member Count: Member count mismatch: expected 2147, got 2100 (diff: 47)
-```
-
-**Diagnosis**:
-1. Check migration error logs for skipped records
-2. Verify required fields were present in source data
-3. Check for duplicate email addresses (unique constraint)
-
-**Resolution**:
-- Review skipped records in migration report
-- Re-run with corrected source data if needed
-
-#### Issue: Low Tier Coverage
-
-```
-[WARN] Tier Coverage: Low tier coverage: 85.0% - 322 members without tier
-```
-
-**Diagnosis**:
-1. Check if tier seeding was run
-2. Verify tier mapping configuration
-3. Check source data for unmapped membership levels
-
-**Resolution**:
-- Run tier seeder if tiers are missing
-- Update tier mapping config
-- Re-run migration to update tier assignments
-
-#### Issue: All Members in One Tier
-
-```
-[WARN] Tier Distribution: Warning: All members in tier 'GENERAL' - verify mapping
-```
-
-**Diagnosis**:
-1. Check tier mapping configuration
-2. Verify source data has membership level information
-3. Check for _default fallback being used
-
-**Resolution**:
-- Update tier mapping to include all source levels
-- Verify source data quality
-
-### 3.7 When to Escalate
-
-Escalate to merge captain if:
-
-- Verification fails with data integrity issues (orphaned registrations)
-- Count mismatch exceeds 5% of total records
-- Multiple verification failures occur
-- Rollback is required
-
-Do NOT self-remediate integrity failures. Document and escalate.
-
----
-
-## 4. Rollback Procedures
-
-See [MIGRATION_ROLLBACK_RECOVERY.md](./MIGRATION_ROLLBACK_RECOVERY.md) for detailed rollback procedures.
-
-### 4.1 Quick Reference
-
-| Situation | Action |
+| Condition | Action |
 |-----------|--------|
-| Verification fails, minor issues | Fix source data, re-run |
-| Verification fails, major issues | Level 1 rollback (by run_id) |
-| Database corruption | Level 2 rollback (restore backup) |
+| `summary.errors > 0` | Review errors, fix source data |
+| Duplicate WA IDs found | Investigate source data |
+| Missing required fields | Re-export from WA with all fields |
+| Record counts don't match source | Investigate parsing issues |
 
 ---
 
-## 5. Escalation Paths
+## Phase 3: LIVE RUN Execution
 
-| Issue | Contact | Priority |
-|-------|---------|----------|
-| Verification failure | Merge captain | High |
-| Database corruption | DBA + Merge captain | Critical |
-| Data loss | Incident response | Critical |
+**Only proceed after successful DRY RUN with zero errors.**
+
+### 3.1 Final Pre-Live Checklist
+
+- [ ] Dry run completed within last 24 hours
+- [ ] No changes to source data since dry run
+- [ ] Backup verified within last hour
+- [ ] No other database operations in progress
+- [ ] Merge Captain has approved live run
+
+### 3.2 Execute Live Run
+
+```bash
+# Live run with confirmation bypass
+npx tsx scripts/migration/migrate.ts \
+  --data-dir ./wa-export \
+  --members members/wa-members-export.csv \
+  --events events/wa-events-export.csv \
+  --registrations events/wa-registrations-export.csv \
+  --output-report ./migration-reports \
+  --live \
+  --yes \
+  --verbose
+```
+
+### 3.3 Live Run Abort Criteria
+
+**STOP IMMEDIATELY if any of these occur:**
+
+| Trigger | Action |
+|---------|--------|
+| Database connection lost | Stop, verify DB state, assess damage |
+| More than 10 consecutive errors | Stop, do not continue |
+| "Fatal error" message | Stop, restore from backup |
+| Duplicate key violations | Stop, check for prior partial run |
+| Memory exhaustion | Stop, reduce batch size |
+| Disk space warning | Stop, free space |
+
+### 3.4 Capture Run ID
+
+After successful live run, record the run_id:
+
+```bash
+# Extract run_id from report
+cat migration-reports/migration-live-*.json | jq -r '.runId'
+
+# Record for rollback reference
+echo "Run ID: $(cat migration-reports/migration-live-*.json | jq -r '.runId')"
+```
 
 ---
 
-## Appendix: Verification Tool Reference
+## Phase 4: Post-Run Verification
 
-### Command Line Options
+### 4.1 Count Verification
 
-| Option | Short | Description | Default |
-|--------|-------|-------------|---------|
-| `--bundle` | `-b` | Path to migration bundle (required) | - |
-| `--output` | `-o` | Output report path | `./verification-report.md` |
-| `--format` | `-f` | Output format: markdown, json | `markdown` |
-| `--verbose` | `-v` | Verbose output | `false` |
-| `--help` | `-h` | Show help | - |
+```bash
+# Get expected counts from migration report
+cat migration-reports/migration-live-*.json | jq '.members.created, .events.created, .registrations.created'
 
-### Exit Codes
+# Compare with database counts
+psql "$DATABASE_URL" -c "SELECT COUNT(*) as members FROM \"Member\";"
+psql "$DATABASE_URL" -c "SELECT COUNT(*) as events FROM \"Event\";"
+psql "$DATABASE_URL" -c "SELECT COUNT(*) as registrations FROM \"Registration\";"
+```
 
-| Code | Meaning |
+| Entity | Report Count | DB Count | Match |
+|--------|--------------|----------|-------|
+| Members | _____ | _____ | [ ] |
+| Events | _____ | _____ | [ ] |
+| Registrations | _____ | _____ | [ ] |
+
+### 4.2 Spot Checks
+
+Verify 5-10 random records manually:
+
+```bash
+# Sample member spot check
+psql "$DATABASE_URL" -c "
+  SELECT m.id, m.email, m.\"firstName\", m.\"lastName\", m.\"waContactId\"
+  FROM \"Member\" m
+  WHERE m.\"waContactId\" IS NOT NULL
+  ORDER BY RANDOM()
+  LIMIT 5;
+"
+```
+
+**Verify for each record:**
+- [ ] Name matches source CSV
+- [ ] Email matches source CSV
+- [ ] Membership tier assigned (if applicable)
+- [ ] No data corruption
+
+### 4.3 Referential Integrity
+
+```bash
+# No orphaned registrations (member)
+psql "$DATABASE_URL" -c "
+  SELECT COUNT(*) as orphaned_member
+  FROM \"Registration\" r
+  LEFT JOIN \"Member\" m ON r.\"memberId\" = m.id
+  WHERE m.id IS NULL;
+"
+# Expected: 0
+
+# No orphaned registrations (event)
+psql "$DATABASE_URL" -c "
+  SELECT COUNT(*) as orphaned_event
+  FROM \"Registration\" r
+  LEFT JOIN \"Event\" e ON r.\"eventId\" = e.id
+  WHERE e.id IS NULL;
+"
+# Expected: 0
+
+# No duplicate WA IDs
+psql "$DATABASE_URL" -c "
+  SELECT \"waContactId\", COUNT(*) as count
+  FROM \"Member\"
+  WHERE \"waContactId\" IS NOT NULL
+  GROUP BY \"waContactId\"
+  HAVING COUNT(*) > 1;
+"
+# Expected: 0 rows
+```
+
+### 4.4 Application Smoke Test
+
+- [ ] Admin dashboard loads without errors
+- [ ] Member list displays imported members
+- [ ] Event list displays imported events
+- [ ] Member detail page works
+- [ ] Event detail page works
+- [ ] No JavaScript console errors
+
+---
+
+## Phase 5: Rollback (If Needed)
+
+Use rollback only if critical issues are discovered post-migration.
+
+### 5.1 Rollback Decision Criteria
+
+| Condition | Rollback? |
+|-----------|-----------|
+| Data corruption discovered | Yes |
+| Wrong source data used | Yes |
+| Critical business logic broken | Yes |
+| Minor data issues (< 1% records) | No - fix in place |
+| Missing optional fields | No - backfill later |
+
+### 5.2 Rollback Options
+
+**Option A: Targeted Rollback (Preferred)**
+
+```bash
+# TODO: rollback.ts CLI is pending implementation
+# For now, use database restore
+
+# Reference the run_id from the migration report
+RUN_ID="<run_id_from_report>"
+```
+
+**Option B: Database Restore**
+
+```bash
+# Full database restore (removes ALL changes since backup)
+psql "$DATABASE_URL" < backup-pre-migration-YYYYMMDD-HHMMSS.sql
+```
+
+**Related:** Issue #277 (Rollback & Recovery)
+
+---
+
+## Phase 6: Completion
+
+### 6.1 Archive Reports
+
+```bash
+# Archive all migration artifacts
+tar -czvf migration-complete-$(date +%Y%m%d-%H%M%S).tar.gz \
+  migration-reports/ \
+  migration-input/
+
+# Move to safe storage
+mv migration-complete-*.tar.gz /path/to/archives/
+```
+
+### 6.2 Post-Migration Sign-Off
+
+```
+============================================
+MIGRATION COMPLETION CERTIFICATE
+============================================
+
+Migration Run ID: _______________________
+Date/Time Started: _______________________
+Date/Time Completed: _______________________
+
+Records Imported:
+  Members: _______
+  Events: _______
+  Registrations: _______
+
+Verification:
+  [ ] Count verification passed
+  [ ] Spot checks passed (___/5 records)
+  [ ] Referential integrity passed
+  [ ] Application smoke test passed
+
+Operator: _______________________
+Merge Captain Approval: _______________________
+Date: _______________________
+============================================
+```
+
+---
+
+## Quick Reference
+
+### Command Summary
+
+```bash
+# Policy capture
+npx tsx scripts/migration/capture-policies.ts --generate-template
+npx tsx scripts/migration/capture-policies.ts --validate-only --mapping-file policy.json
+
+# Tier seeding
+npx tsx scripts/migration/seed-membership-tiers.ts --dry-run
+npx tsx scripts/migration/seed-membership-tiers.ts
+
+# Migration
+npx tsx scripts/migration/migrate.ts --data-dir ./wa-export --verbose          # DRY RUN
+npx tsx scripts/migration/migrate.ts --data-dir ./wa-export --live --yes        # LIVE RUN
+```
+
+### Key Files
+
+| File | Purpose |
 |------|---------|
-| 0 | All checks passed |
-| 1 | One or more checks failed |
-| 2 | Error (bundle not found, DB error) |
+| `scripts/migration/migrate.ts` | Main migration CLI |
+| `scripts/migration/capture-policies.ts` | Policy capture CLI |
+| `scripts/migration/seed-membership-tiers.ts` | Tier seeding CLI |
+| `scripts/migration/lib/invariants.ts` | Validation functions |
+| `migration-reports/` | Output artifacts |
 
-### Required Bundle Structure
+### Related Documentation
 
-The verification tool expects:
-
-```
-migration-bundle/
-├── migration-report.json    # Required
-├── policy-bundle.json       # Optional
-└── migration-config.json    # Optional
-```
+- [WA Policy Capture](./WA_POLICY_CAPTURE.md) - Policy capture details
+- [Migration Invariants](../ARCH/MIGRATION_INVARIANTS.md) - Validation rules
+- [Membership Tier Decision](../ARCH/MEMBERSHIP_TIER_SCHEMA_DECISION.md) - Tier handling
 
 ---
 
-_Document maintained as part of Epic #202 (WA Migration)_
+## Known Limitations
+
+### TODO Items
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Standalone invariant check CLI | Pending | Currently manual JSON review |
+| Rollback CLI (`rollback.ts`) | Pending | Use database restore for now |
+| Incremental migration | Not supported | Full import only |
+| Multi-org migration | Not supported | Single org per run |
+
+### Feature Flags
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `membership_tiers_enabled` | `false` | Enable tier assignment during import |
+
+To enable tier mapping during migration:
+
+```bash
+MEMBERSHIP_TIERS_ENABLED=1 npx tsx scripts/migration/migrate.ts --live --yes
+```
