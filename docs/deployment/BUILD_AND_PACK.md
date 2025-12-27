@@ -1,179 +1,133 @@
-# Build and Pack Scripts
+# Build and Pack
 
-This document describes how to build ClubOS locally and create distributable install packs.
-
----
-
-## Overview
-
-ClubOS provides two scripts for building and packaging:
-
-| Script | Purpose |
-|--------|---------|
-| `scripts/build-site.sh` | Builds the Next.js application |
-| `scripts/make-install-pack.sh` | Creates a distributable zip package |
+Documentation for building distributable packages from ClubOS.
 
 ---
 
-## build-site.sh
+## Evaluation Packet ZIP
 
-Builds the ClubOS Next.js application for production deployment.
+The evaluation packet is a curated collection of documentation for board review.
 
-### Usage
+### Building the Packet
 
 ```bash
-./scripts/build-site.sh
+./scripts/pkg/build-eval-zip.zsh
 ```
 
-### What It Does
+### Output
 
-1. **Checks prerequisites**
-   - Node.js 20+ installed
-   - npm available
-   - node_modules present (runs `npm ci` if missing)
-
-2. **Generates Prisma client**
-   - Runs `npx prisma generate`
-   - Requires DATABASE_URL for schema validation
-
-3. **Runs Next.js build**
-   - Executes `npm run build`
-   - Compiles TypeScript, bundles assets
-
-4. **Verifies output**
-   - Checks for required files in `.next/`
-   - Reports success/failure
-
-### Output Files
+The script creates a ZIP file in `~/Downloads/`:
 
 ```
-.next/
-  BUILD_ID              # Unique build identifier
-  build-manifest.json   # Build metadata
-  package.json          # Runtime package info
-  static/               # Static assets (JS, CSS, images)
-  server/               # Server-side code
+ClubOS_Evaluation_Packet_<SHA>_<YYYYMMDD>.zip
 ```
 
-### macOS Notes
+Example: `ClubOS_Evaluation_Packet_abc1234_20251226.zip`
 
-- Works out of the box on macOS with Homebrew Node.js
-- If you see permission errors, check file ownership in node_modules
+### Contents
 
-### Troubleshooting
+The packet includes a curated set of documents:
 
-| Issue | Solution |
-|-------|----------|
-| "Node.js not found" | Install Node.js 20+ via `brew install node` |
-| "Prisma generate failed" | Set DATABASE_URL or check database connection |
-| "Build failed" | Check TypeScript errors with `npm run typecheck` |
+| Category | Purpose |
+|----------|---------|
+| Board Evaluation | Documents prepared for board review |
+| Business Model | Core business model and governance |
+| Architecture | High-level trust surface contracts |
+| Operator Trust | Documentation for operators |
+
+Plus two generated index files:
+
+- `README.md` - How to use the packet
+- `INCLUDED_FILES.txt` - Complete file manifest
+
+### Curated File List
+
+The script uses a hardcoded file list for reliability. To modify which files are included, edit the arrays in `scripts/pkg/build-eval-zip.zsh`:
+
+```zsh
+# Board evaluation documents
+EVAL_DOCS=(
+  "docs/BIZ/BOARD_EMAIL_EVALUATION_REQUEST.md"
+  "docs/BIZ/BOARD_NARRATIVE_VARIANT.md"
+  # ... etc
+)
+```
+
+### Why Hardcoded Lists?
+
+Pattern-based file selection (e.g., `docs/BIZ/*.md`) is fragile:
+
+- May include draft or WIP documents
+- Breaks when files are moved or renamed
+- Risk of missing important files that don't match patterns
+- Difficult to audit what's included
+
+Hardcoded lists provide:
+
+- Explicit control over packet contents
+- Clear audit trail (list is in source control)
+- Failures are visible (missing files are reported)
+- Intentional updates when docs change
 
 ---
 
-## make-install-pack.sh
+## macOS Compatibility
 
-Creates a distributable install pack containing everything needed to deploy ClubOS.
+The build script uses only macOS-native commands:
 
-### Usage
+| Command | Purpose |
+|---------|---------|
+| `date` | Timestamps (BSD date syntax) |
+| `stat` | File size (BSD stat syntax) |
+| `mktemp` | Temporary directory |
+| `ditto` | ZIP creation (macOS native) |
 
-```bash
-# Full build + pack
-./scripts/make-install-pack.sh
+No GNU coreutils required.
 
-# Skip build (use existing .next)
-./scripts/make-install-pack.sh --skip-build
-```
+---
 
-### What It Does
+## Verifying the Package
 
-1. Runs `build-site.sh` (unless `--skip-build`)
-2. Creates clean `dist/clubos-pack/` directory
-3. Copies required artifacts
-4. Generates `INSTALL.md` with deployment instructions
-5. Creates `dist/clubos-pack.zip`
-
-### Pack Contents
-
-```
-clubos-pack/
-  .next/              # Compiled Next.js application
-  prisma/
-    schema.prisma     # Database schema
-  package.json        # Dependencies manifest
-  package-lock.json   # Locked dependency versions
-  public/             # Static assets (if present)
-  INSTALL.md          # Installation instructions
-```
-
-### Expected Pack Size
-
-- Typical size: 50-100 MB (depends on dependencies)
-- Contains compiled code, not source
-
-### Verification
-
-After creating the pack, verify contents:
+List contents without extracting:
 
 ```bash
-# List pack contents
-unzip -l dist/clubos-pack.zip | head -30
-
-# Check pack size
-du -h dist/clubos-pack.zip
-
-# Test extraction
-cd /tmp && unzip ~/path/to/clubos-pack.zip
-ls clubos-pack/
+unzip -l ~/Downloads/ClubOS_Evaluation_Packet_*.zip
 ```
 
-### Installing from Pack
-
-See the generated `INSTALL.md` inside the pack, or:
+Extract to verify:
 
 ```bash
-# Extract
-unzip clubos-pack.zip
-cd clubos-pack
-
-# Install production dependencies
-npm ci --omit=dev
-npx prisma generate
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your DATABASE_URL
-
-# Push schema to database
-npx prisma db push
-
-# Start
-npm run start
+unzip ~/Downloads/ClubOS_Evaluation_Packet_*.zip -d /tmp/eval-verify
 ```
 
 ---
 
-## Exit Codes
+## Troubleshooting
 
-### build-site.sh
+### Script fails with "Not inside a git repository"
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Prerequisites check failed |
-| 2 | Build failed |
-| 3 | Verification failed |
+Run from within the ClubOS repository:
 
-### make-install-pack.sh
+```bash
+cd /path/to/clubos
+./scripts/pkg/build-eval-zip.zsh
+```
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Prerequisites check failed or zip missing |
+### Missing files reported
+
+If files are listed as missing, either:
+
+1. The file was removed from the repo (update the script)
+2. The file was renamed (update the script)
+3. You're on a branch without that file (switch to main)
+
+### ZIP already exists
+
+The script automatically removes existing ZIPs with the same name before creating a new one.
 
 ---
 
-## Related Documentation
+## Related
 
-- [NETLIFY.md](./NETLIFY.md) - Netlify deployment configuration
-- [ENVIRONMENT.md](../runtime/ENVIRONMENT.md) - Environment variables
-- [DEPLOYMENT_OVERVIEW.md](./DEPLOYMENT_OVERVIEW.md) - Deployment architecture
+- [Evaluation Charter](../BIZ/EVALUATION_CHARTER.md)
+- [Board Email](../BIZ/BOARD_EMAIL_EVALUATION_REQUEST.md)
