@@ -16,6 +16,7 @@ import { requireAuth, hasCapability, type GlobalRole } from "@/lib/auth";
 import { apiSuccess } from "@/lib/api/responses";
 import { errors } from "@/lib/api/errors";
 import { prisma } from "@/lib/prisma";
+import { auditMutation } from "@/lib/audit";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -74,7 +75,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       data: { status: "DRAFT" },
     });
 
-    // TODO: Create audit log entry for return
+    await auditMutation(request, authResult.context, {
+      action: "UPDATE",
+      capability: "admin:full",
+      objectType: "EventPostmortem",
+      objectId: postmortem.id,
+      metadata: {
+        eventId,
+        previousStatus: "SUBMITTED",
+        newStatus: "DRAFT",
+        action: "return",
+      },
+    });
 
     return apiSuccess({
       postmortem: {
