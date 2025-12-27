@@ -154,3 +154,49 @@ Key scenarios:
 - docs/ARCH/CLUBOS_PAGE_BUILDER_PRIMITIVES.md
 - docs/MIGRATION/WILD_APRICOT_GADGET_TAGGING.md
 - docs/MIGRATION/WILD_APRICOT_CUSTOM_HTML_BLOCKS_GUIDE.md
+
+---
+
+## P1: Audit Log Gaps (Charter Violation)
+
+**Priority:** P1 (High)  
+**Added:** 2025-12-27
+
+### Problem
+5 code paths perform mutations without audit logging, violating charter.
+
+### Files needing audit logging
+1. src/app/api/v1/events/[id]/postmortem/submit/route.ts:81
+2. src/app/api/v1/events/[id]/postmortem/return/route.ts:77
+3. src/app/api/v1/events/[id]/postmortem/approve/route.ts:86
+4. src/app/api/v1/events/[id]/postmortem/unlock/route.ts:77
+5. src/app/admin/actions/PendingActionsTable.tsx:149
+
+### Fix pattern
+Add auditMutation() call after each state change.
+
+---
+
+## Operator Policy Editor UI
+
+**Priority:** Medium  
+**Added:** 2025-12-27
+
+### Problem
+Operators cannot configure club policies without code changes.
+
+### Requirements
+1. Read-only dashboard showing all policy values
+2. Editor UI with validation
+3. Database persistence with audit logging
+
+### Policies to expose
+- registrationCutoffHours (number, default: 2)
+- memberInactivityDays (number, default: 90)
+- eventApprovalRequired (boolean, default: true)
+- maxEventCapacity (number, default: 100)
+- waitlistEnabled (boolean, default: true)
+
+### Existing work
+- src/app/admin/policies/status/page.tsx (read-only)
+- src/lib/policies/ (definitions)
