@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getBaseUrl } from "@/lib/getBaseUrl";
 import { listMockEmails, MockEmailEntry } from "@/lib/email";
 import SystemCommsPanel from "./SystemCommsPanel";
@@ -58,7 +59,7 @@ type ActivityItem = {
 
 async function getMembers(): Promise<Member[]> {
   const base = getBaseUrl();
-  const res = await fetch(`${base}/api/members`, { cache: "no-store" });
+  const res = await fetch(\`\${base}/api/members\`, { cache: "no-store" });
 
   if (!res.ok) {
     console.error("Failed to fetch members:", res.status, res.statusText);
@@ -71,7 +72,7 @@ async function getMembers(): Promise<Member[]> {
 
 async function getEvents(): Promise<EventItem[]> {
   const base = getBaseUrl();
-  const res = await fetch(`${base}/api/events`, { cache: "no-store" });
+  const res = await fetch(\`\${base}/api/events\`, { cache: "no-store" });
 
   if (!res.ok) {
     console.error("Failed to fetch events:", res.status, res.statusText);
@@ -84,7 +85,7 @@ async function getEvents(): Promise<EventItem[]> {
 
 async function getRegistrations(): Promise<Registration[]> {
   const base = getBaseUrl();
-  const res = await fetch(`${base}/api/registrations`, { cache: "no-store" });
+  const res = await fetch(\`\${base}/api/registrations\`, { cache: "no-store" });
 
   if (!res.ok) {
     console.error("Failed to fetch registrations:", res.status, res.statusText);
@@ -98,7 +99,7 @@ async function getRegistrations(): Promise<Registration[]> {
 async function getAdminSummary(): Promise<AdminSummary | null> {
   const base = getBaseUrl();
   try {
-    const res = await fetch(`${base}/api/admin/summary`, { headers: adminHeaders, cache: "no-store" });
+    const res = await fetch(\`\${base}/api/admin/summary\`, { headers: adminHeaders, cache: "no-store" });
     if (!res.ok) return null;
     const data = await res.json();
     return data.summary ?? null;
@@ -110,7 +111,7 @@ async function getAdminSummary(): Promise<AdminSummary | null> {
 async function getActivity(): Promise<ActivityItem[]> {
   const base = getBaseUrl();
   try {
-    const res = await fetch(`${base}/api/admin/activity`, { headers: adminHeaders, cache: "no-store" });
+    const res = await fetch(\`\${base}/api/admin/activity\`, { headers: adminHeaders, cache: "no-store" });
     if (!res.ok) return [];
     const data = await res.json();
     return data.activity ?? [];
@@ -126,7 +127,7 @@ function formatActivityTime(isoString: string): string {
   const day = String(date.getDate()).padStart(2, "0");
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
+  return \`\${year}-\${month}-\${day} \${hours}:\${minutes}\`;
 }
 
 function joinRegistrations(
@@ -142,7 +143,7 @@ function joinRegistrations(
     const event = eventById.get(r.eventId);
 
     const memberName = member
-      ? `${member.firstName} ${member.lastName}`
+      ? \`\${member.firstName} \${member.lastName}\`
       : r.memberId;
 
     const eventTitle = event ? event.title : r.eventId;
@@ -169,14 +170,190 @@ export default async function AdminPage() {
   const joinedRegistrations = joinRegistrations(registrations, members, events);
   const recentActivity = activity.slice(0, 10);
 
+  // Mock pending tasks data
+  const pendingTasks = {
+    eventsToApprove: 3,
+    applicationsToReview: 5,
+    refundRequests: 2,
+    expiringMemberships: 8,
+  };
+
   return (
     <div data-test-id="admin-root" style={{ padding: "20px" }}>
+      {/* Enhanced Welcome Header */}
       <header
         data-test-id="admin-header"
-        style={{ fontSize: "24px", marginBottom: "20px" }}
+        style={{
+          backgroundColor: "#1e40af",
+          borderRadius: "12px",
+          padding: "24px",
+          marginBottom: "24px",
+          color: "white",
+        }}
       >
-        Admin
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <h1 style={{ fontSize: "28px", fontWeight: 700, margin: 0 }}>
+              Welcome back, Admin
+            </h1>
+            <p style={{ fontSize: "14px", opacity: 0.9, marginTop: "4px" }}>
+              Club management dashboard
+            </p>
+          </div>
+          <div
+            data-test-id="system-health-indicator"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              backgroundColor: "rgba(255,255,255,0.15)",
+              padding: "8px 16px",
+              borderRadius: "20px",
+            }}
+          >
+            <span
+              style={{
+                width: "10px",
+                height: "10px",
+                borderRadius: "50%",
+                backgroundColor: "#22c55e",
+              }}
+            />
+            <span style={{ fontSize: "14px" }}>System Healthy</span>
+          </div>
+        </div>
       </header>
+
+      {/* Quick Action Buttons */}
+      <section
+        data-test-id="quick-actions-section"
+        style={{ marginBottom: "24px" }}
+      >
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <Link
+            href="/admin/events/new"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "12px 20px",
+              backgroundColor: "#2563eb",
+              color: "white",
+              borderRadius: "8px",
+              textDecoration: "none",
+              fontWeight: 500,
+              fontSize: "14px",
+            }}
+          >
+            + New Event
+          </Link>
+          <Link
+            href="/admin/members/new"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "12px 20px",
+              backgroundColor: "#16a34a",
+              color: "white",
+              borderRadius: "8px",
+              textDecoration: "none",
+              fontWeight: 500,
+              fontSize: "14px",
+            }}
+          >
+            + Add Member
+          </Link>
+          <Link
+            href="/admin/comms/bulk-email"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "12px 20px",
+              backgroundColor: "#7c3aed",
+              color: "white",
+              borderRadius: "8px",
+              textDecoration: "none",
+              fontWeight: 500,
+              fontSize: "14px",
+            }}
+          >
+            Send Email
+          </Link>
+          <Link
+            href="/admin/members/import"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              padding: "12px 20px",
+              backgroundColor: "#0891b2",
+              color: "white",
+              borderRadius: "8px",
+              textDecoration: "none",
+              fontWeight: 500,
+              fontSize: "14px",
+            }}
+          >
+            Import Members
+          </Link>
+        </div>
+      </section>
+
+      {/* Pending Tasks Alert */}
+      {(pendingTasks.eventsToApprove > 0 ||
+        pendingTasks.applicationsToReview > 0 ||
+        pendingTasks.refundRequests > 0) && (
+        <section
+          data-test-id="pending-tasks-section"
+          style={{
+            backgroundColor: "#fef3c7",
+            border: "1px solid #fcd34d",
+            borderRadius: "12px",
+            padding: "16px 20px",
+            marginBottom: "24px",
+          }}
+        >
+          <h3 style={{ fontSize: "16px", fontWeight: 600, color: "#92400e", margin: "0 0 12px 0" }}>
+            Pending Tasks
+          </h3>
+          <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
+            {pendingTasks.eventsToApprove > 0 && (
+              <Link
+                href="/admin/events?filter=pending"
+                style={{ color: "#92400e", textDecoration: "none", fontSize: "14px" }}
+              >
+                <strong>{pendingTasks.eventsToApprove}</strong> events to approve
+              </Link>
+            )}
+            {pendingTasks.applicationsToReview > 0 && (
+              <Link
+                href="/admin/applications"
+                style={{ color: "#92400e", textDecoration: "none", fontSize: "14px" }}
+              >
+                <strong>{pendingTasks.applicationsToReview}</strong> applications to review
+              </Link>
+            )}
+            {pendingTasks.refundRequests > 0 && (
+              <Link
+                href="/admin/refunds"
+                style={{ color: "#92400e", textDecoration: "none", fontSize: "14px" }}
+              >
+                <strong>{pendingTasks.refundRequests}</strong> refund requests
+              </Link>
+            )}
+            {pendingTasks.expiringMemberships > 0 && (
+              <Link
+                href="/admin/members?filter=expiring"
+                style={{ color: "#92400e", textDecoration: "none", fontSize: "14px" }}
+              >
+                <strong>{pendingTasks.expiringMemberships}</strong> expiring memberships
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
 
       <AdminSectionNav />
 
