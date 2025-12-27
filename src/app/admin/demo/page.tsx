@@ -15,6 +15,7 @@ import DemoScenarioCards from "./DemoScenarioCards";
 import ViewAsMemberSection from "./ViewAsMemberSection";
 import EventDerivedPreviewDemo from "./EventDerivedPreviewDemo";
 import EntitlementsSection from "./EntitlementsSection";
+import EventChairDemo from "./EventChairDemo";
 
 // Use default dev token if ADMIN_E2E_TOKEN not set (matches auth.ts logic)
 const adminHeaders =
@@ -229,6 +230,9 @@ export default async function DemoPage() {
 
       {/* View as Member - Impersonation Tool */}
       <ViewAsMemberSection />
+
+      {/* Event Chair Demo Walkthrough */}
+      <EventChairDemo />
 
       {/* Event Field Intelligence Demo */}
       <EventDerivedPreviewDemo />
