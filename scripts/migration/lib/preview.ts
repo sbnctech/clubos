@@ -374,8 +374,28 @@ function extractEventSamples(file: ParsedFile | undefined, count = 5): SampleEve
 // Report Generation
 // ---------------------------------------------------------------------------
 
-function computeContentHash(report: Omit<PreviewReport, 'contentHash' | 'generatedAt'>): string {
-  const content = JSON.stringify(report, Object.keys(report).sort());
+/**
+ * Compute a deterministic content hash for a report.
+ * Excludes previewId (random), generatedAt (timestamp), and contentHash (self-reference).
+ * Uses stable JSON serialization with sorted keys at all nesting levels.
+ */
+function computeContentHash(
+  report: Omit<PreviewReport, 'contentHash' | 'generatedAt' | 'previewId'>
+): string {
+  // Stable JSON serialization: sort keys at all levels for determinism
+  const stableStringify = (obj: unknown): string =>
+    JSON.stringify(obj, (_, v) => {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        return Object.keys(v)
+          .sort()
+          .reduce((sorted: Record<string, unknown>, key) => {
+            sorted[key] = (v as Record<string, unknown>)[key];
+            return sorted;
+          }, {});
+      }
+      return v;
+    });
+  const content = stableStringify(report);
   return crypto.createHash('sha256').update(content).digest('hex').substring(0, 16);
 }
 
@@ -425,7 +445,10 @@ export function generatePreviewReport(options: PreviewOptions): PreviewReport {
     },
   };
 
-  const contentHash = computeContentHash(partialReport);
+  // Exclude previewId from hash computation (it's random per-invocation)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { previewId: _excludedId, ...hashableReport } = partialReport;
+  const contentHash = computeContentHash(hashableReport);
 
   return {
     ...partialReport,
