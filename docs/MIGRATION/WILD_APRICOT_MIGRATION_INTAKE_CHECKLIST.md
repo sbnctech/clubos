@@ -382,6 +382,7 @@ Copy this block and fill it out for each customer. This becomes the migration sc
 
 ## Related Documents
 
+- [Operator Decision Tree](./OPERATOR_DECISION_TREE.md) - quick classification guidance for operators
 - [Canonical Gadget Matrix](./WILD_APRICOT_GADGET_TAGGING.md) - single source of truth for migration tags
 - [ClubOS Page Builder Primitives](../ARCH/CLUBOS_PAGE_BUILDER_PRIMITIVES.md) - ClubOS equivalents and migration behavior
 - [Presentation Discovery Stage](./PRESENTATION_DISCOVERY_STAGE.md) - automated site crawling
