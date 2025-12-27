@@ -185,3 +185,24 @@ export function getClubDayOfWeek(date: Date, tz: string = CLUB_TIMEZONE): number
 export function formatClubMonthName(date: Date, tz: string = CLUB_TIMEZONE): string {
   return new Intl.DateTimeFormat('en-US', { timeZone: tz, month: 'long' }).format(date);
 }
+
+export function formatClubMonthYearLong(dateUtc: Date, locale = "en-US"): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: CLUB_TIMEZONE,
+    month: "long",
+    year: "numeric",
+  }).format(dateUtc);
+}
+
+export function formatClubWeekdayDate(dateUtc: Date, locale = "en-US"): string {
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: CLUB_TIMEZONE,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(dateUtc);
+}
+
+export function createClubMidnight(year: number, month: number, day: number): Date {
+  return utcForTzMidnight({ year, month, day }, CLUB_TIMEZONE);
+}
