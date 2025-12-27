@@ -12,6 +12,14 @@ import * as fs from "fs";
 import * as path from "path";
 import type { PolicyValueMap, PolicyKey } from "../../../src/lib/policy/types";
 import { POLICY_DEFAULTS } from "../../../src/lib/policy/getPolicy";
+import type {
+  CapturedMembershipLevel,
+  MembershipLevelMappingFile,
+  MappingValidationResult,
+  PolicyCaptureReport,
+  SourceOrgInfo,
+  MembershipLevelReportEntry,
+} from "./policy-capture-types";
 
 // =============================================================================
 // Types
@@ -697,4 +705,334 @@ export function extractPolicyValues(bundle: PolicyBundle): Partial<PolicyValueMa
     }
   }
   return result;
+}
+
+// =============================================================================
+// Membership Level Capture Functions
+// =============================================================================
+
+/**
+ * WAClient interface for membership level fetching.
+ * Matches the WildApricotClient's fetchMembershipLevels method.
+ */
+export interface WAClient {
+  fetchMembershipLevels(): Promise<Array<{
+    Id: number;
+    Name: string;
+    MembershipFee: number;
+    Description: string | null;
+    RenewalEnabled: boolean;
+    RenewalPeriod: string | null;
+    NewMembersEnabled: boolean;
+    Url: string;
+  }>>;
+}
+
+/**
+ * Fetch membership levels from Wild Apricot API.
+ * Returns captured levels and any error encountered.
+ */
+export async function fetchMembershipLevels(
+  client: WAClient
+): Promise<{ levels: CapturedMembershipLevel[]; error?: string }> {
+  try {
+    const waLevels = await client.fetchMembershipLevels();
+    const levels: CapturedMembershipLevel[] = waLevels.map((level) => ({
+      waId: level.Id,
+      name: level.Name,
+      fee: level.MembershipFee || 0,
+      description: level.Description,
+      renewalEnabled: level.RenewalEnabled,
+      renewalPeriod: level.RenewalPeriod,
+      newMembersEnabled: level.NewMembersEnabled,
+    }));
+    return { levels };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { levels: [], error: `Failed to fetch membership levels: ${message}` };
+  }
+}
+
+/**
+ * Generate a mapping template from captured membership levels.
+ */
+export function generateMappingTemplate(
+  capturedLevels: CapturedMembershipLevel[]
+): MembershipLevelMappingFile {
+  return {
+    version: "1.0",
+    createdAt: new Date().toISOString(),
+    source: capturedLevels.length > 0 ? "api" : "template",
+    levels: capturedLevels.map((level) => ({
+      waId: level.waId,
+      waName: level.name,
+      clubosTier: undefined,
+      ignore: false,
+      reason: undefined,
+      notes: undefined,
+    })),
+  };
+}
+
+/**
+ * Load a membership level mapping file from disk.
+ */
+export function loadMappingFile(
+  filePath: string
+): MembershipLevelMappingFile | { error: string } {
+  try {
+    if (!fs.existsSync(filePath)) {
+      return { error: `Mapping file not found: ${filePath}` };
+    }
+    const content = fs.readFileSync(filePath, "utf-8");
+    return JSON.parse(content) as MembershipLevelMappingFile;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { error: `Failed to load mapping file: ${message}` };
+  }
+}
+
+/**
+ * Save a membership level mapping file to disk.
+ */
+export function saveMappingFile(
+  filePath: string,
+  mapping: MembershipLevelMappingFile
+): { success: boolean; error?: string } {
+  try {
+    const dir = path.dirname(filePath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(filePath, JSON.stringify(mapping, null, 2));
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Failed to save mapping file: ${message}` };
+  }
+}
+
+/**
+ * Validate a membership level mapping file.
+ * Optionally validates against captured levels for completeness.
+ */
+export function validateMappingFile(
+  mapping: MembershipLevelMappingFile,
+  capturedLevels?: CapturedMembershipLevel[]
+): MappingValidationResult {
+  const errors: MappingValidationResult["errors"] = [];
+  const warnings: MappingValidationResult["warnings"] = [];
+  let mappedCount = 0;
+  let ignoredCount = 0;
+  let unmappedCount = 0;
+
+  // Import VALID_TIER_CODES at runtime to avoid circular dependency
+  const validTiers = ["active", "lapsed", "pending_new", "pending_renewal", "suspended", "not_a_member"];
+
+  for (const level of mapping.levels) {
+    if (level.ignore) {
+      if (!level.reason) {
+        warnings.push({
+          level: level.waName,
+          waId: level.waId,
+          message: "Ignored level should have a reason",
+        });
+      }
+      ignoredCount++;
+    } else if (level.clubosTier) {
+      if (!validTiers.includes(level.clubosTier)) {
+        errors.push({
+          level: level.waName,
+          waId: level.waId,
+          message: `Invalid tier code: ${level.clubosTier}. Valid: ${validTiers.join(", ")}`,
+        });
+      }
+      mappedCount++;
+    } else {
+      errors.push({
+        level: level.waName,
+        waId: level.waId,
+        message: "Level must be mapped to a ClubOS tier or marked as ignored",
+      });
+      unmappedCount++;
+    }
+  }
+
+  // Check for missing levels if capturedLevels provided
+  if (capturedLevels) {
+    const mappedIds = new Set(mapping.levels.map((l) => l.waId));
+    for (const captured of capturedLevels) {
+      if (!mappedIds.has(captured.waId)) {
+        warnings.push({
+          level: captured.name,
+          waId: captured.waId,
+          message: "Captured level not present in mapping file",
+        });
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    summary: {
+      totalLevels: mapping.levels.length,
+      mappedLevels: mappedCount,
+      ignoredLevels: ignoredCount,
+      unmappedLevels: unmappedCount,
+    },
+  };
+}
+
+/**
+ * Generate a policy capture report from the captured data.
+ */
+export function generatePolicyCaptureReport(
+  accountId: string,
+  capturedLevels: CapturedMembershipLevel[],
+  mapping: MembershipLevelMappingFile,
+  validation: MappingValidationResult
+): PolicyCaptureReport {
+  const entries: MembershipLevelReportEntry[] = mapping.levels.map((level) => {
+    let status: "mapped" | "ignored" | "unmapped";
+    if (level.ignore) {
+      status = "ignored";
+    } else if (level.clubosTier) {
+      status = "mapped";
+    } else {
+      status = "unmapped";
+    }
+
+    return {
+      waId: level.waId,
+      waName: level.waName,
+      status,
+      clubosTier: level.clubosTier,
+      reason: level.reason,
+    };
+  });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    sourceAccountId: accountId,
+    membershipLevels: entries,
+    summary: {
+      totalWaLevels: capturedLevels.length,
+      mappedToClubos: validation.summary.mappedLevels,
+      ignoredWithReason: validation.summary.ignoredLevels,
+      unmappedBlocking: validation.summary.unmappedLevels,
+    },
+    validationStatus: validation.valid ? "passed" : "failed",
+    validationErrors: validation.errors.map((e) => `${e.level}: ${e.message}`),
+  };
+}
+
+/**
+ * Render a policy capture report as markdown.
+ */
+export function renderReportAsMarkdown(report: PolicyCaptureReport): string {
+  const lines: string[] = [];
+
+  lines.push("# Policy Capture Report");
+  lines.push("");
+  lines.push(`**Source Account:** ${report.sourceAccountId}`);
+  lines.push(`**Generated:** ${report.generatedAt}`);
+  lines.push(`**Status:** ${report.validationStatus.toUpperCase()}`);
+  lines.push("");
+
+  // Summary
+  lines.push("## Summary");
+  lines.push("");
+  lines.push(`- Total WA Levels: ${report.summary.totalWaLevels}`);
+  lines.push(`- Mapped to ClubOS: ${report.summary.mappedToClubos}`);
+  lines.push(`- Ignored (with reason): ${report.summary.ignoredWithReason}`);
+  lines.push(`- Unmapped (blocking): ${report.summary.unmappedBlocking}`);
+  lines.push("");
+
+  // Validation errors
+  if (report.validationErrors.length > 0) {
+    lines.push("## Validation Errors");
+    lines.push("");
+    for (const error of report.validationErrors) {
+      lines.push(`- ${error}`);
+    }
+    lines.push("");
+  }
+
+  // Membership levels table
+  lines.push("## Membership Level Mapping");
+  lines.push("");
+  lines.push("| WA ID | WA Name | Status | ClubOS Tier | Reason |");
+  lines.push("|-------|---------|--------|-------------|--------|");
+
+  for (const entry of report.membershipLevels) {
+    const tier = entry.clubosTier || "-";
+    const reason = entry.reason || "-";
+    lines.push(`| ${entry.waId} | ${entry.waName} | ${entry.status} | ${tier} | ${reason} |`);
+  }
+  lines.push("");
+
+  return lines.join("\n");
+}
+
+/**
+ * Write a complete migration bundle to disk.
+ */
+export function writeMigrationBundle(
+  outputDir: string,
+  data: {
+    sourceOrg: SourceOrgInfo;
+    capturedLevels: CapturedMembershipLevel[];
+    mapping: MembershipLevelMappingFile;
+    report: PolicyCaptureReport;
+  }
+): { success: boolean; error?: string } {
+  try {
+    // Create directory structure
+    const policiesDir = path.join(outputDir, "policies");
+    const mappingsDir = path.join(outputDir, "mappings");
+    const reportsDir = path.join(outputDir, "reports");
+
+    for (const dir of [outputDir, policiesDir, mappingsDir, reportsDir]) {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    }
+
+    // Write source org info
+    fs.writeFileSync(
+      path.join(outputDir, "source_org.json"),
+      JSON.stringify(data.sourceOrg, null, 2)
+    );
+
+    // Write captured membership levels
+    fs.writeFileSync(
+      path.join(policiesDir, "membership_levels.json"),
+      JSON.stringify(data.capturedLevels, null, 2)
+    );
+
+    // Write mapping file (already saved by saveMappingFile, but include in bundle)
+    fs.writeFileSync(
+      path.join(mappingsDir, "membership_levels_mapping.json"),
+      JSON.stringify(data.mapping, null, 2)
+    );
+
+    // Write report as JSON
+    fs.writeFileSync(
+      path.join(reportsDir, "policy_capture_report.json"),
+      JSON.stringify(data.report, null, 2)
+    );
+
+    // Write report as Markdown
+    fs.writeFileSync(
+      path.join(reportsDir, "policy_capture_report.md"),
+      renderReportAsMarkdown(data.report)
+    );
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { success: false, error: `Failed to write migration bundle: ${message}` };
+  }
 }
