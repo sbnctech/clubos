@@ -408,3 +408,15 @@ For calendar widget replacement during migration, ClubCalendar provides an inlin
 **Architecture**: Config page stores JSON config; events page fetches config and renders calendar using WA API directly.
 
 **No ClubOS dependencies**: ClubCalendar runs independently. ClubOS does not need to host, serve, or manage it.
+
+## External Automation Discovery
+
+### Cron Jobs / Scheduled Tasks
+
+- [ ] Do you have any scheduled jobs that call Wild Apricot's API?
+- [ ] What do they do? (sync, enforce rules, notifications, status updates)
+- [ ] How often do they run?
+- [ ] Who maintains them?
+- [ ] Can we review the code/logic?
+
+**Risk:** External automation rules won't be captured in data export and must be manually reimplemented in ClubOS.

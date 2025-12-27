@@ -642,3 +642,12 @@ Each backlog item must:
 | Date | Author | Change |
 |------|--------|--------|
 | 2025-12-26 | Worker 5 | Initial backlog creation |
+
+## Backlog Item: External Cron Job Discovery
+
+**Priority:** High (migration blocker)
+**Added:** 2025-12-27
+
+External cron jobs that modify WA data via API represent hidden business logic. We have no way of knowing about them without asking. They must be documented during intake and reimplemented in ClubOS.
+
+**Action:** Ensure intake checklist includes cron job discovery questions.
