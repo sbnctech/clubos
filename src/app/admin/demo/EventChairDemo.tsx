@@ -16,6 +16,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatClubDateTime, formatClubTime } from "@/lib/timezone";
 
 // ============================================================================
 // TYPES
@@ -228,13 +229,7 @@ function getPostmortemStatusColor(status: PostmortemStatus | null): string {
 }
 
 function formatDate(date: Date): string {
-  return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatClubDateTime(date);
 }
 
 function formatCurrency(amount: number): string {
@@ -254,7 +249,7 @@ export default function EventChairDemo() {
   const [actionLog, setActionLog] = useState<string[]>([]);
 
   const logAction = (action: string) => {
-    const timestamp = new Date().toLocaleTimeString();
+    const timestamp = formatClubTime(new Date());
     setActionLog((prev) => [`[${timestamp}] ${action}`, ...prev.slice(0, 9)]);
   };
 
