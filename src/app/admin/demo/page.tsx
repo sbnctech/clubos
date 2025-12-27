@@ -231,6 +231,9 @@ export default async function DemoPage() {
       {/* View as Member - Impersonation Tool */}
       <ViewAsMemberSection />
 
+      {/* Event Chair Demo Walkthrough */}
+      <EventChairDemo />
+
       {/* Event Field Intelligence Demo */}
       <EventDerivedPreviewDemo />
 
