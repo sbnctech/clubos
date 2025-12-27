@@ -16,7 +16,7 @@ Before starting, confirm:
 
 - [ ] You have WA admin access to the playground site
 - [ ] You are using Safari on macOS
-- [ ] You have the widget files hosted (see SBNC_HOSTING_GUIDE.md)
+- [ ] You have the HTML snippets from `sbnc-install-pack/` ready
 - [ ] You know your WA calendar widget ID
 - [ ] You have copied the paste-ready HTML blocks to your clipboard app
 

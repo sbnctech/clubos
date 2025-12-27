@@ -1,6 +1,9 @@
 # ClubCalendar Config Templates
 
-Production-ready configuration templates for SBNC's inline calendar widget.
+> **Note**: These config templates are for future ClubOS widget development.
+> For current installation instructions, see the `sbnc-install-pack/` directory in the repository root.
+
+Reference configuration templates for SBNC's inline calendar widget.
 
 ## Quick Start
 
@@ -20,7 +23,7 @@ Pick one template based on your data source:
 
 ## Setup Instructions
 
-See [SBNC_INLINE_ONLY_INSTALL.md](../../docs/INSTALL/SBNC_INLINE_ONLY_INSTALL.md) for complete setup.
+For production installation, use the HTML snippets in `sbnc-install-pack/` (no build required).
 
 ## What to Replace
 

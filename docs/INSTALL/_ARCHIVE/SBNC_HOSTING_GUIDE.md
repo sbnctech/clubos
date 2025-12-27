@@ -1,5 +1,13 @@
 # SBNC Inline-Only Widget Hosting Guide
 
+> **DEPRECATED**: This document describes build infrastructure that was never implemented.
+> The `build:inline-widget` script, `vite.inline.config.ts`, and `dist/inline-widget/` output do not exist.
+>
+> **For current installation instructions**, see the `sbnc-install-pack/` directory in the repository root,
+> which provides copy-paste HTML snippets that require no build steps.
+>
+> Archived: December 2025
+
 ```
 Audience: SBNC Technical Staff, Operators
 Purpose: Deploy inline-only widget build to static hosting

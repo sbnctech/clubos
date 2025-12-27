@@ -1,7 +1,7 @@
 {
   "$schema": "./clubcalendar.schema.json",
   "_comment": "SBNC ClubCalendar config - Static JSON file variant",
-  "_docs": "See docs/INSTALL/SBNC_INLINE_ONLY_INSTALL.md for setup instructions",
+  "_docs": "Reference config for future ClubOS development. For install, see sbnc-install-pack/",
 
   "organization": {
     "name": "Santa Barbara Newcomers Club",
