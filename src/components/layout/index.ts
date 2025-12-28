@@ -15,3 +15,8 @@ export {
   OFFICER_NAV_ITEMS,
   type NavItem,
 } from "./AuthorizedNav";
+
+// Branded layout components
+export { BrandedLayout, type BrandedLayoutProps, type BrandConfig } from "./BrandedLayout";
+export { BrandedHeader, type BrandedHeaderProps, type NavLink } from "./BrandedHeader";
+export { BrandedFooter, type BrandedFooterProps, type SocialLink, type FooterLink } from "./BrandedFooter";
