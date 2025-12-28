@@ -9,7 +9,7 @@
 "use client";
 
 import { useContext, createContext } from "react";
-import type { ClubTheme, ClubColors } from "./types";
+import type { ClubTheme, ColorPalette } from "./types";
 import { defaultTheme } from "./defaults";
 
 interface ThemeContextValue {
@@ -40,7 +40,7 @@ export function useTheme(): ThemeContextValue {
 /**
  * Get a specific color from the current theme.
  */
-export function useThemeColor(colorKey: keyof ClubColors): string {
+export function useThemeColor(colorKey: keyof ColorPalette): string {
   const { theme } = useTheme();
   return theme.colors[colorKey];
 }
@@ -71,24 +71,21 @@ export function getThemeVar(property: string): string {
 /**
  * Utility to get color CSS variable reference.
  */
-export function getColorVar(colorKey: keyof ClubColors): string {
-  const varMap: Record<keyof ClubColors, string> = {
+export function getColorVar(colorKey: keyof ColorPalette): string {
+  const varMap: Record<keyof ColorPalette, string> = {
     primary: "primary",
-    primaryDark: "primary-dark",
-    primaryLight: "primary-light",
+    primaryHover: "primary-hover",
     secondary: "secondary",
-    secondaryDark: "secondary-dark",
-    secondaryLight: "secondary-light",
     accent: "accent",
     background: "background",
     surface: "surface",
-    text: "text",
+    textPrimary: "text-primary",
+    textSecondary: "text-secondary",
     textMuted: "text-muted",
     border: "border",
     error: "error",
     warning: "warning",
     success: "success",
-    info: "info",
   };
   return `var(--theme-${varMap[colorKey]})`;
 }

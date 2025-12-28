@@ -16,4 +16,18 @@ export {
 } from "./useTheme";
 export { applyTheme, clearTheme } from "./applyTheme";
 export { defaultTheme } from "./defaults";
-export type { ClubTheme, ClubColors, ClubFonts, ClubBranding } from "./types";
+export type {
+  ClubTheme,
+  ColorPalette,
+  TypographyConfig,
+  ShapeConfig,
+  VoiceConfig,
+  ChatbotConfig,
+  LogoConfig,
+  BugConfig,
+  BorderRadiusStyle,
+  ButtonStyle,
+  CardStyle,
+  VoiceTone,
+  Terminology,
+} from "./types";
