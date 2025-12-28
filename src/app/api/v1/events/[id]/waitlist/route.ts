@@ -60,13 +60,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return errors.unauthorized("Not authenticated");
     }
 
+    // Look up the member via userAccount
+    const userAccount = await prisma.userAccount.findUnique({
+      where: { id: session.userAccountId },
+      select: { memberId: true },
+    });
+
+    if (!userAccount) {
+      return errors.unauthorized("User account not found");
+    }
+
+    const memberId = userAccount.memberId;
+
     const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event || !event.isPublished) {
       return errors.notFound("Event", eventId);
     }
 
     const existing = await prisma.eventRegistration.findFirst({
-      where: { eventId, memberId: session.memberId, status: { notIn: ["CANCELLED"] } },
+      where: { eventId, memberId, status: { notIn: ["CANCELLED"] } },
     });
 
     if (existing) {
@@ -81,7 +93,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const registration = await prisma.eventRegistration.create({
       data: {
         eventId,
-        memberId: session.memberId,
+        memberId,
         status: "WAITLISTED",
         waitlistPosition: (maxPos._max.waitlistPosition ?? 0) + 1,
         registeredAt: new Date(),
