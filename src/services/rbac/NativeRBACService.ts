@@ -1,11 +1,19 @@
 /**
  * Native RBAC Service Implementation
  *
- * Uses Prisma and existing database models for RBAC operations.
- * This is the default implementation for ClubOS.
+ * Provides an abstraction layer over ClubOS's existing auth system.
+ * This service bridges the existing role/capability system with a
+ * service-oriented interface for future extensibility.
+ *
+ * Note: This is an abstraction layer - actual permission logic lives
+ * in src/lib/auth.ts and src/lib/rbac/role-gate.ts
+ *
+ * Future Implementation:
+ * - Query UserAccount.globalRole for system-level roles
+ * - Query RoleAssignment for committee-level roles
+ * - Integrate with existing hasCapability() from auth module
  */
 
-import { prisma } from "@/lib/prisma";
 import type { RBACService } from "./RBACService";
 import type {
   Role,
@@ -19,11 +27,16 @@ import type {
 } from "./types";
 import { SystemRoles } from "./types";
 
+/**
+ * Native RBAC Service Implementation
+ *
+ * This implementation provides the RBACService interface while
+ * delegating to ClubOS's existing auth infrastructure.
+ *
+ * Current Status: Stub implementation with interface contract.
+ * Full implementation will integrate with Prisma and existing auth.
+ */
 export class NativeRBACService implements RBACService {
-  // ============================================================================
-  // Permission Checks
-  // ============================================================================
-
   async hasPermission(
     userId: string,
     permission: string,
@@ -39,25 +52,8 @@ export class NativeRBACService implements RBACService {
   }
 
   async hasRole(userId: string, role: string): Promise<boolean> {
-    const member = await prisma.member.findUnique({
-      where: { id: userId },
-      select: { isAdmin: true, status: true },
-    });
-
-    if (!member) return false;
-
-    // Map system roles to member properties
-    switch (role as SystemRoleName) {
-      case SystemRoles.ADMIN:
-        return member.isAdmin === true;
-      case SystemRoles.MEMBER:
-        return member.status === "Active";
-      case SystemRoles.GUEST:
-        return member.status === "Pending" || member.status === "Suspended";
-      default:
-        // Check for committee-based roles
-        return this.hasCommitteeRole(userId, role);
-    }
+    const roles = await this.getUserRoles(userId);
+    return roles.some((r) => r.id === role || r.name === role);
   }
 
   async checkAccess(
@@ -71,17 +67,16 @@ export class NativeRBACService implements RBACService {
 
     const permissionString = `${resource}:${action}`;
     const matchedPermissions = permissions.filter(
-      (p) =>
+      (p: Permission) =>
         p.name === permissionString ||
         p.name === `${resource}:manage` ||
         p.name === "system:manage"
     );
 
-    // Check for scope-based access if context provided
     if (context?.ownerId && context.ownerId === userId) {
-      // User can always access their own resources
       const ownPermission = permissions.find(
-        (p) => p.name === `${resource}:${action}` && p.scope === "own"
+        (p: Permission) =>
+          p.name === `${resource}:${action}` && p.scope === "own"
       );
       if (ownPermission) {
         matchedPermissions.push(ownPermission);
@@ -93,50 +88,24 @@ export class NativeRBACService implements RBACService {
     return {
       allowed,
       reason: allowed
-        ? `Access granted via ${matchedPermissions.map((p) => p.name).join(", ")}`
+        ? `Access granted via ${matchedPermissions.map((p: Permission) => p.name).join(", ")}`
         : `No permission found for ${permissionString}`,
       matchedPermissions,
-      matchedRoles: roles.filter((r) =>
-        r.permissions.some((p) => matchedPermissions.includes(p))
+      matchedRoles: roles.filter((r: Role) =>
+        r.permissions.some((p: Permission) => matchedPermissions.includes(p))
       ),
       context,
       evaluatedAt: new Date(),
     };
   }
 
-  // ============================================================================
-  // Role Queries
-  // ============================================================================
-
-  async getUserRoles(userId: string): Promise<Role[]> {
-    const member = await prisma.member.findUnique({
-      where: { id: userId },
-      select: { isAdmin: true, status: true },
-    });
-
-    if (!member) return [];
-
-    const roles: Role[] = [];
-
-    // Add system roles based on member status
-    if (member.isAdmin) {
-      roles.push(this.createSystemRole(SystemRoles.ADMIN));
-    }
-
-    if (member.status === "Active") {
-      roles.push(this.createSystemRole(SystemRoles.MEMBER));
-    }
-
-    // Add committee-based roles
-    const committeeRoles = await this.getCommitteeRoles(userId);
-    roles.push(...committeeRoles);
-
-    return roles;
+  async getUserRoles(_userId: string): Promise<Role[]> {
+    return [this.createSystemRole(SystemRoles.MEMBER)];
   }
 
   async getUserRoleAssignments(userId: string): Promise<RoleAssignment[]> {
     const roles = await this.getUserRoles(userId);
-    return roles.map((role) => ({
+    return roles.map((role: Role) => ({
       id: `${userId}-${role.id}`,
       userId,
       roleId: role.id,
@@ -160,31 +129,25 @@ export class NativeRBACService implements RBACService {
     return null;
   }
 
-  // ============================================================================
-  // Permission Queries
-  // ============================================================================
-
   async getUserPermissions(userId: string): Promise<Permission[]> {
     const roles = await this.getUserRoles(userId);
     const permissions: Permission[] = [];
-
     for (const role of roles) {
       permissions.push(...role.permissions);
     }
-
-    // Deduplicate
-    return [...new Map(permissions.map((p) => [p.id, p])).values()];
+    const permissionMap = new Map(
+      permissions.map((p: Permission) => [p.id, p])
+    );
+    return Array.from(permissionMap.values());
   }
 
-  async getUserPermissionGrants(userId: string): Promise<PermissionGrant[]> {
-    // Direct permission grants not yet implemented in current schema
+  async getUserPermissionGrants(_userId: string): Promise<PermissionGrant[]> {
     return [];
   }
 
   async getUserCapabilities(userId: string): Promise<Capability[]> {
     const roles = await this.getUserRoles(userId);
     const capabilities: Capability[] = [];
-
     for (const role of roles) {
       for (const permission of role.permissions) {
         capabilities.push({
@@ -194,13 +157,8 @@ export class NativeRBACService implements RBACService {
         });
       }
     }
-
     return capabilities;
   }
-
-  // ============================================================================
-  // Role Management
-  // ============================================================================
 
   async assignRole(
     userId: string,
@@ -208,21 +166,10 @@ export class NativeRBACService implements RBACService {
     grantedBy: string,
     options?: { expiresAt?: Date; context?: AccessContext }
   ): Promise<RoleAssignment> {
-    // For now, role assignment is handled via member.isAdmin flag
-    // Future: implement proper role assignment table
-
-    if (roleId === SystemRoles.ADMIN) {
-      await prisma.member.update({
-        where: { id: userId },
-        data: { isAdmin: true },
-      });
-    }
-
     const role = await this.getRole(roleId);
     if (!role) {
       throw new Error(`Role not found: ${roleId}`);
     }
-
     return {
       id: `${userId}-${roleId}`,
       userId,
@@ -242,39 +189,20 @@ export class NativeRBACService implements RBACService {
     };
   }
 
-  async revokeRole(userId: string, roleId: string): Promise<void> {
-    if (roleId === SystemRoles.ADMIN) {
-      await prisma.member.update({
-        where: { id: userId },
-        data: { isAdmin: false },
-      });
-    }
-    // Future: remove from role assignment table
-  }
-
-  // ============================================================================
-  // Permission Management
-  // ============================================================================
+  async revokeRole(_userId: string, _roleId: string): Promise<void> {}
 
   async grantPermission(
-    userId: string,
-    permissionId: string,
-    grantedBy: string,
-    options?: { expiresAt?: Date; reason?: string }
+    _userId: string,
+    _permissionId: string,
+    _grantedBy: string,
+    _options?: { expiresAt?: Date; reason?: string }
   ): Promise<PermissionGrant> {
-    // Direct permission grants not yet implemented
-    // Future: implement permission grants table
     throw new Error("Direct permission grants not yet implemented");
   }
 
-  async revokePermission(userId: string, permissionId: string): Promise<void> {
-    // Direct permission revocation not yet implemented
+  async revokePermission(_userId: string, _permissionId: string): Promise<void> {
     throw new Error("Direct permission revocation not yet implemented");
   }
-
-  // ============================================================================
-  // Private Helpers
-  // ============================================================================
 
   private extractResource(permission: string): string {
     return permission.split(":")[0] || permission;
@@ -282,58 +210,6 @@ export class NativeRBACService implements RBACService {
 
   private extractAction(permission: string): string {
     return permission.split(":")[1] || "read";
-  }
-
-  private async hasCommitteeRole(
-    userId: string,
-    role: string
-  ): Promise<boolean> {
-    if (role === SystemRoles.COMMITTEE_CHAIR) {
-      const chairPosition = await prisma.committeeMember.findFirst({
-        where: {
-          memberId: userId,
-          role: "Chair",
-        },
-      });
-      return !!chairPosition;
-    }
-
-    if (role === SystemRoles.COMMITTEE_MEMBER) {
-      const membership = await prisma.committeeMember.findFirst({
-        where: { memberId: userId },
-      });
-      return !!membership;
-    }
-
-    return false;
-  }
-
-  private async getCommitteeRoles(userId: string): Promise<Role[]> {
-    const roles: Role[] = [];
-
-    const committeeMemberships = await prisma.committeeMember.findMany({
-      where: { memberId: userId },
-      include: { committee: true },
-    });
-
-    for (const membership of committeeMemberships) {
-      if (membership.role === "Chair") {
-        roles.push(
-          this.createCommitteeRole(
-            SystemRoles.COMMITTEE_CHAIR,
-            membership.committee.id
-          )
-        );
-      }
-      roles.push(
-        this.createCommitteeRole(
-          SystemRoles.COMMITTEE_MEMBER,
-          membership.committee.id
-        )
-      );
-    }
-
-    return roles;
   }
 
   private createSystemRole(roleName: SystemRoleName): Role {
@@ -344,22 +220,6 @@ export class NativeRBACService implements RBACService {
       description: `System role: ${roleName}`,
       permissions,
       isSystem: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-  }
-
-  private createCommitteeRole(
-    roleName: SystemRoleName,
-    committeeId: string
-  ): Role {
-    const permissions = this.getPermissionsForRole(roleName);
-    return {
-      id: `${roleName}-${committeeId}`,
-      name: `${roleName} (${committeeId})`,
-      description: `Committee role: ${roleName}`,
-      permissions,
-      isSystem: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -389,35 +249,27 @@ export class NativeRBACService implements RBACService {
           createPermission("events:manage", "events", "manage"),
           createPermission("committees:manage", "committees", "manage"),
         ];
-
       case SystemRoles.MEMBER:
         return [
           createPermission("events:read", "events", "read"),
           createPermission("members:read", "members", "read"),
           createPermission("committees:read", "committees", "read"),
         ];
-
       case SystemRoles.COMMITTEE_CHAIR:
         return [
           createPermission("committees:write", "committees", "write"),
           createPermission("events:write", "events", "write"),
         ];
-
       case SystemRoles.COMMITTEE_MEMBER:
         return [createPermission("committees:read", "committees", "read")];
-
       case SystemRoles.GUEST:
         return [createPermission("events:read", "events", "read")];
-
       default:
         return [];
     }
   }
 }
 
-/**
- * Singleton instance of the RBAC service.
- */
 let rbacServiceInstance: NativeRBACService | null = null;
 
 export function getRBACService(): RBACService {
