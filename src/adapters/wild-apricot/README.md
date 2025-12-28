@@ -1,8 +1,36 @@
 # Wild Apricot Adapter
 
-This directory contains all Wild Apricot-specific code.
+This directory contains Wild Apricot adapter services that wrap the core importer.
 
 When running in standalone mode, this adapter is not loaded.
+
+## Architecture
+
+The WA integration follows a layered architecture:
+
+```
+src/adapters/wild-apricot/     <-- Adapter Layer (this directory)
+├── WAAuthService.ts           - OAuth token management
+├── WAMemberService.ts         - Member sync operations
+├── WASyncService.ts           - Full sync orchestration
+├── types.ts                   - Re-exports + adapter-specific types
+├── config.ts                  - Adapter configuration
+└── index.ts                   - Public API
+
+src/lib/importing/wildapricot/ <-- Core Importer Layer
+├── client.ts                  - WA API client
+├── importer.ts                - Import/sync logic
+├── transformers.ts            - WA → ClubOS transformers
+├── types.ts                   - WA API types
+├── config.ts                  - Import configuration
+└── index.ts                   - Core exports
+```
+
+**Why this structure?**
+
+- **Separation of concerns**: Core importer handles raw WA API interaction; adapter provides ClubOS-specific services
+- **Import direction**: Adapter imports from lib (never the reverse) to avoid circular dependencies
+- **Standalone mode**: Adapter is conditionally loaded; lib code remains available for scripts
 
 ## Structure
 
@@ -17,6 +45,12 @@ When running in standalone mode, this adapter is not loaded.
 
 ```typescript
 import { WAAuthService, WAMemberService, WASyncService } from '@/adapters/wild-apricot';
+```
+
+For core importer functions:
+
+```typescript
+import { WildApricotClient, fullSync } from '@/lib/importing/wildapricot';
 ```
 
 ## Environment Variables
