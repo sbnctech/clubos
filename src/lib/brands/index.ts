@@ -54,6 +54,15 @@ export {
   defaultBrand,
 } from "./defaults";
 
+// Validation Utilities
+export {
+  safeParseBrand,
+  checkColorContrast,
+  validateLogoDimensions,
+  getBrandCompleteness,
+  auditBrand,
+} from "./validate";
+
 // Customer Brands
 export { sbncBrand } from "./customers/sbnc";
 
