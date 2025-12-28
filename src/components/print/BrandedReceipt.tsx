@@ -8,6 +8,7 @@
  */
 
 import type { ClubBrand } from "@/lib/brands/types";
+import { formatClubDateLong } from "@/lib/timezone";
 
 export interface PaymentData {
   receiptNumber: string;
@@ -42,12 +43,7 @@ export function BrandedReceipt({ brand, payment }: BrandedReceiptProps) {
       currency: "USD",
     }).format(amount);
 
-  const formatDate = (date: Date) =>
-    new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }).format(date);
+  const formatDate = (date: Date) => formatClubDateLong(date);
 
   return (
     <>

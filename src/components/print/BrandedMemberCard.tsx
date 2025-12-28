@@ -8,6 +8,7 @@
  */
 
 import type { ClubBrand } from "@/lib/brands/types";
+import { formatClubMonthYear } from "@/lib/timezone";
 
 export interface MemberCardData {
   memberId: string;
@@ -46,11 +47,7 @@ export function BrandedMemberCard({
   const { identity, name: clubName } = brand;
   const { logo, colors, fonts } = identity;
 
-  const formatDate = (date: Date) =>
-    new Intl.DateTimeFormat("en-US", {
-      year: "numeric",
-      month: "short",
-    }).format(date);
+  const formatDate = (date: Date) => formatClubMonthYear(date);
 
   const tierColor = tierColors[member.tier];
 
