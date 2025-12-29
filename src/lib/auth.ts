@@ -119,7 +119,15 @@ export type Capability =
   | "files:view_all"                    // View all files regardless of access
   // Delegation and role assignment
   | "roles:assign"                      // Authority to create role assignments (SD-3, DM-3)
-  | "roles:view";                       // Authority to view role assignments
+  | "roles:view"                        // Authority to view role assignments
+  // Activity Groups (member-led interest groups)
+  | "groups:view"                       // View public groups (all members)
+  | "groups:propose"                    // Propose new group (any member)
+  | "groups:approve"                    // Approve/reject/deactivate groups (President, VP Activities)
+  | "groups:join"                       // Join approved groups (all members)
+  | "groups:coordinate"                 // Manage own group - scoped to coordinator role
+  | "groups:message"                    // Send group messages - scoped to coordinator role
+  | "groups:events";                    // Create group events - scoped to coordinator role
 
 /**
  * Map of which capabilities each role has.
@@ -174,6 +182,14 @@ const _ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     "files:view_all",
     "roles:assign",     // SD-3, DM-3: Can assign roles to any committee
     "roles:view",
+    // Activity Groups - admin has all capabilities
+    "groups:view",
+    "groups:propose",
+    "groups:approve",
+    "groups:join",
+    "groups:coordinate",
+    "groups:message",
+    "groups:events",
   ],
   president: [
     "members:view",
@@ -194,6 +210,11 @@ const _ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     // Delegation authority
     "roles:assign",     // SD-3, DM-3: Can assign roles to any committee
     "roles:view",
+    // Activity Groups - President can approve/deactivate groups
+    "groups:view",
+    "groups:propose",
+    "groups:approve",   // Can approve/reject/deactivate activity groups
+    "groups:join",
     // President can view but not directly manage finances
     // NO finance:manage - treasurer handles that
     // NO users:manage - handled through transitions
@@ -224,6 +245,11 @@ const _ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     // Delegation authority for activities domain
     "roles:assign",          // SD-3, DM-3: Can assign event chair roles within domain
     "roles:view",
+    // Activity Groups - VP Activities can approve/deactivate groups
+    "groups:view",
+    "groups:propose",
+    "groups:approve",        // Can approve/reject/deactivate activity groups
+    "groups:join",
     // VP Activities can edit all events (peer trust model)
     // NO events:delete - admin only
     // NO finance:view/manage
@@ -327,7 +353,14 @@ const _ROLE_CAPABILITIES: Record<GlobalRole, Capability[]> = {
     // NO members:history
     // NO publishing:manage
   ],
-  member: [],
+  member: [
+    // Activity Groups - basic member capabilities
+    "groups:view",     // View public groups
+    "groups:propose",  // Propose new groups
+    "groups:join",     // Join approved groups
+    // Note: groups:coordinate, groups:message, groups:events are scoped
+    // to coordinators only - checked at runtime via groupAuth.ts
+  ],
 };
 
 /**

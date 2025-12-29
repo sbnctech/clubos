@@ -186,6 +186,27 @@ enum SupportCaseResolution {
   NO_ACTION_NEEDED     // Determined no action required
 }
 
+// ============================================================================
+// ACTIVITY GROUP ENUMS
+// Activity Groups are member-led interest groups (Book Club, Hiking, etc.)
+// Separate from governance Committees - simpler membership, no terms
+// ============================================================================
+
+// Activity Group lifecycle state machine (Charter P3)
+// PROPOSED -> (APPROVED | REJECTED), APPROVED -> DEACTIVATED
+enum ActivityGroupStatus {
+  PROPOSED    // Awaiting approval from President/VP Activities
+  APPROVED    // Active and visible to members
+  REJECTED    // Denied by approver
+  DEACTIVATED // Removed by approver
+}
+
+// Activity Group member roles
+enum ActivityGroupRole {
+  COORDINATOR // Can manage group, send messages, create events
+  MEMBER      // Regular participant
+}
+
 // Core Models
 
 model Member {
@@ -275,6 +296,14 @@ model Member {
 
   // Payment methods
   paymentMethods PaymentMethod[]
+
+  // Activity Group relations
+  activityGroupMemberships      ActivityGroupMember[]
+  activityGroupsProposed        ActivityGroup[]             @relation("GroupProposedBy")
+  activityGroupsApproved        ActivityGroup[]             @relation("GroupApprovedBy")
+  activityGroupsRejected        ActivityGroup[]             @relation("GroupRejectedBy")
+  activityGroupsDeactivated     ActivityGroup[]             @relation("GroupDeactivatedBy")
+  activityGroupAnnouncements    ActivityGroupAnnouncement[]
 
   @@index([membershipStatusId])
   @@index([membershipTierId])
@@ -668,6 +697,9 @@ model Event {
   // Committee ownership (for RBAC filtering)
   committeeId String? @db.Uuid
 
+  // Activity Group ownership (for group events - no approval required)
+  activityGroupId String? @db.Uuid
+
   ticketTiers    TicketTier[]
   registrations  EventRegistration[]
   photoAlbum     PhotoAlbum?
@@ -684,6 +716,7 @@ model Event {
   changesRequestedBy Member? @relation("EventChangesRequestedBy", fields: [changesRequestedById], references: [id], onDelete: SetNull)
   canceledBy         Member? @relation("EventCanceledBy", fields: [canceledById], references: [id], onDelete: SetNull)
   committee          Committee? @relation(fields: [committeeId], references: [id], onDelete: SetNull)
+  activityGroup      ActivityGroup? @relation(fields: [activityGroupId], references: [id], onDelete: SetNull)
 
   // Clone tracking - for safe event cloning workflow
   // Charter P6: Cloned events start as drafts requiring explicit approval
@@ -702,6 +735,7 @@ model Event {
   @@index([clonedFromId])
   @@index([status])
   @@index([committeeId])
+  @@index([activityGroupId])
   @@index([submittedById])
   @@index([approvedById])
   @@index([publishedById])
@@ -1041,6 +1075,17 @@ enum AuditAction {
   // Page revision events (A7)
   UNDO
   REDO
+  // Activity Group events
+  GROUP_PROPOSED
+  GROUP_APPROVED
+  GROUP_REJECTED
+  GROUP_DEACTIVATED
+  GROUP_JOIN
+  GROUP_LEAVE
+  GROUP_ANNOUNCEMENT_CREATE
+  GROUP_ANNOUNCEMENT_UPDATE
+  GROUP_ANNOUNCEMENT_DELETE
+  GROUP_MESSAGE_SEND
 }
 
 // Theme - Visual styling tokens and CSS
@@ -1756,4 +1801,107 @@ model SupportCaseNote {
 
   @@index([caseId])
   @@index([createdAt])
+}
+
+// ============================================================================
+// ACTIVITY GROUPS
+// Member-led interest groups (Book Club, Hiking, Wine Tasting, etc.)
+// Separate from governance Committees - simpler membership, no terms
+// Charter P3: State machine for lifecycle (PROPOSED -> APPROVED/REJECTED)
+// ============================================================================
+
+// ActivityGroup - Member-led interest groups
+model ActivityGroup {
+  id          String              @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String              @unique
+  description String?
+  category    String?             // "Arts & Culture", "Outdoor", "Social", "Games", "Hobbies"
+  schedule    String?             // Human-readable: "Every Saturday, 8:00 AM"
+  imageEmoji  String?             // Simple emoji for display (e.g., "📚", "🥾")
+
+  // Lifecycle state machine (Charter P3)
+  status   ActivityGroupStatus @default(PROPOSED)
+  isPublic Boolean             @default(true) // Visible to non-members on public site
+
+  // Proposal tracking (Charter P1, P7: audit trail)
+  proposedById String   @db.Uuid
+  proposedAt   DateTime @default(now())
+
+  // Approval tracking
+  approvedById String?   @db.Uuid
+  approvedAt   DateTime?
+
+  // Rejection tracking
+  rejectedById   String?  @db.Uuid
+  rejectedAt     DateTime?
+  rejectionNotes String?
+
+  // Deactivation tracking
+  deactivatedById    String?  @db.Uuid
+  deactivatedAt      DateTime?
+  deactivationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  proposedBy    Member  @relation("GroupProposedBy", fields: [proposedById], references: [id])
+  approvedBy    Member? @relation("GroupApprovedBy", fields: [approvedById], references: [id])
+  rejectedBy    Member? @relation("GroupRejectedBy", fields: [rejectedById], references: [id])
+  deactivatedBy Member? @relation("GroupDeactivatedBy", fields: [deactivatedById], references: [id])
+
+  members       ActivityGroupMember[]
+  events        Event[]
+  announcements ActivityGroupAnnouncement[]
+
+  @@index([status])
+  @@index([category])
+  @@index([proposedById])
+  @@index([approvedById])
+  @@index([slug])
+}
+
+// ActivityGroupMember - Simple membership tracking (no terms)
+// Charter P3: joinedAt/leftAt over boolean flags
+model ActivityGroupMember {
+  id       String            @id @default(uuid()) @db.Uuid
+  groupId  String            @db.Uuid
+  memberId String            @db.Uuid
+  role     ActivityGroupRole @default(MEMBER)
+  joinedAt DateTime          @default(now())
+  leftAt   DateTime?         // null = currently a member
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group  ActivityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  member Member        @relation(fields: [memberId], references: [id])
+
+  // Allow rejoining with new record (previous record has leftAt set)
+  @@unique([groupId, memberId, joinedAt])
+  @@index([groupId, leftAt]) // Active members query
+  @@index([memberId])
+}
+
+// ActivityGroupAnnouncement - Group bulletin board
+// Charter P7: Audit via createdById
+model ActivityGroupAnnouncement {
+  id          String    @id @default(uuid()) @db.Uuid
+  groupId     String    @db.Uuid
+  title       String
+  content     String    @db.Text
+  isPinned    Boolean   @default(false)
+  publishedAt DateTime  @default(now())
+  expiresAt   DateTime? // Optional expiration for time-sensitive announcements
+  createdById String    @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  group     ActivityGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy Member        @relation(fields: [createdById], references: [id])
+
+  @@index([groupId, publishedAt(sort: Desc)])
+  @@index([expiresAt])
 }
