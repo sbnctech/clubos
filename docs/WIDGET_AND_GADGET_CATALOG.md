@@ -18,23 +18,50 @@ In practice, "widget" and "gadget" are often used interchangeably. The key disti
 
 ---
 
-## Content Blocks (v1 Palette)
+## Content Blocks
 
-These are static content blocks available in the page editor.
+These are the block types available in the page editor, organized by category.
 
-| Block Type | Description | Props |
-|------------|-------------|-------|
-| `heading` | Section heading | level (1-3), text |
-| `richText` | Formatted text content | format, content (tiptap-json) |
-| `divider` | Horizontal rule | variant (optional) |
-| `callout` | Highlighted message box | tone (info/warning/success/neutral), title, content |
-| `buttonRow` | Row of action buttons | buttons[] with label, href, variant |
-| `image` | Image with caption | assetId or src, alt, caption, size |
-| `spacer` | Vertical spacing | size (xs/sm/md/lg) |
-| `columns` | Multi-column layout | columns (2/3), gap, blocksLeft, blocksRight |
-| `section` | Grouping container | (layout construct) |
+### Content Blocks
 
-**Spec:** `docs/pages/BLOCKS_AND_WIDGETS_V1.md`
+| Block Type | Description | Key Props |
+|------------|-------------|-----------|
+| `hero` | Full-width header with background | title, subtitle, backgroundImage, ctaText, ctaLink |
+| `text` | Rich text content | content (HTML), alignment |
+| `cards` | Grid of content cards | columns, cards[] with title, description, image, linkUrl |
+| `faq` | Expandable Q&A pairs | title, items[] with question, answer |
+| `testimonial` | Rotating member quotes | testimonials[] with quote, author, role, image |
+| `stats` | Animated number counters | stats[] with value, prefix, suffix, label |
+| `timeline` | Vertical chronological layout | events[] with date, title, description |
+
+### Media Blocks
+
+| Block Type | Description | Key Props |
+|------------|-------------|-----------|
+| `image` | Single image with caption | src, alt, caption, alignment, linkUrl |
+| `gallery` | Grid of images with lightbox | images[], columns, enableLightbox |
+
+### Interactive Blocks
+
+| Block Type | Description | Key Props |
+|------------|-------------|-----------|
+| `event-list` | Dynamic upcoming events | title, limit, categories, layout (list/cards/calendar) |
+| `contact` | Configurable contact form | recipientEmail, fields[], submitText |
+| `cta` | Call-to-action button | text, link, style, size, alignment |
+| `flip-card` | Cards that flip on hover | cards[] with frontImage, backTitle, backDescription |
+| `accordion` | Expandable content sections | items[] with title, content; allowMultiple |
+| `tabs` | Tabbed content panels | tabs[] with label, content; alignment |
+| `before-after` | Draggable image comparison slider | beforeImage, afterImage, initialPosition |
+
+### Layout Blocks
+
+| Block Type | Description | Key Props |
+|------------|-------------|-----------|
+| `divider` | Horizontal line separator | style (solid/dashed/dotted), width |
+| `spacer` | Vertical whitespace | height (small/medium/large) |
+
+**Full specification:** `docs/pages/BLOCK_TYPES_REFERENCE.md`
+**Original v1 spec:** `docs/pages/BLOCKS_AND_WIDGETS_V1.md`
 
 ---
 
@@ -169,6 +196,7 @@ WA uses "gadget" for page editor blocks. Migration categories:
 
 | Document | Description |
 |----------|-------------|
+| `docs/pages/BLOCK_TYPES_REFERENCE.md` | Full block type specifications with examples |
 | `docs/pages/PAGE_MODEL_AND_RENDERING.md` | Page Document structure |
 | `docs/pages/WIDGET_PERSISTENCE_MODEL.md` | Widget state storage |
 | `docs/widgets/EMBED_WIDGET_SDK_V1.md` | External embed SDK |
@@ -182,7 +210,7 @@ WA uses "gadget" for page editor blocks. Migration categories:
 
 | Category | Status |
 |----------|--------|
-| Content blocks (v1) | Defined in spec |
+| Content blocks | 17 block types documented in BLOCK_TYPES_REFERENCE.md |
 | Widget block contract | Defined in spec |
 | Dashboard gadgets | 2 implemented (UpcomingEvents, MyRegistrations) |
 | Admin list widgets | Spec complete, implementation pending |
