@@ -148,9 +148,15 @@ describe("Role Capabilities Policy Contract: SBNC Default Coverage", () => {
     expect(defaults.admin).toContain("admin:full");
   });
 
-  it("member has empty capabilities", () => {
+  it("member has activity group capabilities", () => {
     const defaults = getSBNCDefaultCapabilities();
-    expect(defaults.member).toHaveLength(0);
+    // Members can view, propose, and join activity groups
+    expect(defaults.member).toContain("groups:view");
+    expect(defaults.member).toContain("groups:propose");
+    expect(defaults.member).toContain("groups:join");
+    // But no admin or sensitive capabilities
+    expect(defaults.member).not.toContain("admin:full");
+    expect(defaults.member).not.toContain("groups:approve");
   });
 
   it("webmaster has publishing:manage but not admin:full", () => {
