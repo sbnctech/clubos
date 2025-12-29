@@ -76,9 +76,9 @@ This avoids confusion with Page Templates in the publishing system.
   - Exclude list (suppress specific recipients)
   - Respect email preferences / unsubscribe status
 
-### P1.3 Email Composer (Send Flow)
+### P1.3 Message Composer (Send Flow)
 
-- Goal: Compose and send emails using templates + audiences
+- Goal: Compose and send messages using templates + audiences
 - Workflow:
   1. Select template (or start from blank)
   2. Select audience (or create new)
@@ -86,10 +86,21 @@ This avoids confusion with Page Templates in the publishing system.
      - **Auto-populated:** Data from database (member info, event details)
      - **Manual entry:** Ad-hoc fields filled at send time (e.g., custom message)
   4. Preview with real recipient data (show 3-5 sample renders)
-  5. Send immediately or schedule
+  5. Send immediately, schedule, or set up recurring
+- Scheduling options:
+  - **Immediate:** Send now
+  - **Scheduled:** Pick specific date/time
+  - **Relative to event:** X days before/after event start date
+  - **Relative to milestone:** X days before/after renewal date, join date, etc.
+  - **Recurring:** Weekly digest, monthly newsletter (with end date)
+- Missing merge field handling:
+  - Show blank (field disappears)
+  - Show placeholder text (configurable per field)
+  - Warn sender before send if critical fields missing
 - Deliverables:
   - Template + audience selection UI
   - Variable resolution engine (stored vs. ad-hoc)
+  - Relative scheduling engine (event/milestone triggers)
   - Send confirmation with recipient count
   - Audit logging for all sends
 
@@ -143,10 +154,31 @@ This avoids confusion with Page Templates in the publishing system.
   - Email client rendering issues
   - Forwarding/sharing message content
   - Accessibility (some users prefer browser)
+- Post-send editing:
+  - Allow corrections (fix typos, update links) with audit log
+  - Can retract/unpublish the web view entirely
+  - Email already delivered is unaffected; web view reflects edits
 - Security:
   - Unique token per message (not guessable)
   - Optional expiration (e.g., 90 days)
   - No PII in URL
+
+### P1.8 Message Analytics
+
+- Goal: Track message engagement for sender insight
+- Metrics:
+  - Delivery rate (sent vs. bounced)
+  - Open rate (pixel tracking, privacy-respecting)
+  - Click rate (link tracking)
+  - Unsubscribe rate
+- Access control:
+  - Sender can see their own message stats
+  - VP Communications can see all message stats
+  - Tech Chair / President can see all stats
+- Privacy:
+  - Aggregate stats by default
+  - Individual recipient activity only for debugging bounces
+  - Respect Do Not Track where possible
 
 **Spec reference:** Salvage Plan 202 (archived) - PR #117
 **Related:** `src/lib/email/`, `src/lib/publishing/email.ts`, page editor components
