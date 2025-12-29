@@ -22,3 +22,11 @@ export {
   PublicLayoutProvider,
   MemberLayoutProvider,
 } from "./useTheme";
+
+export {
+  useMemberData,
+  useMembersData,
+  type UseMemberDataResult,
+  type UseMemberDataOptions,
+  type UseMembersDataResult,
+} from "./useMemberData";
