@@ -12,7 +12,7 @@
 /**
  * News source types available in the feed
  */
-export type NewsSource = "pages" | "announcements" | "events";
+export type NewsSource = "pages" | "announcements" | "events" | "photos";
 
 /**
  * News widget operator configuration
@@ -43,7 +43,7 @@ export function getNewsConfig(): NewsConfig {
   const sourcesEnv = process.env.CLUBOS_NEWS_SOURCES;
   const defaultSources: NewsSource[] = sourcesEnv
     ? (sourcesEnv.split(",").map((s) => s.trim().toLowerCase()) as NewsSource[])
-    : ["pages", "announcements", "events"];
+    : ["pages", "announcements", "events", "photos"];
 
   // Parse limit (default: 10, max: 50)
   const limitEnv = process.env.CLUBOS_NEWS_LIMIT;

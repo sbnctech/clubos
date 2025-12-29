@@ -24,7 +24,7 @@ import { formatClubMonthYear } from "@/lib/timezone";
 
 interface NewsItem {
   id: string;
-  source: "page" | "announcement" | "event";
+  source: "page" | "announcement" | "event" | "photo";
   sourceId: string;
   title: string;
   excerpt: string | null;
@@ -34,6 +34,8 @@ interface NewsItem {
   href: string | null;
   isPinned: boolean;
   groupName: string | null;
+  imageUrl: string | null;
+  photoCount: number | null;
 }
 
 interface NewsResponse {
@@ -75,6 +77,9 @@ function getCategoryLabel(item: NewsItem): string {
   }
   if (item.source === "event") {
     return "Upcoming Event";
+  }
+  if (item.source === "photo") {
+    return "New Photos";
   }
   if (item.category) {
     // Capitalize first letter of each word
@@ -269,8 +274,50 @@ export default function ClubNewsCard() {
                   {item.title}
                 </h3>
 
+                {/* Photo thumbnail (for photo items) */}
+                {item.source === "photo" && item.imageUrl && (
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "80px",
+                      borderRadius: "6px",
+                      overflow: "hidden",
+                      marginTop: "4px",
+                      marginBottom: "4px",
+                      position: "relative",
+                    }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={item.imageUrl}
+                      alt=""
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
+                    />
+                    {item.photoCount && item.photoCount > 1 && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          bottom: "4px",
+                          right: "4px",
+                          backgroundColor: "rgba(0,0,0,0.7)",
+                          color: "white",
+                          fontSize: "11px",
+                          padding: "2px 6px",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        +{item.photoCount - 1} more
+                      </span>
+                    )}
+                  </div>
+                )}
+
                 {/* Excerpt - compact */}
-                {item.excerpt && (
+                {item.excerpt && item.source !== "photo" && (
                   <p
                     style={{
                       fontSize: "13px",

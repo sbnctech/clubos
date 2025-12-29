@@ -1,17 +1,20 @@
 /**
  * News Feed API
  *
- * Aggregates published content from multiple sources (Pages, Announcements, Events)
+ * Aggregates published content from multiple sources (Pages, Announcements, Events, Photos)
  * and filters by user's role/membership via AudienceRule evaluation.
  *
  * GET /api/v1/news
- *   ?sources=pages,announcements,events  (comma-separated, default: all)
- *   ?categories=club-news,events         (comma-separated, optional)
- *   ?limit=10                            (default: 10, max: 50)
- *   ?includeExpired=false                (default: false)
+ *   ?sources=pages,announcements,events,photos  (comma-separated, default: all)
+ *   ?categories=club-news,events                (comma-separated, optional)
+ *   ?limit=10                                   (default: 10, max: 50)
+ *   ?includeExpired=false                       (default: false)
  *
  * Returns news items visible to the authenticated user based on RBAC.
  * Unauthenticated users see only PUBLIC content.
+ *
+ * Photo triggers: New photos from events the member attended.
+ * (Future: photos where member is tagged, requires schema addition)
  *
  * Charter: P2 (default deny, role-based filtering), P1 (audit trail)
  *
@@ -26,7 +29,7 @@ import { buildUserContext, canViewPage, type UserContext } from "@/lib/publishin
 // News item returned by the API
 interface NewsItem {
   id: string;
-  source: "page" | "announcement" | "event";
+  source: "page" | "announcement" | "event" | "photo";
   sourceId: string;
   title: string;
   excerpt: string | null;
@@ -36,11 +39,13 @@ interface NewsItem {
   href: string | null;
   isPinned: boolean;
   groupName: string | null; // For announcements
+  imageUrl: string | null; // For photos
+  photoCount: number | null; // For photo albums
 }
 
 // Valid source types
-type NewsSource = "pages" | "announcements" | "events";
-const VALID_SOURCES: NewsSource[] = ["pages", "announcements", "events"];
+type NewsSource = "pages" | "announcements" | "events" | "photos";
+const VALID_SOURCES: NewsSource[] = ["pages", "announcements", "events", "photos"];
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -93,13 +98,14 @@ export async function GET(request: NextRequest) {
 
   try {
     // Fetch from each source in parallel
-    const [pageItems, announcementItems, eventItems] = await Promise.all([
+    const [pageItems, announcementItems, eventItems, photoItems] = await Promise.all([
       sources.includes("pages") ? fetchPageNews(now, userContext, categories) : [],
       sources.includes("announcements") ? fetchAnnouncementNews(now, userContext, categories, includeExpired) : [],
       sources.includes("events") ? fetchEventNews(now, categories) : [],
+      sources.includes("photos") ? fetchPhotoNews(userContext, categories) : [],
     ]);
 
-    newsItems.push(...pageItems, ...announcementItems, ...eventItems);
+    newsItems.push(...pageItems, ...announcementItems, ...eventItems, ...photoItems);
 
     // Sort by publishedAt (newest first), with pinned items at top
     newsItems.sort((a, b) => {
@@ -185,6 +191,8 @@ async function fetchPageNews(
       href: `/${page.slug}`,
       isPinned: false,
       groupName: null,
+      imageUrl: null,
+      photoCount: null,
     });
   }
 
@@ -273,6 +281,8 @@ async function fetchAnnouncementNews(
       href: `/groups/${ann.group.slug}`,
       isPinned: ann.isPinned,
       groupName: ann.group.name,
+      imageUrl: null,
+      photoCount: null,
     });
   }
 
@@ -320,6 +330,99 @@ async function fetchEventNews(
       href: `/events/${event.id}`,
       isPinned: false,
       groupName: null,
+      imageUrl: null,
+      photoCount: null,
+    });
+  }
+
+  return items;
+}
+
+/**
+ * Fetch photo albums as news items
+ *
+ * Shows photos from events the member attended (trigger: new photos added).
+ * Future enhancement: photos where member is tagged (requires PhotoTag schema).
+ */
+async function fetchPhotoNews(
+  userContext: UserContext,
+  categories: string[] | null
+): Promise<NewsItem[]> {
+  // Photos only shown to authenticated users (for their attended events)
+  if (!userContext.memberId) {
+    return [];
+  }
+
+  // Apply category filter if specified
+  const category = "new-photos";
+  if (categories && !categories.includes(category)) {
+    return [];
+  }
+
+  // Find events the member attended that have photo albums with recent photos
+  // Look for photos added in the last 30 days
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+  // Get albums with recent photos from events member is registered for
+  const albums = await prisma.photoAlbum.findMany({
+    where: {
+      eventId: { not: null },
+      event: {
+        registrations: {
+          some: {
+            memberId: userContext.memberId,
+            // CONFIRMED = paid/registered, NO_SHOW also counts as attended
+            status: { in: ["CONFIRMED", "NO_SHOW"] },
+          },
+        },
+      },
+      photos: {
+        some: {
+          createdAt: { gte: thirtyDaysAgo },
+        },
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 10,
+  });
+
+  const items: NewsItem[] = [];
+
+  // Fetch additional details for each album
+  for (const album of albums) {
+    if (!album.eventId) continue;
+
+    // Get event info and photo count
+    const [event, photoCount, latestPhoto] = await Promise.all([
+      prisma.event.findUnique({
+        where: { id: album.eventId },
+        select: { id: true, title: true },
+      }),
+      prisma.photo.count({ where: { albumId: album.id } }),
+      prisma.photo.findFirst({
+        where: { albumId: album.id, createdAt: { gte: thirtyDaysAgo } },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, url: true, createdAt: true },
+      }),
+    ]);
+
+    if (!event || !latestPhoto) continue;
+
+    items.push({
+      id: `photo-${album.id}`,
+      source: "photo",
+      sourceId: album.id,
+      title: `New photos: ${event.title}`,
+      excerpt: album.description || `${photoCount} photos from this event`,
+      category,
+      publishedAt: latestPhoto.createdAt.toISOString(),
+      expiresAt: null,
+      href: `/events/${event.id}/photos`,
+      isPinned: false,
+      groupName: null,
+      imageUrl: latestPhoto.url,
+      photoCount,
     });
   }
 

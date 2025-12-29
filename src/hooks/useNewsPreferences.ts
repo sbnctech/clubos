@@ -23,7 +23,7 @@ const STORAGE_KEY = "clubos-news-preferences";
 /**
  * News source types
  */
-export type NewsSource = "pages" | "announcements" | "events";
+export type NewsSource = "pages" | "announcements" | "events" | "photos";
 
 /**
  * Member news preferences
@@ -43,7 +43,7 @@ export interface NewsPreferences {
  * Default preferences
  */
 const DEFAULT_PREFERENCES: NewsPreferences = {
-  sources: ["pages", "announcements", "events"],
+  sources: ["pages", "announcements", "events", "photos"],
   categories: [],
   limit: 5,
   includeExpired: false,
@@ -161,7 +161,8 @@ export function useNewsPreferences(): UseNewsPreferencesReturn {
 export function buildNewsQueryString(prefs: NewsPreferences): string {
   const params = new URLSearchParams();
 
-  if (prefs.sources.length > 0 && prefs.sources.length < 3) {
+  // Only add sources param if not all 4 are selected
+  if (prefs.sources.length > 0 && prefs.sources.length < 4) {
     params.set("sources", prefs.sources.join(","));
   }
 
