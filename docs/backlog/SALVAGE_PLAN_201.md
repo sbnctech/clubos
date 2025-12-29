@@ -1,7 +1,12 @@
+<!--
+  Copyright © 2025 Murmurant, Inc. All rights reserved.
+-->
+
+
 # Salvage Plan: Issue #201 - Auth/RBAC/Security Wave
 
 **Status:** Parked
-**Tracking Issue:** [#201](https://github.com/sbnctech/clubos/issues/201)
+**Tracking Issue:** [#201](https://github.com/sbnctech/murmurant/issues/201)
 **Theme Label:** `theme-auth`
 **Date:** 2025-12-21
 

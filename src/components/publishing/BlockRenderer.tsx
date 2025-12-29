@@ -437,6 +437,597 @@ function SpacerBlock({ block }: { block: Extract<Block, { type: "spacer" }> }) {
   );
 }
 
+function FlipCardBlock({ block }: { block: Extract<Block, { type: "flip-card" }> }) {
+  const columns = block.data.columns || 3;
+  const cardSize = columns === 2 ? "300px" : columns === 4 ? "200px" : "250px";
+
+  return (
+    <section
+      data-block-type="flip-card"
+      style={{ padding: "var(--spacing-lg, 24px) var(--spacing-md, 16px)" }}
+    >
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .flip-card-container {
+              perspective: 1000px;
+            }
+            .flip-card-inner {
+              position: relative;
+              width: 100%;
+              height: 100%;
+              transition: transform 0.6s;
+              transform-style: preserve-3d;
+            }
+            .flip-card-container:hover .flip-card-inner,
+            .flip-card-container:focus-within .flip-card-inner {
+              transform: rotateY(180deg);
+            }
+            .flip-card-front,
+            .flip-card-back {
+              position: absolute;
+              width: 100%;
+              height: 100%;
+              backface-visibility: hidden;
+              border-radius: var(--border-radius-md, 4px);
+              overflow: hidden;
+            }
+            .flip-card-back {
+              transform: rotateY(180deg);
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              padding: var(--spacing-lg, 24px);
+              text-align: center;
+            }
+          `,
+        }}
+      />
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${columns}, 1fr)`,
+          gap: "var(--spacing-lg, 24px)",
+          maxWidth: "1200px",
+          margin: "0 auto",
+        }}
+      >
+        {block.data.cards.map((card, idx) => (
+          <div
+            key={idx}
+            className="flip-card-container"
+            tabIndex={0}
+            role="button"
+            aria-label={`${card.backTitle}: ${card.backDescription}`}
+            style={{
+              width: "100%",
+              height: cardSize,
+            }}
+          >
+            <div className="flip-card-inner">
+              <div className="flip-card-front">
+                {/* eslint-disable-next-line @next/next/no-img-element -- user-provided dynamic src */}
+                <img
+                  src={card.frontImage || "/placeholder-card.svg"}
+                  alt={card.frontImageAlt}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+              </div>
+              <div
+                className="flip-card-back"
+                style={{
+                  background: card.backGradient || "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                  color: card.backTextColor || "#ffffff",
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: "var(--font-size-lg, 18px)",
+                    fontWeight: 600,
+                    marginBottom: "var(--spacing-sm, 8px)",
+                  }}
+                >
+                  {card.backTitle}
+                </h3>
+                <p
+                  style={{
+                    fontSize: "var(--font-size-sm, 14px)",
+                    opacity: 0.9,
+                    marginBottom: card.linkUrl ? "var(--spacing-md, 16px)" : 0,
+                  }}
+                >
+                  {card.backDescription}
+                </p>
+                {card.linkUrl && (
+                  <a
+                    href={card.linkUrl}
+                    style={{
+                      color: card.backTextColor || "#ffffff",
+                      textDecoration: "underline",
+                      fontWeight: 500,
+                    }}
+                  >
+                    {card.linkText || "Learn more"}
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AccordionBlock({ block }: { block: Extract<Block, { type: "accordion" }> }) {
+  return (
+    <section
+      data-block-type="accordion"
+      style={{ padding: "var(--spacing-lg, 24px) var(--spacing-md, 16px)", maxWidth: "800px", margin: "0 auto" }}
+    >
+      {block.data.title && (
+        <h2 style={{ fontSize: "var(--font-size-2xl, 24px)", marginBottom: "var(--spacing-lg, 24px)" }}>
+          {block.data.title}
+        </h2>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--spacing-sm, 8px)" }}>
+        {block.data.items.map((item, idx) => (
+          <details
+            key={idx}
+            open={item.defaultOpen}
+            style={{
+              padding: "var(--spacing-md, 16px)",
+              backgroundColor: "#f9f9f9",
+              borderRadius: "var(--border-radius-md, 4px)",
+              border: "1px solid #e0e0e0",
+            }}
+          >
+            <summary
+              style={{
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: "var(--font-size-lg, 18px)",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              {item.title}
+              <span style={{ fontSize: "var(--font-size-sm, 14px)" }}>▼</span>
+            </summary>
+            <div
+              style={{ marginTop: "var(--spacing-md, 16px)", color: "#444", lineHeight: 1.6 }}
+              dangerouslySetInnerHTML={{ __html: item.content }}
+            />
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TabsBlock({ block }: { block: Extract<Block, { type: "tabs" }> }) {
+  // Note: This is a server component, so tabs default to first tab
+  // Client-side interactivity would need to be added for tab switching
+  return (
+    <section
+      data-block-type="tabs"
+      style={{
+        padding: "var(--spacing-lg, 24px) var(--spacing-md, 16px)",
+        maxWidth: "800px",
+        margin: "0 auto",
+      }}
+    >
+      <div
+        role="tablist"
+        style={{
+          display: "flex",
+          gap: "var(--spacing-xs, 4px)",
+          borderBottom: "2px solid #e0e0e0",
+          marginBottom: "var(--spacing-lg, 24px)",
+          justifyContent: block.data.alignment === "center" ? "center" : block.data.alignment === "right" ? "flex-end" : "flex-start",
+        }}
+      >
+        {block.data.tabs.map((tab, idx) => (
+          <button
+            key={idx}
+            role="tab"
+            aria-selected={idx === 0}
+            style={{
+              padding: "var(--spacing-sm, 8px) var(--spacing-lg, 24px)",
+              backgroundColor: idx === 0 ? "#fff" : "transparent",
+              border: "none",
+              borderBottom: idx === 0 ? "2px solid var(--color-primary, #0066cc)" : "2px solid transparent",
+              marginBottom: "-2px",
+              cursor: "pointer",
+              fontWeight: idx === 0 ? 600 : 400,
+              color: idx === 0 ? "var(--color-primary, #0066cc)" : "#666",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+      {/* Show first tab content by default */}
+      {block.data.tabs[0] && (
+        <div
+          role="tabpanel"
+          style={{ lineHeight: 1.6 }}
+          dangerouslySetInnerHTML={{ __html: block.data.tabs[0].content }}
+        />
+      )}
+    </section>
+  );
+}
+
+function TestimonialBlock({ block }: { block: Extract<Block, { type: "testimonial" }> }) {
+  // Show first testimonial by default (rotation requires client-side JS)
+  const testimonial = block.data.testimonials[0];
+  if (!testimonial) return null;
+
+  return (
+    <section
+      data-block-type="testimonial"
+      style={{
+        padding: "var(--spacing-xl, 48px) var(--spacing-md, 16px)",
+        textAlign: "center",
+        backgroundColor: "#f9f9f9",
+      }}
+    >
+      {block.data.title && (
+        <h2 style={{ fontSize: "var(--font-size-2xl, 24px)", marginBottom: "var(--spacing-xl, 48px)" }}>
+          {block.data.title}
+        </h2>
+      )}
+      <blockquote style={{ maxWidth: "700px", margin: "0 auto" }}>
+        <p
+          style={{
+            fontSize: "var(--font-size-xl, 20px)",
+            fontStyle: "italic",
+            lineHeight: 1.6,
+            marginBottom: "var(--spacing-lg, 24px)",
+            color: "#333",
+          }}
+        >
+          &ldquo;{testimonial.quote}&rdquo;
+        </p>
+        <footer style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--spacing-md, 16px)" }}>
+          {testimonial.image && (
+            // eslint-disable-next-line @next/next/no-img-element -- user-provided dynamic src
+            <img
+              src={testimonial.image}
+              alt={testimonial.author}
+              style={{ width: "60px", height: "60px", borderRadius: "50%", objectFit: "cover" }}
+            />
+          )}
+          <div>
+            <cite style={{ fontStyle: "normal", fontWeight: 600, display: "block" }}>{testimonial.author}</cite>
+            {testimonial.role && (
+              <span style={{ fontSize: "var(--font-size-sm, 14px)", color: "#666" }}>{testimonial.role}</span>
+            )}
+          </div>
+        </footer>
+      </blockquote>
+      {block.data.testimonials.length > 1 && (
+        <div style={{ marginTop: "var(--spacing-lg, 24px)", display: "flex", justifyContent: "center", gap: "var(--spacing-xs, 4px)" }}>
+          {block.data.testimonials.map((_, idx) => (
+            <span
+              key={idx}
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                backgroundColor: idx === 0 ? "var(--color-primary, #0066cc)" : "#ccc",
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function StatsBlock({ block }: { block: Extract<Block, { type: "stats" }> }) {
+  const columns = block.data.columns || 3;
+
+  return (
+    <section
+      data-block-type="stats"
+      style={{
+        padding: "var(--spacing-xl, 48px) var(--spacing-md, 16px)",
+        backgroundColor: "var(--color-primary, #0066cc)",
+        color: "#fff",
+      }}
+    >
+      {block.data.title && (
+        <h2 style={{ fontSize: "var(--font-size-2xl, 24px)", marginBottom: "var(--spacing-xl, 48px)", textAlign: "center" }}>
+          {block.data.title}
+        </h2>
+      )}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${columns}, 1fr)`,
+          gap: "var(--spacing-xl, 48px)",
+          maxWidth: "1000px",
+          margin: "0 auto",
+          textAlign: "center",
+        }}
+      >
+        {block.data.stats.map((stat, idx) => (
+          <div key={idx}>
+            <div style={{ fontSize: "var(--font-size-4xl, 48px)", fontWeight: 700, marginBottom: "var(--spacing-sm, 8px)" }}>
+              {stat.prefix}{stat.value.toLocaleString()}{stat.suffix}
+            </div>
+            <div style={{ fontSize: "var(--font-size-lg, 18px)", opacity: 0.9 }}>
+              {stat.label}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TimelineBlock({ block }: { block: Extract<Block, { type: "timeline" }> }) {
+  return (
+    <section
+      data-block-type="timeline"
+      style={{ padding: "var(--spacing-lg, 24px) var(--spacing-md, 16px)", maxWidth: "800px", margin: "0 auto" }}
+    >
+      {block.data.title && (
+        <h2 style={{ fontSize: "var(--font-size-2xl, 24px)", marginBottom: "var(--spacing-xl, 48px)", textAlign: "center" }}>
+          {block.data.title}
+        </h2>
+      )}
+      <div style={{ position: "relative", paddingLeft: "var(--spacing-xl, 48px)" }}>
+        {/* Vertical line */}
+        <div
+          style={{
+            position: "absolute",
+            left: "8px",
+            top: 0,
+            bottom: 0,
+            width: "2px",
+            backgroundColor: "#e0e0e0",
+          }}
+        />
+        {block.data.events.map((event, idx) => (
+          <div
+            key={idx}
+            style={{
+              position: "relative",
+              marginBottom: "var(--spacing-xl, 48px)",
+            }}
+          >
+            {/* Dot */}
+            <div
+              style={{
+                position: "absolute",
+                left: "-40px",
+                width: "16px",
+                height: "16px",
+                borderRadius: "50%",
+                backgroundColor: "var(--color-primary, #0066cc)",
+                border: "3px solid #fff",
+                boxShadow: "0 0 0 2px var(--color-primary, #0066cc)",
+              }}
+            />
+            <div style={{ fontSize: "var(--font-size-sm, 14px)", color: "var(--color-primary, #0066cc)", fontWeight: 600, marginBottom: "var(--spacing-xs, 4px)" }}>
+              {event.date}
+            </div>
+            <h3 style={{ fontSize: "var(--font-size-lg, 18px)", fontWeight: 600, marginBottom: "var(--spacing-sm, 8px)" }}>
+              {event.title}
+            </h3>
+            <p style={{ color: "#666", lineHeight: 1.6 }}>
+              {event.description}
+            </p>
+            {event.image && (
+              // eslint-disable-next-line @next/next/no-img-element -- user-provided dynamic src
+              <img
+                src={event.image}
+                alt={event.title}
+                style={{ marginTop: "var(--spacing-md, 16px)", maxWidth: "100%", borderRadius: "var(--border-radius-md, 4px)" }}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function BeforeAfterBlock({ block }: { block: Extract<Block, { type: "before-after" }> }) {
+  const aspectRatios: Record<string, string> = {
+    "16:9": "56.25%",
+    "4:3": "75%",
+    "1:1": "100%",
+    "3:2": "66.67%",
+  };
+  const paddingBottom = aspectRatios[block.data.aspectRatio || "16:9"];
+  const initialPos = block.data.initialPosition ?? 50;
+  const uniqueId = `before-after-${block.id.replace(/-/g, "")}`;
+
+  return (
+    <section
+      data-block-type="before-after"
+      style={{ padding: "var(--spacing-lg, 24px) var(--spacing-md, 16px)", maxWidth: "900px", margin: "0 auto" }}
+    >
+      {block.data.title && (
+        <h2 style={{ fontSize: "var(--font-size-2xl, 24px)", marginBottom: "var(--spacing-lg, 24px)", textAlign: "center" }}>
+          {block.data.title}
+        </h2>
+      )}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            .${uniqueId} {
+              position: relative;
+              width: 100%;
+              overflow: hidden;
+              border-radius: var(--border-radius-md, 4px);
+              cursor: ew-resize;
+              user-select: none;
+              -webkit-user-select: none;
+            }
+            .${uniqueId} .ba-after {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+            }
+            .${uniqueId} .ba-after img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+            }
+            .${uniqueId} .ba-before {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: ${initialPos}%;
+              height: 100%;
+              overflow: hidden;
+            }
+            .${uniqueId} .ba-before img {
+              width: 100%;
+              height: 100%;
+              object-fit: cover;
+              /* Make image width match parent container, not clipped width */
+              min-width: calc(100vw * 0.9);
+              max-width: 900px;
+            }
+            .${uniqueId} .ba-slider {
+              position: absolute;
+              top: 0;
+              left: ${initialPos}%;
+              width: 4px;
+              height: 100%;
+              background: #fff;
+              cursor: ew-resize;
+              transform: translateX(-50%);
+              box-shadow: 0 0 8px rgba(0,0,0,0.3);
+            }
+            .${uniqueId} .ba-slider::before {
+              content: '';
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              width: 40px;
+              height: 40px;
+              background: #fff;
+              border-radius: 50%;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            }
+            .${uniqueId} .ba-slider::after {
+              content: '◀ ▶';
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%);
+              font-size: 12px;
+              color: #333;
+              white-space: nowrap;
+            }
+            .${uniqueId} .ba-label {
+              position: absolute;
+              top: var(--spacing-md, 16px);
+              padding: var(--spacing-xs, 4px) var(--spacing-sm, 8px);
+              background: rgba(0,0,0,0.6);
+              color: #fff;
+              font-size: var(--font-size-sm, 14px);
+              border-radius: var(--border-radius-sm, 2px);
+              pointer-events: none;
+            }
+            .${uniqueId} .ba-label-before {
+              left: var(--spacing-md, 16px);
+            }
+            .${uniqueId} .ba-label-after {
+              right: var(--spacing-md, 16px);
+            }
+          `,
+        }}
+      />
+      <div
+        className={uniqueId}
+        style={{ paddingBottom }}
+        onMouseDown={(e) => {
+          const container = e.currentTarget;
+          const rect = container.getBoundingClientRect();
+          const updatePosition = (clientX: number) => {
+            const x = clientX - rect.left;
+            const percent = Math.min(100, Math.max(0, (x / rect.width) * 100));
+            const before = container.querySelector(".ba-before") as HTMLElement;
+            const slider = container.querySelector(".ba-slider") as HTMLElement;
+            if (before) before.style.width = `${percent}%`;
+            if (slider) slider.style.left = `${percent}%`;
+          };
+          updatePosition(e.clientX);
+          const handleMouseMove = (ev: MouseEvent) => updatePosition(ev.clientX);
+          const handleMouseUp = () => {
+            document.removeEventListener("mousemove", handleMouseMove);
+            document.removeEventListener("mouseup", handleMouseUp);
+          };
+          document.addEventListener("mousemove", handleMouseMove);
+          document.addEventListener("mouseup", handleMouseUp);
+        }}
+        onTouchStart={(e) => {
+          const container = e.currentTarget;
+          const rect = container.getBoundingClientRect();
+          const updatePosition = (clientX: number) => {
+            const x = clientX - rect.left;
+            const percent = Math.min(100, Math.max(0, (x / rect.width) * 100));
+            const before = container.querySelector(".ba-before") as HTMLElement;
+            const slider = container.querySelector(".ba-slider") as HTMLElement;
+            if (before) before.style.width = `${percent}%`;
+            if (slider) slider.style.left = `${percent}%`;
+          };
+          const touch = e.touches[0];
+          if (touch) updatePosition(touch.clientX);
+          const handleTouchMove = (ev: TouchEvent) => {
+            const t = ev.touches[0];
+            if (t) updatePosition(t.clientX);
+          };
+          const handleTouchEnd = () => {
+            document.removeEventListener("touchmove", handleTouchMove);
+            document.removeEventListener("touchend", handleTouchEnd);
+          };
+          document.addEventListener("touchmove", handleTouchMove, { passive: true });
+          document.addEventListener("touchend", handleTouchEnd);
+        }}
+      >
+        {/* After image (background) */}
+        <div className="ba-after">
+          {/* eslint-disable-next-line @next/next/no-img-element -- user-provided dynamic src */}
+          <img src={block.data.afterImage || "/placeholder-image.svg"} alt={block.data.afterAlt} />
+        </div>
+        {/* Before image (foreground, clipped) */}
+        <div className="ba-before">
+          {/* eslint-disable-next-line @next/next/no-img-element -- user-provided dynamic src */}
+          <img src={block.data.beforeImage || "/placeholder-image.svg"} alt={block.data.beforeAlt} />
+        </div>
+        {/* Slider handle */}
+        <div className="ba-slider" />
+        {/* Labels */}
+        {block.data.beforeLabel && (
+          <span className="ba-label ba-label-before">{block.data.beforeLabel}</span>
+        )}
+        {block.data.afterLabel && (
+          <span className="ba-label ba-label-after">{block.data.afterLabel}</span>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function renderBlock(block: Block) {
   switch (block.type) {
     case "hero":
@@ -461,6 +1052,20 @@ function renderBlock(block: Block) {
       return <DividerBlock key={block.id} block={block} />;
     case "spacer":
       return <SpacerBlock key={block.id} block={block} />;
+    case "flip-card":
+      return <FlipCardBlock key={block.id} block={block} />;
+    case "accordion":
+      return <AccordionBlock key={block.id} block={block} />;
+    case "tabs":
+      return <TabsBlock key={block.id} block={block} />;
+    case "testimonial":
+      return <TestimonialBlock key={block.id} block={block} />;
+    case "stats":
+      return <StatsBlock key={block.id} block={block} />;
+    case "timeline":
+      return <TimelineBlock key={block.id} block={block} />;
+    case "before-after":
+      return <BeforeAfterBlock key={block.id} block={block} />;
     default:
       return null;
   }

@@ -1,23 +1,28 @@
+<!--
+  Copyright © 2025 Murmurant, Inc. All rights reserved.
+-->
+
+
 <!-- MERGE NOTE: auto-resolved add/add by concatenating ours then theirs -->
 
 
 ---
 
-## P2 — Publishing: JSON-LD Structured Metadata for Public Pages
+## P2 — ✅ COMPLETE - JSON-LD Structured Metadata for Public Pages
 
 - Spec: docs/publishing/JSON_LD_METADATA.md
-- Deliverable: emit JSON-LD (<script type="application/ld+json">) for public pages
-- Guardrail: no JSON-LD for non-public pages
-- Tests: unit tests for JSON-LD builders + basic rendering assertion (if practical)
+- Implemented: src/lib/seo/jsonld.ts, src/components/seo/JsonLd.tsx
+- Integrated: src/app/(public)/[slug]/page.tsx
+- Tests: tests/unit/seo/jsonld.spec.ts (22 tests)
 
 ---
 
 ---
 
-# ClubOS - Work Queue (Backlog)
+# Murmurant - Work Queue (Backlog)
 
 Status: Canonical backlog
-Last updated: 2025-12-21
+Last updated: 2025-12-28
 
 This file is the system-of-record backlog for reliability, editor, and publishing work.
 Items are ordered. Do not reorder without explicit rationale.
@@ -26,52 +31,85 @@ Items are ordered. Do not reorder without explicit rationale.
 
 ## A. Editor and Publishing (Next)
 
-A1. Editor Phase 1 - Block ordering UI wiring (draft-only)
-- Goal: Wire Move Up/Move Down controls using reorderBlocks utility.
-- Out of scope: drag-and-drop, publish lifecycle, preview plumbing beyond spec.
-- Deliverables: UI wiring + component tests.
+A1. ✅ COMPLETE - Editor Phase 1 - Block ordering UI wiring (draft-only)
+- Implemented: src/lib/publishing/blockOrdering.ts (reorderBlocks, moveBlockUp, moveBlockDown)
+- Implemented: PageEditorClient.tsx with Move Up/Down buttons
+- Tests: tests/unit/publishing/block-ordering.spec.ts (14 tests)
 
-A2. Editor Phase 2 - Drag-and-drop (deferred until A1 complete)
-- Goal: DnD ordering with clear accessibility and deterministic order.
-- Must include: tests, keyboard fallback, no hidden side effects.
+A2. ✅ COMPLETE - Editor Phase 2 - Drag-and-drop
+- Implemented: src/components/publishing/SortableBlockList.tsx (@dnd-kit integration)
+- Features: DragHandle, DragOverlay, keyboard accessibility
+- Tests: block-ordering.spec.ts includes DnD compatibility tests
 
-A3. Publishing lifecycle orchestration (draft -> preview -> publish) (spec then code)
-- Goal: Implement lifecycle state machine and enforcement at boundaries.
-- Must include: audit events and reversible transitions.
-- Must not: change reliability posture.
+A3. ✅ COMPLETE - Publishing lifecycle orchestration (draft -> preview -> publish)
+- Implemented: src/lib/publishing/pageLifecycle.ts (state machine: DRAFT → PUBLISHED → ARCHIVED)
+- Validation: isValidTransition() enforces allowed transitions
+- Controls: PageEditorClient.tsx with publish/unpublish/archive/discardDraft
+- API: POST /api/admin/content/pages/[id]?action=publish|unpublish|archive|discardDraft
+- Undo/Redo: 20-step stack, clears on publish boundaries
+- Audit: Full before/after logging on all lifecycle actions
+- Docs: docs/BIZ/PUBLISHING_AND_CONTENT_LIFECYCLE.md
 
-A4. Preview/publish plumbing beyond spec (code)
-- Goal: implement routing, fetch policies, and storage model per specs.
-- Must include: preview isolation tests and audience enforcement tests.
+A4. ✅ COMPLETE - Preview/publish plumbing
+- Preview route: /pages/{slug}/preview (auth + content admin required)
+- Preview isolation: Public route ONLY shows publishedContent, never draft
+- Audience enforcement: PUBLIC, MEMBERS_ONLY, ROLE_RESTRICTED (server-side)
+- Content selection: src/lib/publishing/contentSelection.ts
+- Visibility: src/lib/publishing/visibility.ts, audience.ts
+- Permissions: src/lib/publishing/permissions.ts
+- Tests: tests/unit/publishing/ (contentSelection, permissions, audience, pageLifecycle)
 
-A5. Subset rollout for pages/copy (feature spec + minimal mechanism)
-- Goal: allow limited audience/percent/group rollout before full launch.
-- Deliverables: canonical spec doc, then implementation plan.
+A5. ✅ COMPLETE - Subset rollout for pages/copy (feature spec)
+- Spec: docs/publishing/SUBSET_ROLLOUT.md
+- Three-stage rollout: INTERNAL → PREVIEW → GENERAL
+
+A6. ✅ COMPLETE - FlipCard block type
+- Implemented: 3D CSS flip animation, keyboard accessible
+- Files: blocks.ts, blockSchemas.ts, BlockRenderer.tsx
+
+A7. ✅ COMPLETE - Accordion block type
+- Implemented: Expandable sections with <details> element
+- Features: Multiple panels, defaultOpen option
+
+A8. ✅ COMPLETE - Tabs block type
+- Implemented: Tabbed panels with tab navigation
+- Server-rendered (first tab default)
+
+A9. ✅ COMPLETE - Testimonial block type
+- Implemented: Quote with author/role/image
+- Features: Pagination dots, auto-rotate option
+
+A10. ✅ COMPLETE - Stats block type
+- Implemented: Number counters with prefix/suffix
+- Styled: Primary color background, grid layout
+
+A11. ✅ COMPLETE - Timeline block type
+- Implemented: Vertical timeline with dots
+- Features: Date, title, description, optional image
+
+A12. ✅ COMPLETE - Before/After image slider block type
+- Implemented: Draggable slider comparing two images
+- Features: Horizontal drag handle, mouse/touch support, Before/After labels
+- Options: aspectRatio (16:9, 4:3, 1:1, 3:2), initialPosition (0-100)
+- Files: blocks.ts, blockSchemas.ts, BlockRenderer.tsx
 
 -------------------------------------------------------------------------------
 
 ## B. Reliability R3 (Stubs + CI Wiring) - Pre-deployment readiness
 
-B1. Implement inert mechanism stubs (NO enabling)
-- WRITE_GUARD stub
-- PUBLISH_GUARD stub
-- AUDIT_LOG stub (shape + sink)
-- KILL_SWITCH registry stub
-- DEPENDENCY_ISOLATION wrapper stub
-- BACKPRESSURE facade stub
-- BACKUP job scaffold (dry-run)
-- RESTORE verification scaffold (fixtures/local only)
-- FAILURE injection harness (compile-time disabled)
+B1. ✅ COMPLETE - Implement inert mechanism stubs (NO enabling)
+- Implemented: src/lib/reliability/ (guards, killSwitch, isolation, backpressure, backup, failureInjection)
+- Tests: tests/unit/reliability/ (103 tests)
+- All stubs are inert (always allow, no-op)
 
-B2. CI merge gates (usage enforcement only; no activation)
-- Require write wrapper usage on write paths
-- Require guard calls on write/publish routes (no-op OK)
-- Require actor context on admin actions
-- Ensure required reliability docs exist
-- Ensure mechanism matrix updates when stubs change
+B2. ✅ COMPLETE - CI merge gates (usage enforcement only; no activation)
+- Implemented: scripts/ci/check-reliability-guardrails.ts
+- Checks: required docs, module exports, guard adoption tracking, mechanism matrix
+- Wired into: npm run test:guardrails
 
-B3. Update MECHANISM_STUBS_AND_OWNERSHIP.md
-- Move applicable mechanisms from Defined -> Stubbed
+B3. ✅ COMPLETE - Update MECHANISM_STUBS_AND_OWNERSHIP.md
+- Updated: 8 mechanisms moved from Defined → Stubbed
+- Last updated: 2025-12-28
 
 -------------------------------------------------------------------------------
 
@@ -106,6 +144,42 @@ E4. Disaster recovery exercise plan (restore drills with verification)
 
 -------------------------------------------------------------------------------
 
+## F. Migration Path (WA as Source of Truth)
+
+Strategy: Use Murmurant UI while Wild Apricot remains the system of record.
+This enables gradual user migration with minimal risk.
+
+F1. ✅ COMPLETE - Migration architecture spec
+- Spec: docs/ARCH/MIGRATION_INTEGRATION_ARCHITECTURE.md
+- Defines: Read-through caching, write-through with confirmation, conflict resolution
+- Authority matrix: WA vs MM authoritative per entity per stage
+- Sync: Real-time (on-demand), near-real-time (5 min polling), nightly reconciliation
+- Failure handling: Retry, queue, graceful degradation
+- Cutover criteria: Technical, operational, stakeholder checklists
+
+F2. WA API proxy layer
+- Goal: Abstract WA API behind internal service interface.
+- Deliverables: src/lib/wa/ with typed client, error handling, retry logic.
+- Must include: Rate limit handling, audit logging of WA calls.
+- Must use: DEPENDENCY_ISOLATION wrapper from reliability module.
+
+F3. Member data read-through
+- Goal: MM reads member data from WA, caches locally for performance.
+- Deliverables: Member sync service, cache invalidation strategy.
+- Must include: Staleness indicators in UI, manual refresh option.
+
+F4. Event/registration write-through
+- Goal: Event registrations in MM UI write to WA as source of truth.
+- Deliverables: Registration API that proxies to WA, confirms success.
+- Must include: Rollback on WA failure, clear error messages.
+
+F5. Gradual cutover plan
+- Goal: Define criteria and process for migrating entity types to MM-authoritative.
+- Deliverables: Cutover checklist, rollback procedures, data validation suite.
+- Must include: Per-entity migration (members, events, pages separate).
+
+-------------------------------------------------------------------------------
+
 ## Parallelization Plan (Official)
 
 Safe parallel streams (now):
@@ -124,6 +198,7 @@ Safe parallel streams (now):
 Not parallelized yet / gated:
 - Editor drag-and-drop (A2) waits for A1 completion.
 - Reliability enablement (C*) requires explicit deployment posture decision.
+- Migration path (F*) requires F1 architecture spec approval before implementation.
 
 Coordination rules:
 - One PR per stream.

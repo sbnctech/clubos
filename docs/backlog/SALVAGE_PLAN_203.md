@@ -1,7 +1,12 @@
+<!--
+  Copyright © 2025 Murmurant, Inc. All rights reserved.
+-->
+
+
 # Salvage Plan: Issue #203 - Eligibility Engine Wave
 
 **Status:** Parked
-**Tracking Issue:** [#203](https://github.com/sbnctech/clubos/issues/203)
+**Tracking Issue:** [#203](https://github.com/sbnctech/murmurant/issues/203)
 **Theme Label:** `theme-eligibility`
 **Date:** 2025-12-21
 

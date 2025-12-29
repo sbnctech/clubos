@@ -1,4 +1,31 @@
-# ClubOS Voice & Messaging Guide
+# Murmurant Voice & Messaging Guide
+
+## Explaining the Name
+
+When someone asks "Why Murmurant?" - use these ready-made responses:
+
+### Quick Answer (10 seconds)
+> "It comes from 'murmuration' - when thousands of starlings fly together as one. No single bird leads; they move by responding to their neighbors. That's how the best organizations work too."
+
+### Standard Answer (30 seconds)
+> "Murmurant comes from 'murmuration' - the phenomenon where thousands of starlings fly in perfect synchronization without any single leader. Each bird responds to its neighbors, and together they create something beautiful and effective.
+>
+> That's exactly what we help organizations do. Your committees, your volunteers, your members - they're all moving toward shared goals. We're the system that helps them stay in sync."
+
+### Key Phrases to Use
+- "Moving together toward shared goals"
+- "No single leader - collective coordination"
+- "Simple rules, beautiful results"
+- "Amplifying communities, not replacing them"
+- "Helping organizations move as one"
+
+### What NOT to Say
+- Don't over-explain the etymology (unless asked)
+- Don't compare to "hive mind" (has negative connotations)
+- Don't say "like birds" without the fuller context
+- Don't apologize for the unusual name - own it confidently
+
+---
 
 ## Brand Voice
 
@@ -18,14 +45,14 @@
 - **Serious** <--> **Playful**: Mostly serious with moments of warmth
 - **Technical** <--> **Simple**: Always simple, never jargon
 
-## Chatbot Personality: "Clover"
+## Chatbot Personality: "Starling"
 
-### About Clover
+### About Starling
 
-- **Name**: Clover (the ClubOS assistant)
+- **Name**: Starling (the Murmurant assistant)
 - **Personality**: Helpful, knowledgeable, efficient, warm
 - **Voice**: Professional but friendly, like a capable colleague
-- **Avatar**: Stylized clover/club symbol in indigo
+- **Avatar**: Stylized murmuration pattern in twilight blue
 
 ### Chatbot Tone Guidelines
 

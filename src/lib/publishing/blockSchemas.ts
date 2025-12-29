@@ -203,6 +203,138 @@ export const contactDataSchema = z
   })
   .passthrough();
 
+/**
+ * FlipCard block data schema
+ * Interactive cards that flip on hover to reveal back content
+ * Uses passthrough to preserve existing data during read-only phase
+ */
+export const flipCardDataSchema = z
+  .object({
+    columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).optional(),
+    cards: z.array(
+      z.object({
+        frontImage: z.string(),
+        frontImageAlt: z.string(),
+        backTitle: z.string(),
+        backDescription: z.string(),
+        backGradient: z.string().optional(),
+        backTextColor: z.string().optional(),
+        linkUrl: z.string().optional(),
+        linkText: z.string().optional(),
+      })
+    ),
+  })
+  .passthrough();
+
+/**
+ * Accordion block data schema
+ * Expandable/collapsible content sections
+ */
+export const accordionDataSchema = z
+  .object({
+    title: z.string().optional(),
+    allowMultiple: z.boolean().optional(),
+    items: z.array(
+      z.object({
+        title: z.string(),
+        content: z.string(),
+        defaultOpen: z.boolean().optional(),
+      })
+    ),
+  })
+  .passthrough();
+
+/**
+ * Tabs block data schema
+ * Tabbed content panels
+ */
+export const tabsDataSchema = z
+  .object({
+    tabs: z.array(
+      z.object({
+        label: z.string(),
+        content: z.string(),
+      })
+    ),
+    alignment: alignmentSchema,
+  })
+  .passthrough();
+
+/**
+ * Testimonial block data schema
+ * Rotating quotes and testimonials
+ */
+export const testimonialDataSchema = z
+  .object({
+    title: z.string().optional(),
+    autoRotate: z.boolean().optional(),
+    rotateIntervalMs: z.number().optional(),
+    testimonials: z.array(
+      z.object({
+        quote: z.string(),
+        author: z.string(),
+        role: z.string().optional(),
+        image: z.string().optional(),
+      })
+    ),
+  })
+  .passthrough();
+
+/**
+ * Stats block data schema
+ * Animated number counters
+ */
+export const statsDataSchema = z
+  .object({
+    title: z.string().optional(),
+    columns: z.union([z.literal(2), z.literal(3), z.literal(4)]).optional(),
+    stats: z.array(
+      z.object({
+        value: z.number(),
+        suffix: z.string().optional(),
+        prefix: z.string().optional(),
+        label: z.string(),
+      })
+    ),
+  })
+  .passthrough();
+
+/**
+ * Timeline block data schema
+ * Vertical chronological layout
+ */
+export const timelineDataSchema = z
+  .object({
+    title: z.string().optional(),
+    events: z.array(
+      z.object({
+        date: z.string(),
+        title: z.string(),
+        description: z.string(),
+        image: z.string().optional(),
+      })
+    ),
+  })
+  .passthrough();
+
+/**
+ * Before/After block data schema
+ * Draggable slider comparing two images
+ */
+export const beforeAfterDataSchema = z
+  .object({
+    title: z.string().optional(),
+    beforeImage: z.string().min(1, "Before image URL is required"),
+    beforeAlt: z.string().min(1, "Before image alt text is required"),
+    beforeLabel: z.string().optional(),
+    afterImage: z.string().min(1, "After image URL is required"),
+    afterAlt: z.string().min(1, "After image alt text is required"),
+    afterLabel: z.string().optional(),
+    initialPosition: z.number().min(0).max(100).optional(),
+    aspectRatio: z.enum(["16:9", "4:3", "1:1", "3:2"]).optional(),
+  })
+  .passthrough();
+
 // ============================================================================
 // Schema Registry
 // ============================================================================
@@ -222,6 +354,13 @@ export const BLOCK_DATA_SCHEMAS: Record<BlockType, z.ZodType> = {
   gallery: galleryDataSchema,
   faq: faqDataSchema,
   contact: contactDataSchema,
+  "flip-card": flipCardDataSchema,
+  accordion: accordionDataSchema,
+  tabs: tabsDataSchema,
+  testimonial: testimonialDataSchema,
+  stats: statsDataSchema,
+  timeline: timelineDataSchema,
+  "before-after": beforeAfterDataSchema,
 };
 
 /**
@@ -245,6 +384,13 @@ export const READONLY_BLOCK_TYPES: BlockType[] = [
   "gallery",
   "faq",
   "contact",
+  "flip-card",
+  "accordion",
+  "tabs",
+  "testimonial",
+  "stats",
+  "timeline",
+  "before-after",
 ];
 
 // ============================================================================
@@ -326,6 +472,71 @@ export function getDefaultBlockData(type: BlockType): Record<string, unknown> {
           { name: "message", label: "Message", type: "textarea", required: true },
         ],
         submitText: "Send Message",
+      };
+    case "flip-card":
+      return {
+        columns: 3,
+        cards: [
+          {
+            frontImage: "",
+            frontImageAlt: "Card image",
+            backTitle: "Card Title",
+            backDescription: "Description shown on hover",
+            backGradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+            backTextColor: "#ffffff",
+          },
+        ],
+      };
+    case "accordion":
+      return {
+        allowMultiple: false,
+        items: [
+          { title: "Section 1", content: "<p>Content for section 1</p>", defaultOpen: true },
+          { title: "Section 2", content: "<p>Content for section 2</p>" },
+        ],
+      };
+    case "tabs":
+      return {
+        alignment: "left",
+        tabs: [
+          { label: "Tab 1", content: "<p>Content for tab 1</p>" },
+          { label: "Tab 2", content: "<p>Content for tab 2</p>" },
+        ],
+      };
+    case "testimonial":
+      return {
+        autoRotate: true,
+        rotateIntervalMs: 5000,
+        testimonials: [
+          { quote: "This is a great organization!", author: "Jane Doe", role: "Member since 2020" },
+        ],
+      };
+    case "stats":
+      return {
+        columns: 3,
+        stats: [
+          { value: 500, suffix: "+", label: "Members" },
+          { value: 50, label: "Events per Year" },
+          { value: 30, label: "Interest Groups" },
+        ],
+      };
+    case "timeline":
+      return {
+        events: [
+          { date: "2020", title: "Founded", description: "Our organization was established" },
+          { date: "2022", title: "Milestone", description: "Reached 500 members" },
+        ],
+      };
+    case "before-after":
+      return {
+        beforeImage: "",
+        beforeAlt: "Before image",
+        beforeLabel: "Before",
+        afterImage: "",
+        afterAlt: "After image",
+        afterLabel: "After",
+        initialPosition: 50,
+        aspectRatio: "16:9",
       };
     default:
       return {};

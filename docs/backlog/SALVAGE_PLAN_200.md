@@ -1,7 +1,12 @@
+<!--
+  Copyright © 2025 Murmurant, Inc. All rights reserved.
+-->
+
+
 # Salvage Plan: Issue #200 - Editor/Publishing Integration Wave
 
 **Status:** Parked
-**Tracking Issue:** [#200](https://github.com/sbnctech/clubos/issues/200)
+**Tracking Issue:** [#200](https://github.com/sbnctech/murmurant/issues/200)
 **Theme Label:** `theme-editor`
 **Date:** 2025-12-21
 
