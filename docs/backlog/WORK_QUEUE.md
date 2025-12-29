@@ -24,7 +24,7 @@ Items are ordered. Do not reorder without explicit rationale.
 
 -------------------------------------------------------------------------------
 
-## P1 — Communications: Email Template Editor
+## P1 — Communications: Email Message Editor
 
 **Priority: HIGH** - Core operator capability for member communications.
 
@@ -33,9 +33,21 @@ Items are ordered. Do not reorder without explicit rationale.
 **Design principle:** Reuse page editor patterns and components where possible.
 The email editor should feel familiar to anyone who has used the page editor.
 
-### P1.1 Email Template Editor UI
+### Terminology (Avoid Confusion)
 
-- Goal: Visual editor for creating and editing email templates
+| Term | Meaning | Location |
+|------|---------|----------|
+| **Page Template** | Layout/structure for website pages | `/admin/content/templates/` |
+| **Message Template** | Reusable email content with merge fields | `/admin/comms/templates/` |
+| **Page** | Published website content | `/admin/content/pages/` |
+| **Message** | Email communication to members | `/admin/comms/messages/` |
+
+Use "Message Template" and "Message" for email, not "Email Template".
+This avoids confusion with Page Templates in the publishing system.
+
+### P1.1 Message Template Editor UI
+
+- Goal: Visual editor for creating and editing message templates
 - Location: `/admin/comms/templates/`
 - Existing: `MessageTemplatesTable.tsx`, basic `page.tsx`
 - Design: Mirror page editor UX patterns
@@ -117,6 +129,24 @@ The email editor should feel familiar to anyone who has used the page editor.
   - Role-based access (who can send as whom)
   - Verification status display
   - Default identity per committee
+
+### P1.7 View Message as Web Page
+
+- Goal: Allow recipients to view email content in browser
+- Features:
+  - "View in browser" link at top of every sent message
+  - Hosted web page version of the message at `/messages/{messageId}`
+  - Renders with club branding/theme
+  - Accessible without login (public URL with token)
+  - Retains all formatting, images, links
+- Use cases:
+  - Email client rendering issues
+  - Forwarding/sharing message content
+  - Accessibility (some users prefer browser)
+- Security:
+  - Unique token per message (not guessable)
+  - Optional expiration (e.g., 90 days)
+  - No PII in URL
 
 **Spec reference:** Salvage Plan 202 (archived) - PR #117
 **Related:** `src/lib/email/`, `src/lib/publishing/email.ts`, page editor components
