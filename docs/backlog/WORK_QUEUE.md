@@ -28,19 +28,87 @@ Items are ordered. Do not reorder without explicit rationale.
 
 **Priority: HIGH** - Core operator capability for member communications.
 
+**Target users:** Committee Chairs, VP Communications, Tech Chair (not general members)
+
+**Design principle:** Reuse page editor patterns and components where possible.
+The email editor should feel familiar to anyone who has used the page editor.
+
 ### P1.1 Email Template Editor UI
 
 - Goal: Visual editor for creating and editing email templates
 - Location: `/admin/comms/templates/`
 - Existing: `MessageTemplatesTable.tsx`, basic `page.tsx`
-- Needed:
-  - Template creation wizard
-  - WYSIWYG content editing (reuse block editor patterns)
-  - Variable/merge field insertion (member name, event details, etc.)
-  - Preview with sample data
+- Design: Mirror page editor UX patterns
+  - Block-based content (reuse existing block types where applicable)
+  - Drag-and-drop ordering (reuse SortableBlockList when available)
+  - Rich text editing (reuse RichTextEditor/tiptap)
+  - Preview pane with sample data
   - Mobile-responsive preview toggle
+- Template-specific features:
+  - Merge field picker (insert `{{member.firstName}}`, `{{event.title}}`, etc.)
+  - Merge field validation (warn if field may be empty)
+  - Subject line editor with merge field support
 
-### P1.2 Email Identity Management
+### P1.2 Audience Builder
+
+- Goal: Define and save recipient audiences for email campaigns
+- Audience types:
+  - **All members** (with status filter: active, alumni, etc.)
+  - **Committee members** (select committee)
+  - **Event registrants** (select event, filter by status)
+  - **Custom segment** (saved filter criteria)
+  - **Manual list** (paste emails or select individuals)
+- Features:
+  - Save audiences for reuse
+  - Preview audience count before send
+  - Exclude list (suppress specific recipients)
+  - Respect email preferences / unsubscribe status
+
+### P1.3 Email Composer (Send Flow)
+
+- Goal: Compose and send emails using templates + audiences
+- Workflow:
+  1. Select template (or start from blank)
+  2. Select audience (or create new)
+  3. Fill template variables:
+     - **Auto-populated:** Data from database (member info, event details)
+     - **Manual entry:** Ad-hoc fields filled at send time (e.g., custom message)
+  4. Preview with real recipient data (show 3-5 sample renders)
+  5. Send immediately or schedule
+- Deliverables:
+  - Template + audience selection UI
+  - Variable resolution engine (stored vs. ad-hoc)
+  - Send confirmation with recipient count
+  - Audit logging for all sends
+
+### P1.4 AI Writing Assistant (Optional Enhancement)
+
+- Goal: Help chairs write effective member communications
+- Features:
+  - "Help me write" button in composer
+  - Suggest subject lines
+  - Draft body content from bullet points
+  - Tone adjustment (formal, friendly, urgent)
+  - Grammar/clarity check
+- Guardrails:
+  - Human review required before send
+  - No auto-send of AI-generated content
+  - Clear disclosure if AI-assisted (optional)
+
+### P1.5 Template Library
+
+- Goal: Pre-built templates for common use cases
+- Templates needed:
+  - Welcome email (new member)
+  - Event invitation
+  - Event reminder (day before)
+  - Event confirmation (post-registration)
+  - Renewal reminder
+  - Password reset
+  - Committee announcement
+  - General newsletter
+
+### P1.6 Email Identity Management
 
 - Goal: Manage sender identities (From name/email) with proper authorization
 - Deliverables:
@@ -48,30 +116,10 @@ Items are ordered. Do not reorder without explicit rationale.
   - Admin UI for identity CRUD
   - Role-based access (who can send as whom)
   - Verification status display
-
-### P1.3 Email Composer
-
-- Goal: Compose and send emails using templates
-- Deliverables:
-  - Template selection
-  - Recipient selection (individual, list, segment)
-  - Merge field population
-  - Send/schedule controls
-  - Audit logging for all sends
-
-### P1.4 Template Library
-
-- Goal: Pre-built templates for common use cases
-- Templates needed:
-  - Welcome email (new member)
-  - Event reminder
-  - Event confirmation
-  - Renewal reminder
-  - Password reset
-  - General announcement
+  - Default identity per committee
 
 **Spec reference:** Salvage Plan 202 (archived) - PR #117
-**Related:** `src/lib/email/`, `src/lib/publishing/email.ts`
+**Related:** `src/lib/email/`, `src/lib/publishing/email.ts`, page editor components
 
 -------------------------------------------------------------------------------
 
