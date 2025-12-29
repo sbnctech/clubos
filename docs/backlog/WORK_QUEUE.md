@@ -303,6 +303,37 @@ F6. Eligibility engine (future - not blocking)
 
 -------------------------------------------------------------------------------
 
+## G. Activity Groups: Photo Gallery (HOTSPOT - Schema Required)
+
+Added: 2025-12-29 (Sprint 5 deferral)
+
+**Prerequisite:** Requires schema changes to prisma/schema.prisma (HOTSPOT)
+
+G1. Schema additions
+- ActivityGroupPhotoAlbum model
+- ActivityGroupPhoto model (with album relation)
+- Add photoAlbums relation to ActivityGroup model
+
+G2. Photo upload API
+- POST /api/v1/groups/[id]/albums - create album (coordinator)
+- POST /api/v1/groups/[id]/albums/[albumId]/photos - upload photos
+- DELETE endpoints for album/photo management
+- Image validation and resizing
+
+G3. Gallery UI
+- Member view: browse group photo albums
+- Coordinator view: create albums, upload/delete photos
+- Public view: featured photos on public groups page
+
+G4. Storage integration
+- Configure cloud storage (S3/R2/similar)
+- Implement signed URLs for private album access
+- Thumbnail generation
+
+**Charter compliance:** P1 (audit photo uploads), P2 (coordinator-scoped access)
+
+-------------------------------------------------------------------------------
+
 ## Parallelization Plan (Official)
 
 Safe parallel streams (now):
