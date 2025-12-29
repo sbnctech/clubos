@@ -3,12 +3,12 @@
 
 ---
 
-## P2 — Publishing: JSON-LD Structured Metadata for Public Pages
+## P2 — ✅ COMPLETE - JSON-LD Structured Metadata for Public Pages
 
 - Spec: docs/publishing/JSON_LD_METADATA.md
-- Deliverable: emit JSON-LD (<script type="application/ld+json">) for public pages
-- Guardrail: no JSON-LD for non-public pages
-- Tests: unit tests for JSON-LD builders + basic rendering assertion (if practical)
+- Implemented: src/lib/seo/jsonld.ts, src/components/seo/JsonLd.tsx
+- Integrated: src/app/(public)/[slug]/page.tsx
+- Tests: tests/unit/seo/jsonld.spec.ts (22 tests)
 
 ---
 
@@ -206,34 +206,69 @@ A4. Preview/publish plumbing beyond spec (code)
 - Goal: implement routing, fetch policies, and storage model per specs.
 - Must include: preview isolation tests and audience enforcement tests.
 
-A5. Subset rollout for pages/copy (feature spec + minimal mechanism)
-- Goal: allow limited audience/percent/group rollout before full launch.
-- Deliverables: canonical spec doc, then implementation plan.
+A5. ✅ COMPLETE - Subset rollout for pages/copy (feature spec)
+- Spec: docs/publishing/SUBSET_ROLLOUT.md
+- Three-stage rollout: INTERNAL → PREVIEW → GENERAL
+
+A6. FlipCard block type
+- Goal: Hover-activated 3D flip card with image front, text/gradient back
+- Features: CSS-only animation (rotateY), keyboard accessible (focus=flip)
+- Inspiration: sbnc-website-redesign-playground.wildapricot.org
+- Deliverables: Block schema, editor UI, CSS styles, unit tests
+
+A7. Accordion block type
+- Goal: Expandable/collapsible content sections
+- Features: Multiple panels, one-at-a-time or multi-open modes, smooth animation
+- Use cases: FAQs, program details, nested information
+- Deliverables: Block schema, editor UI, accessibility (ARIA), tests
+
+A8. Tabs block type
+- Goal: Tabbed content panels for organizing related content
+- Features: Horizontal tabs, keyboard navigation, lazy content loading option
+- Use cases: Event details, member benefits, multi-category info
+- Deliverables: Block schema, editor UI, accessibility, tests
+
+A9. Testimonial/Quote carousel block type
+- Goal: Rotating member testimonials or quotes with author attribution
+- Features: Auto-rotate, manual navigation, pause on hover
+- Use cases: Member stories, board quotes, event feedback
+- Deliverables: Block schema, editor UI, CSS animations, tests
+
+A10. Stats counter block type
+- Goal: Animated number counters for key metrics
+- Features: Count-up animation on scroll into view, configurable values
+- Use cases: "500+ Members", "50 Events/Year", "30 Interest Groups"
+- Deliverables: Block schema, editor UI, intersection observer, tests
+
+A11. Timeline block type
+- Goal: Vertical timeline for chronological content
+- Features: Alternating left/right layout, date markers, scroll animations
+- Use cases: Club history, event schedules, membership journey
+- Deliverables: Block schema, editor UI, responsive design, tests
+
+A12. Before/After image slider block type
+- Goal: Draggable slider comparing two images
+- Features: Horizontal drag handle, touch support, labels
+- Use cases: Venue transformations, event setups, community impact
+- Deliverables: Block schema, editor UI, touch events, tests
 
 -------------------------------------------------------------------------------
 
 ## B. Reliability R3 (Stubs + CI Wiring) - Pre-deployment readiness
 
-B1. Implement inert mechanism stubs (NO enabling)
-- WRITE_GUARD stub
-- PUBLISH_GUARD stub
-- AUDIT_LOG stub (shape + sink)
-- KILL_SWITCH registry stub
-- DEPENDENCY_ISOLATION wrapper stub
-- BACKPRESSURE facade stub
-- BACKUP job scaffold (dry-run)
-- RESTORE verification scaffold (fixtures/local only)
-- FAILURE injection harness (compile-time disabled)
+B1. ✅ COMPLETE - Implement inert mechanism stubs (NO enabling)
+- Implemented: src/lib/reliability/ (guards, killSwitch, isolation, backpressure, backup, failureInjection)
+- Tests: tests/unit/reliability/ (103 tests)
+- All stubs are inert (always allow, no-op)
 
-B2. CI merge gates (usage enforcement only; no activation)
-- Require write wrapper usage on write paths
-- Require guard calls on write/publish routes (no-op OK)
-- Require actor context on admin actions
-- Ensure required reliability docs exist
-- Ensure mechanism matrix updates when stubs change
+B2. ✅ COMPLETE - CI merge gates (usage enforcement only; no activation)
+- Implemented: scripts/ci/check-reliability-guardrails.ts
+- Checks: required docs, module exports, guard adoption tracking, mechanism matrix
+- Wired into: npm run test:guardrails
 
-B3. Update MECHANISM_STUBS_AND_OWNERSHIP.md
-- Move applicable mechanisms from Defined -> Stubbed
+B3. ✅ COMPLETE - Update MECHANISM_STUBS_AND_OWNERSHIP.md
+- Updated: 8 mechanisms moved from Defined → Stubbed
+- Last updated: 2025-12-28
 
 -------------------------------------------------------------------------------
 
