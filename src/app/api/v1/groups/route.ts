@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     // Build where clause
     const where: {
-      status: string;
+      status: "APPROVED" | "PROPOSED" | "REJECTED" | "DEACTIVATED";
       category?: string;
       isPublic?: boolean;
     } = {

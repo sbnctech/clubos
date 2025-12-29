@@ -64,6 +64,14 @@ const SBNC_DEFAULT_ROLE_CAPABILITIES: Record<GlobalRole, readonly Capability[]> 
     "files:upload",
     "files:manage",
     "files:view_all",
+    // Activity Groups - admin has all capabilities
+    "groups:view",
+    "groups:propose",
+    "groups:approve",
+    "groups:join",
+    "groups:coordinate",
+    "groups:message",
+    "groups:events",
   ],
   president: [
     "members:view",
@@ -80,6 +88,11 @@ const SBNC_DEFAULT_ROLE_CAPABILITIES: Record<GlobalRole, readonly Capability[]> 
     "governance:flags:read",
     "governance:flags:resolve",
     "governance:annotations:read",
+    // Activity Groups - President can approve/deactivate groups
+    "groups:view",
+    "groups:propose",
+    "groups:approve",
+    "groups:join",
   ],
   "past-president": [
     "members:view",
@@ -101,6 +114,11 @@ const SBNC_DEFAULT_ROLE_CAPABILITIES: Record<GlobalRole, readonly Capability[]> 
     "transitions:approve",
     "roles:assign",
     "roles:view",
+    // Activity Groups - VP Activities can approve/deactivate groups
+    "groups:view",
+    "groups:propose",
+    "groups:approve",
+    "groups:join",
   ],
   "vp-communications": [
     "events:view",
@@ -156,7 +174,12 @@ const SBNC_DEFAULT_ROLE_CAPABILITIES: Record<GlobalRole, readonly Capability[]> 
     "governance:docs:write",
     "files:upload",
   ],
-  member: [],
+  member: [
+    // Activity Groups - basic member capabilities
+    "groups:view",
+    "groups:propose",
+    "groups:join",
+  ],
 } as const;
 
 /**
