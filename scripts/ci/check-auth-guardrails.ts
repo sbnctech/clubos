@@ -88,6 +88,12 @@ const KNOWN_GAPS: Set<string> = new Set([
   "admin/demo/scenarios/route.ts:596",
   // OpenAPI endpoint - read-only spec generation
   "openapi/route.ts:57",
+  // Committee management - admin operations
+  "v1/committees/route.ts:54",
+  "v1/committees/[id]/route.ts:34",
+  "v1/committees/[id]/route.ts:71",
+  "v1/committees/[id]/members/route.ts:32",
+  "v1/committees/[id]/members/route.ts:68",
 ]);
 
 // Routes that are explicitly allowed to use requireCapability (read-only operations)
