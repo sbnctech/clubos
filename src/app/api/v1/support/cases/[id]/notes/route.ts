@@ -14,7 +14,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireCapability } from "@/lib/auth";
+import { requireCapabilitySafe } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
@@ -39,7 +39,8 @@ export async function POST(
     );
   }
 
-  const auth = await requireCapability(req, "admin:full");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #229)
+  const auth = await requireCapabilitySafe(req, "admin:full");
   if (!auth.ok) {
     return auth.response;
   }

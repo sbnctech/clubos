@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireCapability } from "@/lib/auth";
+import { requireCapabilitySafe } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export type SupportDashboardData = {
@@ -45,8 +45,8 @@ export type SupportDashboardData = {
  * GET /api/v1/support/dashboard
  */
 export async function GET(req: NextRequest) {
-  // Check for admin capability
-  const auth = await requireCapability(req, "admin:full");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #229)
+  const auth = await requireCapabilitySafe(req, "admin:full");
   if (!auth.ok) {
     // Return not visible instead of 403 for widget compatibility
     return NextResponse.json({

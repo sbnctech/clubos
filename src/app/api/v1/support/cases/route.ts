@@ -17,7 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireCapability } from "@/lib/auth";
+import { requireCapabilitySafe } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SupportCaseStatus, SupportCaseCategory, SupportCaseChannel } from "@prisma/client";
 
@@ -40,8 +40,8 @@ type CaseSummary = {
  * GET /api/v1/support/cases
  */
 export async function GET(req: NextRequest) {
-  // Require admin capability for support case access
-  const auth = await requireCapability(req, "admin:full");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #229)
+  const auth = await requireCapabilitySafe(req, "admin:full");
   if (!auth.ok) {
     return auth.response;
   }
@@ -100,8 +100,8 @@ export async function GET(req: NextRequest) {
  * POST /api/v1/support/cases
  */
 export async function POST(req: NextRequest) {
-  // Require admin capability for support case creation
-  const auth = await requireCapability(req, "admin:full");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #229)
+  const auth = await requireCapabilitySafe(req, "admin:full");
   if (!auth.ok) {
     return auth.response;
   }

@@ -17,7 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireCapability } from "@/lib/auth";
+import { requireCapabilitySafe } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SupportCaseStatus, Prisma } from "@prisma/client";
 
@@ -50,7 +50,8 @@ export async function GET(
     );
   }
 
-  const auth = await requireCapability(req, "admin:full");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #229)
+  const auth = await requireCapabilitySafe(req, "admin:full");
   if (!auth.ok) {
     return auth.response;
   }
@@ -157,7 +158,8 @@ export async function PATCH(
     );
   }
 
-  const auth = await requireCapability(req, "admin:full");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #229)
+  const auth = await requireCapabilitySafe(req, "admin:full");
   if (!auth.ok) {
     return auth.response;
   }
