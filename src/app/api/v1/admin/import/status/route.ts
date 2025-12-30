@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireCapability } from "@/lib/auth";
+import { requireCapabilitySafe } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { runPreflightChecks, detectStaleRecords } from "@/lib/importing/wildapricot";
 
@@ -34,7 +34,8 @@ interface SyncStats {
 
 export async function GET(req: NextRequest) {
   // Require full admin access for import status
-  const auth = await requireCapability(req, "admin:full");
+  // Uses requireCapabilitySafe to block action during impersonation (Issue #233)
+  const auth = await requireCapabilitySafe(req, "admin:full");
   if (!auth.ok) return auth.response;
 
   try {

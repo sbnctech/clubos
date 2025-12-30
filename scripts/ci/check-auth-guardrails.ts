@@ -71,7 +71,7 @@ const KNOWN_GAPS: Set<string> = new Set([
   "v1/admin/transitions/[id]/route.ts:55",
   "v1/admin/transitions/[id]/route.ts:105",
   // admin:full endpoints - read/diagnostic operations, lower priority for safety
-  "v1/admin/import/status/route.ts:37",
+  // GAP-014 fixed: v1/admin/import/status/route.ts:37 (Issue #233)
   "v1/support/cases/route.ts:44",
   "v1/support/cases/route.ts:104",
   "v1/support/cases/[id]/notes/route.ts:42",
