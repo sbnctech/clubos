@@ -18,6 +18,10 @@ import {
   ProductType,
   StoreOrderStatus,
   FulfillmentType,
+  GovernanceMeetingType,
+  MinutesStatus,
+  MotionResult,
+  EmailStatus,
 } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
@@ -62,11 +66,20 @@ async function clearData(): Promise<void> {
   console.log("Clearing existing data...");
 
   // Delete in reverse dependency order
-  await prisma.emailLog.deleteMany();
+  // Governance
+  await prisma.governanceAnnotation.deleteMany();
+  await prisma.governanceMotion.deleteMany();
+  await prisma.governanceMinutes.deleteMany();
+  await prisma.governanceMeeting.deleteMany();
+  // Photos
   await prisma.photo.deleteMany();
   await prisma.photoAlbum.deleteMany();
+  // Email
+  await prisma.emailLog.deleteMany();
+  // Events and registrations
   await prisma.eventRegistration.deleteMany();
   await prisma.event.deleteMany();
+  // Users and roles
   await prisma.userAccount.deleteMany();
   await prisma.roleAssignment.deleteMany();
   await prisma.term.deleteMany();
@@ -151,8 +164,12 @@ async function seedMembers(
 
   const extendedId = statusMap.get("EXTENDED")!;
   const newcomerId = statusMap.get("NEWCOMER")!;
+  const prospectId = statusMap.get("PROSPECT")!;
+  const alumniId = statusMap.get("ALUMNI")!;
+  const lapsedId = statusMap.get("LAPSED")!;
 
   const members = [
+    // Active members
     {
       email: "alice@example.com",
       firstName: "Alice",
@@ -168,6 +185,33 @@ async function seedMembers(
       phone: "+1-555-0102",
       membershipStatusId: newcomerId,
       joinedAt: new Date("2024-06-01"),
+    },
+    // Prospect: interested but hasn't completed membership
+    {
+      email: "karen@example.com",
+      firstName: "Karen",
+      lastName: "Liu",
+      phone: "+1-555-0103",
+      membershipStatusId: prospectId,
+      joinedAt: new Date("2025-01-10"), // Recent interest
+    },
+    // Alumni: former active member
+    {
+      email: "larry@example.com",
+      firstName: "Larry",
+      lastName: "Davis",
+      phone: "+1-555-0104",
+      membershipStatusId: alumniId,
+      joinedAt: new Date("2018-03-15"), // Long-time former member
+    },
+    // Lapsed: membership expired, eligible for renewal
+    {
+      email: "henry@example.com",
+      firstName: "Henry",
+      lastName: "Wilson",
+      phone: "+1-555-0105",
+      membershipStatusId: lapsedId,
+      joinedAt: new Date("2021-09-01"), // Membership lapsed
     },
   ];
 
@@ -362,6 +406,45 @@ async function seedEvents(
   const carolId = memberMap.get("carol@example.com")!;
 
   const events = [
+    // ============================================
+    // PAST EVENTS (for photo albums and history)
+    // ============================================
+    {
+      title: "Spring Hike 2024",
+      description: "Beautiful spring hike through the canyon with wildflower views.",
+      category: "Outdoors",
+      location: "Valley Trail",
+      startTime: new Date("2024-04-15T08:00:00Z"),
+      endTime: new Date("2024-04-15T12:00:00Z"),
+      capacity: 15,
+      isPublished: true,
+      eventChairId: aliceId,
+    },
+    {
+      title: "April DiningIn 2024",
+      description: "Intimate dining experience at member homes.",
+      category: "Social",
+      location: "Member Homes",
+      startTime: new Date("2024-04-20T18:00:00Z"),
+      endTime: new Date("2024-04-20T21:00:00Z"),
+      capacity: 24,
+      isPublished: true,
+      eventChairId: carolId,
+    },
+    {
+      title: "Summer Potluck 2024",
+      description: "Annual summer potluck gathering at the park.",
+      category: "Social",
+      location: "Oak Park Pavilion",
+      startTime: new Date("2024-07-10T17:00:00Z"),
+      endTime: new Date("2024-07-10T20:00:00Z"),
+      capacity: 40,
+      isPublished: true,
+      eventChairId: aliceId,
+    },
+    // ============================================
+    // FUTURE EVENTS (for registration testing)
+    // ============================================
     {
       title: "Welcome Coffee",
       description: "A casual gathering for new and prospective members to learn about the club.",
@@ -406,6 +489,18 @@ async function seedEvents(
       isPublished: false,
       // No event chair
     },
+    // Cancelled event for testing
+    {
+      title: "Cancelled Wine Tasting",
+      description: "This event was cancelled due to venue issues.",
+      category: "Social",
+      location: "Wine Country Vineyard",
+      startTime: new Date("2025-05-15T16:00:00Z"),
+      endTime: new Date("2025-05-15T19:00:00Z"),
+      capacity: 30,
+      isPublished: false,
+      // Represents a cancelled event
+    },
   ];
 
   const eventMap = new Map<string, string>();
@@ -427,13 +522,26 @@ async function seedEventRegistrations(
 ): Promise<void> {
   console.log("Seeding event registrations...");
 
+  // Future events
   const welcomeCoffeeId = eventMap.get("Welcome Coffee")!;
   const hikeId = eventMap.get("Morning Hike at Rattlesnake Canyon")!;
   const picnicId = eventMap.get("Summer Beach Picnic")!;
+
+  // Past events
+  const springHikeId = eventMap.get("Spring Hike 2024")!;
+  const diningInId = eventMap.get("April DiningIn 2024")!;
+  const potluckId = eventMap.get("Summer Potluck 2024")!;
+
+  // Members
   const carolId = memberMap.get("carol@example.com")!;
   const aliceId = memberMap.get("alice@example.com")!;
+  const henryId = memberMap.get("henry@example.com")!; // Lapsed member - for no-show testing
+  const larryId = memberMap.get("larry@example.com")!; // Alumni - for history testing
 
   const registrations = [
+    // ============================================
+    // CONFIRMED registrations
+    // ============================================
     {
       eventId: welcomeCoffeeId,
       memberId: carolId,
@@ -447,6 +555,40 @@ async function seedEventRegistrations(
       registeredAt: new Date("2025-06-01T09:00:00Z"),
     },
     {
+      eventId: picnicId,
+      memberId: aliceId,
+      status: RegistrationStatus.CONFIRMED,
+      registeredAt: new Date("2025-07-15T08:00:00Z"),
+    },
+    // Past event - attended
+    {
+      eventId: springHikeId,
+      memberId: carolId,
+      status: RegistrationStatus.CONFIRMED,
+      registeredAt: new Date("2024-04-01T10:00:00Z"),
+    },
+    {
+      eventId: springHikeId,
+      memberId: aliceId,
+      status: RegistrationStatus.CONFIRMED,
+      registeredAt: new Date("2024-04-02T11:00:00Z"),
+    },
+    {
+      eventId: diningInId,
+      memberId: aliceId,
+      status: RegistrationStatus.CONFIRMED,
+      registeredAt: new Date("2024-04-10T09:00:00Z"),
+    },
+    {
+      eventId: potluckId,
+      memberId: carolId,
+      status: RegistrationStatus.CONFIRMED,
+      registeredAt: new Date("2024-07-01T14:00:00Z"),
+    },
+    // ============================================
+    // WAITLISTED registrations
+    // ============================================
+    {
       eventId: hikeId,
       memberId: aliceId,
       status: RegistrationStatus.WAITLISTED,
@@ -454,10 +596,68 @@ async function seedEventRegistrations(
       registeredAt: new Date("2025-06-02T10:30:00Z"),
     },
     {
-      eventId: picnicId,
+      eventId: hikeId,
+      memberId: henryId,
+      status: RegistrationStatus.WAITLISTED,
+      waitlistPosition: 2,
+      registeredAt: new Date("2025-06-03T09:00:00Z"),
+    },
+    // ============================================
+    // CANCELLED registrations
+    // ============================================
+    {
+      eventId: welcomeCoffeeId,
       memberId: aliceId,
+      status: RegistrationStatus.CANCELLED,
+      registeredAt: new Date("2025-06-18T10:00:00Z"),
+      cancelledAt: new Date("2025-06-19T15:00:00Z"),
+    },
+    {
+      eventId: picnicId,
+      memberId: carolId,
+      status: RegistrationStatus.CANCELLED,
+      registeredAt: new Date("2025-07-10T11:00:00Z"),
+      cancelledAt: new Date("2025-07-12T09:00:00Z"),
+    },
+    // ============================================
+    // NO_SHOW registrations (from past events)
+    // ============================================
+    {
+      eventId: springHikeId,
+      memberId: henryId,
+      status: RegistrationStatus.NO_SHOW,
+      registeredAt: new Date("2024-04-05T08:00:00Z"),
+    },
+    {
+      eventId: potluckId,
+      memberId: henryId,
+      status: RegistrationStatus.NO_SHOW,
+      registeredAt: new Date("2024-07-05T10:00:00Z"),
+    },
+    // ============================================
+    // REFUND_PENDING registrations
+    // ============================================
+    {
+      eventId: picnicId,
+      memberId: henryId,
+      status: RegistrationStatus.REFUND_PENDING,
+      registeredAt: new Date("2025-07-20T14:00:00Z"),
+      cancelledAt: new Date("2025-08-01T10:00:00Z"),
+    },
+    // ============================================
+    // Historical registrations for alumni
+    // ============================================
+    {
+      eventId: diningInId,
+      memberId: larryId,
       status: RegistrationStatus.CONFIRMED,
-      registeredAt: new Date("2025-07-15T08:00:00Z"),
+      registeredAt: new Date("2024-04-08T16:00:00Z"),
+    },
+    {
+      eventId: potluckId,
+      memberId: larryId,
+      status: RegistrationStatus.CONFIRMED,
+      registeredAt: new Date("2024-07-02T11:00:00Z"),
     },
   ];
 
@@ -465,7 +665,12 @@ async function seedEventRegistrations(
     await prisma.eventRegistration.create({ data: reg });
   }
 
-  console.log(`  Created ${registrations.length} event registrations`);
+  console.log(`  Created ${registrations.length} event registrations:`);
+  console.log("    - 9 CONFIRMED");
+  console.log("    - 2 WAITLISTED");
+  console.log("    - 2 CANCELLED");
+  console.log("    - 2 NO_SHOW");
+  console.log("    - 1 REFUND_PENDING");
 }
 
 async function seedCommitteesAndRoles(): Promise<void> {
@@ -1272,6 +1477,653 @@ async function clearStoreData(): Promise<void> {
   await prisma.product.deleteMany();
 }
 
+// ============================================================================
+// Governance Seeding
+// ============================================================================
+
+async function seedGovernanceData(memberMap: Map<string, string>): Promise<void> {
+  console.log("Seeding governance data...");
+
+  // Get demo users for governance roles
+  const presidentId = await prisma.member.findUnique({
+    where: { email: "president@demo.murmurant.test" },
+    select: { id: true },
+  }).then(m => m?.id);
+
+  const secretaryId = await prisma.member.findUnique({
+    where: { email: "secretary@demo.murmurant.test" },
+    select: { id: true },
+  }).then(m => m?.id);
+
+  const aliceId = memberMap.get("alice@example.com");
+  const carolId = memberMap.get("carol@example.com");
+
+  // Create governance meetings
+  const meetings = [
+    // Past meetings with published minutes
+    {
+      date: new Date("2024-09-15"),
+      type: GovernanceMeetingType.BOARD,
+      title: "September 2024 Board Meeting",
+      location: "Community Center, Room B",
+      attendanceCount: 8,
+      quorumMet: true,
+      createdById: secretaryId,
+    },
+    {
+      date: new Date("2024-10-20"),
+      type: GovernanceMeetingType.BOARD,
+      title: "October 2024 Board Meeting",
+      location: "Community Center, Room B",
+      attendanceCount: 9,
+      quorumMet: true,
+      createdById: secretaryId,
+    },
+    {
+      date: new Date("2024-11-17"),
+      type: GovernanceMeetingType.BOARD,
+      title: "November 2024 Board Meeting",
+      location: "Virtual (Zoom)",
+      attendanceCount: 7,
+      quorumMet: true,
+      createdById: secretaryId,
+    },
+    // Meeting with draft minutes (for testing workflow)
+    {
+      date: new Date("2024-12-15"),
+      type: GovernanceMeetingType.BOARD,
+      title: "December 2024 Board Meeting",
+      location: "Community Center, Room A",
+      attendanceCount: 8,
+      quorumMet: true,
+      createdById: secretaryId,
+    },
+    // Annual meeting
+    {
+      date: new Date("2024-02-10"),
+      type: GovernanceMeetingType.ANNUAL,
+      title: "2024 Annual General Meeting",
+      location: "Santa Barbara Museum of Natural History",
+      attendanceCount: 145,
+      quorumMet: true,
+      createdById: secretaryId,
+    },
+    // Executive session
+    {
+      date: new Date("2024-11-05"),
+      type: GovernanceMeetingType.EXECUTIVE,
+      title: "Executive Session - Personnel Matter",
+      location: "Virtual (Zoom)",
+      attendanceCount: 4,
+      quorumMet: true,
+      createdById: presidentId,
+    },
+  ];
+
+  const meetingMap = new Map<string, string>();
+
+  for (const meeting of meetings) {
+    const created = await prisma.governanceMeeting.create({
+      data: meeting,
+    });
+    meetingMap.set(meeting.title!, created.id);
+  }
+
+  console.log(`  Created ${meetings.length} governance meetings`);
+
+  // Create minutes for meetings
+  const septMeetingId = meetingMap.get("September 2024 Board Meeting")!;
+  const octMeetingId = meetingMap.get("October 2024 Board Meeting")!;
+  const novMeetingId = meetingMap.get("November 2024 Board Meeting")!;
+  const decMeetingId = meetingMap.get("December 2024 Board Meeting")!;
+  const annualMeetingId = meetingMap.get("2024 Annual General Meeting")!;
+
+  // Published minutes
+  await prisma.governanceMinutes.create({
+    data: {
+      meetingId: septMeetingId,
+      status: MinutesStatus.PUBLISHED,
+      version: 1,
+      content: {
+        sections: [
+          { type: "heading", text: "Call to Order" },
+          { type: "paragraph", text: "The meeting was called to order at 6:30 PM by President Pat President." },
+          { type: "heading", text: "Approval of Minutes" },
+          { type: "paragraph", text: "August minutes were approved unanimously." },
+          { type: "heading", text: "Treasurer's Report" },
+          { type: "paragraph", text: "Current balance: $45,234. All bills paid." },
+          { type: "heading", text: "New Business" },
+          { type: "paragraph", text: "Discussed upcoming holiday party venue options." },
+        ],
+      },
+      summary: "Routine board meeting. Approved August minutes. Discussed holiday party plans.",
+      submittedAt: new Date("2024-09-16T10:00:00Z"),
+      submittedById: secretaryId,
+      approvedAt: new Date("2024-09-17T14:00:00Z"),
+      approvedById: presidentId,
+      publishedAt: new Date("2024-09-18T09:00:00Z"),
+      publishedById: secretaryId,
+      createdById: secretaryId,
+      lastEditedById: secretaryId,
+    },
+  });
+
+  await prisma.governanceMinutes.create({
+    data: {
+      meetingId: octMeetingId,
+      status: MinutesStatus.PUBLISHED,
+      version: 1,
+      content: {
+        sections: [
+          { type: "heading", text: "Call to Order" },
+          { type: "paragraph", text: "The meeting was called to order at 6:30 PM." },
+          { type: "heading", text: "Holiday Party Update" },
+          { type: "paragraph", text: "Venue booked at Cabrillo Pavilion. Budget approved for catering." },
+          { type: "heading", text: "Membership Report" },
+          { type: "paragraph", text: "Current membership: 285 active members. 12 new applications received." },
+        ],
+      },
+      summary: "Finalized holiday party plans. Membership growing steadily.",
+      submittedAt: new Date("2024-10-21T10:00:00Z"),
+      submittedById: secretaryId,
+      approvedAt: new Date("2024-10-22T11:00:00Z"),
+      approvedById: presidentId,
+      publishedAt: new Date("2024-10-23T09:00:00Z"),
+      publishedById: secretaryId,
+      createdById: secretaryId,
+      lastEditedById: secretaryId,
+    },
+  });
+
+  // Approved but not yet published
+  await prisma.governanceMinutes.create({
+    data: {
+      meetingId: novMeetingId,
+      status: MinutesStatus.APPROVED,
+      version: 1,
+      content: {
+        sections: [
+          { type: "heading", text: "Call to Order" },
+          { type: "paragraph", text: "Virtual meeting called to order at 6:30 PM." },
+          { type: "heading", text: "Budget Discussion" },
+          { type: "paragraph", text: "Preliminary 2025 budget reviewed. Final vote scheduled for December." },
+        ],
+      },
+      summary: "Virtual meeting. Reviewed 2025 budget proposal.",
+      submittedAt: new Date("2024-11-18T10:00:00Z"),
+      submittedById: secretaryId,
+      approvedAt: new Date("2024-11-19T14:00:00Z"),
+      approvedById: presidentId,
+      createdById: secretaryId,
+      lastEditedById: secretaryId,
+    },
+  });
+
+  // Draft minutes (not yet submitted)
+  await prisma.governanceMinutes.create({
+    data: {
+      meetingId: decMeetingId,
+      status: MinutesStatus.DRAFT,
+      version: 1,
+      content: {
+        sections: [
+          { type: "heading", text: "Call to Order" },
+          { type: "paragraph", text: "Meeting called to order at 6:30 PM." },
+          { type: "heading", text: "TODO" },
+          { type: "paragraph", text: "[Secretary to complete notes]" },
+        ],
+      },
+      createdById: secretaryId,
+      lastEditedById: secretaryId,
+    },
+  });
+
+  // Annual meeting minutes
+  await prisma.governanceMinutes.create({
+    data: {
+      meetingId: annualMeetingId,
+      status: MinutesStatus.PUBLISHED,
+      version: 1,
+      content: {
+        sections: [
+          { type: "heading", text: "Welcome and Call to Order" },
+          { type: "paragraph", text: "President welcomed 145 members to the Annual General Meeting." },
+          { type: "heading", text: "Year in Review" },
+          { type: "paragraph", text: "Highlights included 48 events with 1,200+ total attendees." },
+          { type: "heading", text: "Election Results" },
+          { type: "paragraph", text: "New board members elected by acclamation." },
+          { type: "heading", text: "Member Recognition" },
+          { type: "paragraph", text: "Awards presented to volunteers of the year." },
+        ],
+      },
+      summary: "Annual meeting with 145 attendees. New board elected. Volunteer recognition.",
+      submittedAt: new Date("2024-02-11T10:00:00Z"),
+      submittedById: secretaryId,
+      approvedAt: new Date("2024-02-12T14:00:00Z"),
+      approvedById: presidentId,
+      publishedAt: new Date("2024-02-13T09:00:00Z"),
+      publishedById: secretaryId,
+      createdById: secretaryId,
+      lastEditedById: secretaryId,
+    },
+  });
+
+  console.log("  Created 5 meeting minutes in various states");
+
+  // Create motions
+  const motions = [
+    // September meeting motions
+    {
+      meetingId: septMeetingId,
+      motionNumber: 1,
+      motionText: "Motion to approve August 2024 meeting minutes as presented.",
+      movedById: aliceId,
+      secondedById: carolId,
+      votesYes: 8,
+      votesNo: 0,
+      votesAbstain: 0,
+      result: MotionResult.PASSED,
+      createdById: secretaryId,
+    },
+    {
+      meetingId: septMeetingId,
+      motionNumber: 2,
+      motionText: "Motion to approve holiday party budget of $2,500.",
+      movedById: carolId,
+      secondedById: aliceId,
+      votesYes: 7,
+      votesNo: 1,
+      votesAbstain: 0,
+      result: MotionResult.PASSED,
+      createdById: secretaryId,
+    },
+    // October meeting motions
+    {
+      meetingId: octMeetingId,
+      motionNumber: 1,
+      motionText: "Motion to approve September 2024 meeting minutes.",
+      movedById: aliceId,
+      secondedById: carolId,
+      votesYes: 9,
+      votesNo: 0,
+      votesAbstain: 0,
+      result: MotionResult.PASSED,
+      createdById: secretaryId,
+    },
+    {
+      meetingId: octMeetingId,
+      motionNumber: 2,
+      motionText: "Motion to increase dues by $5 effective January 2025.",
+      movedById: presidentId,
+      secondedById: aliceId,
+      votesYes: 5,
+      votesNo: 3,
+      votesAbstain: 1,
+      result: MotionResult.PASSED,
+      resultNotes: "Narrow passage; concerns noted about affordability.",
+      createdById: secretaryId,
+    },
+    // Tabled motion for testing
+    {
+      meetingId: novMeetingId,
+      motionNumber: 1,
+      motionText: "Motion to create a new standing committee for technology oversight.",
+      movedById: carolId,
+      secondedById: aliceId,
+      votesYes: 2,
+      votesNo: 1,
+      votesAbstain: 4,
+      result: MotionResult.TABLED,
+      resultNotes: "Tabled for further research and to be revisited in Q1 2025.",
+      createdById: secretaryId,
+    },
+    // Annual meeting motion
+    {
+      meetingId: annualMeetingId,
+      motionNumber: 1,
+      motionText: "Motion to approve the slate of officers for 2024-2025 as presented by the Nominating Committee.",
+      movedById: aliceId,
+      secondedById: carolId,
+      votesYes: 142,
+      votesNo: 0,
+      votesAbstain: 3,
+      result: MotionResult.PASSED,
+      resultNotes: "Elected by acclamation.",
+      createdById: secretaryId,
+    },
+    {
+      meetingId: annualMeetingId,
+      motionNumber: 2,
+      motionText: "Motion to adopt the revised bylaws as presented.",
+      movedById: presidentId,
+      secondedById: aliceId,
+      votesYes: 138,
+      votesNo: 5,
+      votesAbstain: 2,
+      result: MotionResult.PASSED,
+      createdById: secretaryId,
+    },
+  ];
+
+  for (const motion of motions) {
+    await prisma.governanceMotion.create({ data: motion });
+  }
+
+  console.log(`  Created ${motions.length} motions with voting records`);
+}
+
+// ============================================================================
+// Photo Album Seeding
+// ============================================================================
+
+async function seedPhotoAlbums(
+  eventMap: Map<string, string>,
+  memberMap: Map<string, string>
+): Promise<void> {
+  console.log("Seeding photo albums and photos...");
+
+  const springHikeId = eventMap.get("Spring Hike 2024");
+  const potluckId = eventMap.get("Summer Potluck 2024");
+  const diningInId = eventMap.get("April DiningIn 2024");
+
+  const aliceId = memberMap.get("alice@example.com")!;
+  const carolId = memberMap.get("carol@example.com")!;
+
+  // Create albums for past events
+  const springHikeAlbum = await prisma.photoAlbum.create({
+    data: {
+      eventId: springHikeId,
+      title: "Spring Hike 2024 Photos",
+      description: "Beautiful wildflower views from our April canyon hike.",
+    },
+  });
+
+  const potluckAlbum = await prisma.photoAlbum.create({
+    data: {
+      eventId: potluckId,
+      title: "Summer Potluck 2024",
+      description: "Annual potluck gathering at Oak Park.",
+    },
+  });
+
+  const diningInAlbum = await prisma.photoAlbum.create({
+    data: {
+      eventId: diningInId,
+      title: "April DiningIn 2024",
+      description: "Photos from our intimate dining experience.",
+    },
+  });
+
+  // Standalone album (not tied to event)
+  const standaloneAlbum = await prisma.photoAlbum.create({
+    data: {
+      title: "Club Memories 2024",
+      description: "Miscellaneous photos from throughout the year.",
+    },
+  });
+
+  console.log("  Created 4 photo albums (3 event-linked, 1 standalone)");
+
+  // Create photos for Spring Hike album
+  const springHikePhotos = [
+    {
+      albumId: springHikeAlbum.id,
+      uploaderId: aliceId,
+      filename: "spring-hike-001.jpg",
+      url: "/photos/2024/spring-hike/001.jpg",
+      caption: "Group photo at the trailhead",
+      takenAt: new Date("2024-04-15T08:15:00Z"),
+    },
+    {
+      albumId: springHikeAlbum.id,
+      uploaderId: aliceId,
+      filename: "spring-hike-002.jpg",
+      url: "/photos/2024/spring-hike/002.jpg",
+      caption: "California poppies in bloom",
+      takenAt: new Date("2024-04-15T09:30:00Z"),
+    },
+    {
+      albumId: springHikeAlbum.id,
+      uploaderId: carolId,
+      filename: "spring-hike-003.jpg",
+      url: "/photos/2024/spring-hike/003.jpg",
+      caption: "View from the summit",
+      takenAt: new Date("2024-04-15T10:45:00Z"),
+    },
+    {
+      albumId: springHikeAlbum.id,
+      uploaderId: carolId,
+      filename: "spring-hike-004.jpg",
+      url: "/photos/2024/spring-hike/004.jpg",
+      caption: "Picnic lunch break",
+      takenAt: new Date("2024-04-15T11:30:00Z"),
+    },
+  ];
+
+  // Create photos for Summer Potluck
+  const potluckPhotos = [
+    {
+      albumId: potluckAlbum.id,
+      uploaderId: aliceId,
+      filename: "potluck-001.jpg",
+      url: "/photos/2024/potluck/001.jpg",
+      caption: "The amazing spread of dishes",
+      takenAt: new Date("2024-07-10T17:30:00Z"),
+    },
+    {
+      albumId: potluckAlbum.id,
+      uploaderId: aliceId,
+      filename: "potluck-002.jpg",
+      url: "/photos/2024/potluck/002.jpg",
+      caption: "Members enjoying the picnic",
+      takenAt: new Date("2024-07-10T18:00:00Z"),
+    },
+    {
+      albumId: potluckAlbum.id,
+      uploaderId: carolId,
+      filename: "potluck-003.jpg",
+      url: "/photos/2024/potluck/003.jpg",
+      caption: "Sunset at the park",
+      takenAt: new Date("2024-07-10T19:45:00Z"),
+    },
+  ];
+
+  // Create photos for DiningIn
+  const diningInPhotos = [
+    {
+      albumId: diningInAlbum.id,
+      uploaderId: carolId,
+      filename: "diningin-001.jpg",
+      url: "/photos/2024/diningin/001.jpg",
+      caption: "Beautifully set table",
+      takenAt: new Date("2024-04-20T18:00:00Z"),
+    },
+    {
+      albumId: diningInAlbum.id,
+      uploaderId: carolId,
+      filename: "diningin-002.jpg",
+      url: "/photos/2024/diningin/002.jpg",
+      caption: "Host presenting the first course",
+      takenAt: new Date("2024-04-20T18:30:00Z"),
+    },
+  ];
+
+  // Create photos for standalone album
+  const standalonePhotos = [
+    {
+      albumId: standaloneAlbum.id,
+      uploaderId: aliceId,
+      filename: "club-001.jpg",
+      url: "/photos/2024/misc/001.jpg",
+      caption: "Board meeting in action",
+      takenAt: new Date("2024-03-15T14:00:00Z"),
+    },
+    {
+      albumId: standaloneAlbum.id,
+      uploaderId: aliceId,
+      filename: "club-002.jpg",
+      url: "/photos/2024/misc/002.jpg",
+      caption: "New member orientation",
+      takenAt: new Date("2024-05-10T10:00:00Z"),
+    },
+  ];
+
+  const allPhotos = [...springHikePhotos, ...potluckPhotos, ...diningInPhotos, ...standalonePhotos];
+
+  let coverPhotoId: string | undefined;
+  for (const photo of allPhotos) {
+    const created = await prisma.photo.create({ data: photo });
+    // Set first photo of spring hike as cover
+    if (photo.filename === "spring-hike-001.jpg") {
+      coverPhotoId = created.id;
+    }
+  }
+
+  // Set cover photo for spring hike album
+  if (coverPhotoId) {
+    await prisma.photoAlbum.update({
+      where: { id: springHikeAlbum.id },
+      data: { coverPhotoId },
+    });
+  }
+
+  console.log(`  Created ${allPhotos.length} photos across 4 albums`);
+}
+
+// ============================================================================
+// Email Log Seeding
+// ============================================================================
+
+async function seedEmailLogs(memberMap: Map<string, string>): Promise<void> {
+  console.log("Seeding email logs...");
+
+  const aliceId = memberMap.get("alice@example.com");
+  const carolId = memberMap.get("carol@example.com");
+  const karenId = memberMap.get("karen@example.com"); // Prospect
+  const larryId = memberMap.get("larry@example.com"); // Alumni
+  const henryId = memberMap.get("henry@example.com"); // Lapsed
+
+  const emailLogs = [
+    // Successful deliveries
+    {
+      memberId: aliceId,
+      recipientEmail: "alice@example.com",
+      subject: "Your Event Registration Confirmation",
+      bodyPreview: "Thank you for registering for Welcome Coffee...",
+      sentAt: new Date("2024-12-01T10:00:00Z"),
+      channel: "transactional",
+      templateKey: "event-registration-confirmation",
+      status: EmailStatus.DELIVERED,
+    },
+    {
+      memberId: carolId,
+      recipientEmail: "carol@example.com",
+      subject: "December Newsletter",
+      bodyPreview: "Happy holidays from the Club! Here's what's happening...",
+      sentAt: new Date("2024-12-05T09:00:00Z"),
+      channel: "newsletter",
+      templateKey: "monthly-newsletter",
+      status: EmailStatus.DELIVERED,
+    },
+    {
+      memberId: aliceId,
+      recipientEmail: "alice@example.com",
+      subject: "Board Meeting Reminder",
+      bodyPreview: "Reminder: December Board Meeting this Thursday...",
+      sentAt: new Date("2024-12-12T08:00:00Z"),
+      channel: "governance",
+      templateKey: "meeting-reminder",
+      status: EmailStatus.DELIVERED,
+    },
+    // Sent but not yet delivered
+    {
+      memberId: carolId,
+      recipientEmail: "carol@example.com",
+      subject: "Your Membership Renewal",
+      bodyPreview: "Your membership expires in 30 days...",
+      sentAt: new Date("2024-12-20T10:00:00Z"),
+      channel: "transactional",
+      templateKey: "renewal-reminder",
+      status: EmailStatus.SENT,
+    },
+    // Bounced email (common for testing error handling)
+    {
+      memberId: henryId,
+      recipientEmail: "henry@example.com",
+      subject: "December Newsletter",
+      bodyPreview: "Happy holidays from the Club!...",
+      sentAt: new Date("2024-12-05T09:05:00Z"),
+      channel: "newsletter",
+      templateKey: "monthly-newsletter",
+      status: EmailStatus.BOUNCED,
+    },
+    // Failed delivery
+    {
+      memberId: larryId,
+      recipientEmail: "larry@example.com",
+      subject: "Alumni Event Invitation",
+      bodyPreview: "You're invited to our special alumni gathering...",
+      sentAt: new Date("2024-11-15T14:00:00Z"),
+      channel: "marketing",
+      templateKey: "alumni-event-invite",
+      status: EmailStatus.FAILED,
+    },
+    // Queued (not yet sent)
+    {
+      memberId: karenId,
+      recipientEmail: "karen@example.com",
+      subject: "Welcome to the Club!",
+      bodyPreview: "We're excited to have you as a prospective member...",
+      sentAt: new Date("2024-12-22T16:00:00Z"),
+      channel: "transactional",
+      templateKey: "prospect-welcome",
+      status: EmailStatus.QUEUED,
+    },
+    // More delivered for history
+    {
+      memberId: aliceId,
+      recipientEmail: "alice@example.com",
+      subject: "November Newsletter",
+      bodyPreview: "Thanksgiving greetings from the Club!...",
+      sentAt: new Date("2024-11-05T09:00:00Z"),
+      channel: "newsletter",
+      templateKey: "monthly-newsletter",
+      status: EmailStatus.DELIVERED,
+    },
+    {
+      memberId: carolId,
+      recipientEmail: "carol@example.com",
+      subject: "Event Waitlist Update",
+      bodyPreview: "You've been moved off the waitlist for Morning Hike...",
+      sentAt: new Date("2024-11-20T11:30:00Z"),
+      channel: "transactional",
+      templateKey: "waitlist-promotion",
+      status: EmailStatus.DELIVERED,
+    },
+    {
+      memberId: aliceId,
+      recipientEmail: "alice@example.com",
+      subject: "Your Order Has Shipped",
+      bodyPreview: "Your order #1234 is on its way...",
+      sentAt: new Date("2024-11-16T14:30:00Z"),
+      channel: "store",
+      templateKey: "order-shipped",
+      status: EmailStatus.DELIVERED,
+    },
+  ];
+
+  for (const log of emailLogs) {
+    await prisma.emailLog.create({ data: log });
+  }
+
+  console.log(`  Created ${emailLogs.length} email log entries:`);
+  console.log("    - 7 DELIVERED");
+  console.log("    - 1 SENT (pending delivery)");
+  console.log("    - 1 BOUNCED");
+  console.log("    - 1 FAILED");
+  console.log("    - 1 QUEUED");
+}
+
 async function main(): Promise<void> {
   console.log("=== Murmurant Seed Script ===\n");
 
@@ -1300,15 +2152,25 @@ async function main(): Promise<void> {
     const addressMap = await seedShippingAddresses(memberMap);
     await seedStoreOrders(memberMap, productMap, variantMap, addressMap);
 
+    // Seed governance data (after demo users created)
+    await seedGovernanceData(memberMap);
+
+    // Seed photo albums (after events created)
+    await seedPhotoAlbums(eventMap, memberMap);
+
+    // Seed email logs (after members created)
+    await seedEmailLogs(memberMap);
+
     console.log("\n=== Seed Complete ===");
     console.log("Summary:");
-    console.log("  - 5 membership statuses");
-    console.log("  - 2 members (Alice Chen, Carol Johnson)");
+    console.log("  - 5 membership statuses (PROSPECT, NEWCOMER, EXTENDED, ALUMNI, LAPSED)");
+    console.log("  - 5 members in all statuses");
     console.log("  - 1 admin user account (alice@example.com)");
     console.log("  - 5 committees with 18 committee roles");
     console.log("  - 3 terms (Winter 2024, Winter 2025, Summer 2025)");
-    console.log("  - 4 events (3 published, 1 draft)");
-    console.log("  - 4 event registrations (3 confirmed, 1 waitlisted)");
+    console.log("  - 8 events (3 past, 4 future, 1 draft)");
+    console.log("  - 16 event registrations across all states:");
+    console.log("    - CONFIRMED, WAITLISTED, CANCELLED, NO_SHOW, REFUND_PENDING");
     console.log("  - 5 demo users with role-based access:");
     console.log("    - president@demo.murmurant.test (President)");
     console.log("    - secretary@demo.murmurant.test (Secretary)");
@@ -1318,10 +2180,12 @@ async function main(): Promise<void> {
     console.log("  - 7 store products (4 physical, 2 digital, 1 members-only)");
     console.log("  - 5 t-shirt size variants");
     console.log("  - 3 shipping addresses (2 member, 1 guest)");
-    console.log("  - 9 store orders covering all statuses:");
-    console.log("    - Completed, Picked Up, Shipped, Processing");
-    console.log("    - Pending Payment, Cart, Cancelled, Refunded");
-    console.log("    - Includes guest checkout and digital delivery");
+    console.log("  - 9 store orders covering all statuses");
+    console.log("  - 6 governance meetings (BOARD, ANNUAL, EXECUTIVE)");
+    console.log("  - 5 meeting minutes (DRAFT, APPROVED, PUBLISHED)");
+    console.log("  - 7 motions (PASSED, TABLED)");
+    console.log("  - 4 photo albums with 11 photos");
+    console.log("  - 11 email logs (DELIVERED, SENT, BOUNCED, FAILED, QUEUED)");
     console.log("\nDemo Login Instructions:");
     console.log("  1. Go to /login");
     console.log("  2. Enter demo email (e.g., president@demo.murmurant.test)");
