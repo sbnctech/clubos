@@ -26,3 +26,8 @@ tsconfig.tsbuildinfo
 # --- Murmurant: ignore harvested WA/SBNC policy PDFs (local source artifacts) ---
 docs/policies/**/sources/**/*.pdf
 # --- end Murmurant harvested PDFs ---
+
+# Migration generated data
+scripts/migration/reports/
+scripts/migration/screenshots/
+storage/
