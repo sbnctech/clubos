@@ -36,6 +36,7 @@ interface CreateProductBody {
   description?: string;
   type?: "PHYSICAL" | "DIGITAL";
   priceCents: number;
+  memberPriceCents?: number;
   comparePriceCents?: number;
   imageUrl?: string;
   isActive?: boolean;
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest) {
         description: body.description?.trim() || null,
         type: body.type || "PHYSICAL",
         priceCents: body.priceCents,
+        memberPriceCents: body.memberPriceCents || null,
         comparePriceCents: body.comparePriceCents || null,
         imageUrl: body.imageUrl?.trim() || null,
         isActive: body.isActive ?? true,

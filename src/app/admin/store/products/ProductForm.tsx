@@ -11,6 +11,7 @@ type ProductFormData = {
   description: string;
   type: "PHYSICAL" | "DIGITAL";
   priceCents: number;
+  memberPriceCents: number | null;
   comparePriceCents: number | null;
   imageUrl: string;
   isActive: boolean;
@@ -36,6 +37,7 @@ const defaultFormData: ProductFormData = {
   description: "",
   type: "PHYSICAL",
   priceCents: 0,
+  memberPriceCents: null,
   comparePriceCents: null,
   imageUrl: "",
   isActive: true,
@@ -70,6 +72,11 @@ export default function ProductForm({
   const [priceDisplay, setPriceDisplay] = useState(
     initialData?.priceCents ? (initialData.priceCents / 100).toFixed(2) : ""
   );
+  const [memberPriceDisplay, setMemberPriceDisplay] = useState(
+    initialData?.memberPriceCents
+      ? (initialData.memberPriceCents / 100).toFixed(2)
+      : ""
+  );
   const [comparePriceDisplay, setComparePriceDisplay] = useState(
     initialData?.comparePriceCents
       ? (initialData.comparePriceCents / 100).toFixed(2)
@@ -96,6 +103,19 @@ export default function ProductForm({
       ...prev,
       priceCents: isNaN(cents) ? 0 : cents,
     }));
+  };
+
+  const handleMemberPriceChange = (value: string) => {
+    setMemberPriceDisplay(value);
+    if (value === "") {
+      setFormData((prev) => ({ ...prev, memberPriceCents: null }));
+    } else {
+      const cents = Math.round(parseFloat(value) * 100);
+      setFormData((prev) => ({
+        ...prev,
+        memberPriceCents: isNaN(cents) ? null : cents,
+      }));
+    }
   };
 
   const handleComparePriceChange = (value: string) => {
@@ -270,6 +290,24 @@ export default function ProductForm({
               placeholder="25.00"
             />
           </label>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label style={labelStyle}>
+            Member Price ($)
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={memberPriceDisplay}
+              onChange={(e) => handleMemberPriceChange(e.target.value)}
+              data-test-id="product-form-member-price"
+              style={inputStyle}
+              placeholder="20.00"
+            />
+          </label>
+          <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
+            Discounted price for members
+          </p>
         </div>
         <div style={{ flex: 1 }}>
           <label style={labelStyle}>

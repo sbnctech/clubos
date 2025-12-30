@@ -63,6 +63,7 @@ interface UpdateProductBody {
   description?: string | null;
   type?: "PHYSICAL" | "DIGITAL";
   priceCents?: number;
+  memberPriceCents?: number | null;
   comparePriceCents?: number | null;
   imageUrl?: string | null;
   images?: string[] | null;
@@ -145,6 +146,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
         ...(body.description !== undefined && { description: body.description?.trim() || null }),
         ...(body.type !== undefined && { type: body.type }),
         ...(body.priceCents !== undefined && { priceCents: body.priceCents }),
+        ...(body.memberPriceCents !== undefined && { memberPriceCents: body.memberPriceCents }),
         ...(body.comparePriceCents !== undefined && { comparePriceCents: body.comparePriceCents }),
         ...(body.imageUrl !== undefined && { imageUrl: body.imageUrl?.trim() || null }),
         ...(body.images !== undefined && { images: body.images === null ? Prisma.JsonNull : body.images }),
