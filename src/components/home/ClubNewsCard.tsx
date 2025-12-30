@@ -10,7 +10,7 @@
  *   2. Replace CLUB_NEWS with fetch() in useEffect
  *   3. Keep NewsItem interface the same
  *
- * Copyright (c) Santa Barbara Newcomers Club
+ * Copyright © 2025 Murmurant, Inc.
  */
 
 "use client";
