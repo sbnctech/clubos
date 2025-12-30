@@ -160,6 +160,9 @@ export async function POST(req: NextRequest) {
         sessionId: sessionId,
         fulfillmentType: body.fulfillmentType,
       },
+      // Enable Stripe Tax for automatic sales tax calculation
+      // Requires Stripe Tax to be enabled in the Stripe dashboard
+      automatic_tax: { enabled: true },
     };
 
     // Add shipping collection if needed

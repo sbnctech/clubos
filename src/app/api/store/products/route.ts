@@ -18,12 +18,14 @@ type PublicProductListItem = {
   description: string | null;
   type: "PHYSICAL" | "DIGITAL";
   priceCents: number;
+  memberPriceCents: number | null;
   comparePriceCents: number | null;
   imageUrl: string | null;
   allowsShipping: boolean;
   allowsPickup: boolean;
   inStock: boolean;
   hasVariants: boolean;
+  variantCount: number;
 };
 
 // ============================================================================
@@ -36,8 +38,9 @@ export async function GET(req: NextRequest) {
   // Parse pagination params with defaults
   const pageParam = searchParams.get("page");
   const pageSizeParam = searchParams.get("pageSize");
-  const query = searchParams.get("query")?.trim() || null;
+  const query = searchParams.get("q")?.trim() || searchParams.get("query")?.trim() || null;
   const typeFilter = searchParams.get("type"); // "PHYSICAL" or "DIGITAL"
+  const sortParam = searchParams.get("sort") || "name";
 
   let page = 1;
   let pageSize = 20;
@@ -89,6 +92,28 @@ export async function GET(req: NextRequest) {
   const totalPages = Math.ceil(totalItems / pageSize);
   const skip = (page - 1) * pageSize;
 
+  // Build orderBy based on sort param
+  type OrderByClause = { sortOrder?: "asc" | "desc"; name?: "asc" | "desc"; priceCents?: "asc" | "desc"; createdAt?: "asc" | "desc" };
+  let orderBy: OrderByClause[] = [{ sortOrder: "asc" }, { name: "asc" }];
+
+  switch (sortParam) {
+    case "name":
+      orderBy = [{ name: "asc" }];
+      break;
+    case "-name":
+      orderBy = [{ name: "desc" }];
+      break;
+    case "price":
+      orderBy = [{ priceCents: "asc" }];
+      break;
+    case "-price":
+      orderBy = [{ priceCents: "desc" }];
+      break;
+    case "newest":
+      orderBy = [{ createdAt: "desc" }];
+      break;
+  }
+
   // Fetch products with variant info for stock calculation
   const products = await prisma.product.findMany({
     where: whereClause,
@@ -98,7 +123,7 @@ export async function GET(req: NextRequest) {
         select: { quantity: true },
       },
     },
-    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    orderBy,
     skip,
     take: pageSize,
   });
@@ -124,12 +149,14 @@ export async function GET(req: NextRequest) {
       description: p.description,
       type: p.type,
       priceCents: p.priceCents,
+      memberPriceCents: p.memberPriceCents,
       comparePriceCents: p.comparePriceCents,
       imageUrl: p.imageUrl,
       allowsShipping: p.allowsShipping,
       allowsPickup: p.allowsPickup,
       inStock,
       hasVariants,
+      variantCount: p.variants.length,
     };
   });
 

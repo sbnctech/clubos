@@ -1961,6 +1961,7 @@ model Product {
   isActive          Boolean     @default(true)
   isPublic          Boolean     @default(true) // Public store vs members-only
   priceCents        Int         // Base price in cents (variants can override)
+  memberPriceCents  Int?        // Member-only price (null = no discount)
   comparePriceCents Int?        // Original price for "sale" display
   imageUrl          String?
   images            Json?       // Array of additional image URLs
@@ -1997,8 +1998,9 @@ model ProductVariant {
   productId  String  @db.Uuid
   name       String  // e.g., "Large / Blue"
   sku        String? @unique
-  priceCents Int?    // Override product price (null = use product price)
-  isActive   Boolean @default(true)
+  priceCents       Int?    // Override product price (null = use product price)
+  memberPriceCents Int?    // Member-only price override
+  isActive         Boolean @default(true)
   sortOrder  Int     @default(0)
 
   // Variant-specific inventory
