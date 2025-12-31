@@ -136,7 +136,53 @@ Murmurant does NOT guarantee:
 
 ---
 
-## 9. Explicit Non-Goals
+## 9. API Stability Guarantees (Append-Only Contract)
+
+### 9.1 Stable API Fields
+
+Murmurant guarantees:
+- Response fields listed in `tests/contracts/api-schema.contract.spec.ts` cannot be removed.
+- New fields may be added to any response (append-only).
+- Field types cannot change once stable (e.g., string cannot become number).
+- Pagination envelope structure is stable: `{ items, page, pageSize, totalItems, totalPages }`.
+- Error responses always include `{ error: string }`.
+
+### 9.2 Breaking Change Policy
+
+A breaking change is defined as:
+- Removing a field from an API response
+- Changing the type of a field
+- Renaming a field
+- Changing the structure of a response envelope
+- Removing an endpoint
+
+Breaking changes require:
+1. **Major version bump** (e.g., v1 → v2)
+2. **6-month deprecation period** with `Deprecation` header
+3. **Merge captain approval**
+4. **Contract test update** with documented justification
+
+### 9.3 Versioning Strategy
+
+- All APIs are versioned under `/api/v1/`
+- Old versions remain available for minimum 12 months after successor release
+- Sunset dates are communicated via `Sunset` HTTP header
+
+### 9.4 Contract Test Enforcement
+
+The following contract tests run in CI to prevent regressions:
+- `tests/contracts/api-schema.contract.spec.ts` - Response field stability
+- `tests/contracts/rbac.contract.spec.ts` - Authorization invariants
+- `tests/contracts/lifecycle.contract.spec.ts` - State machine invariants
+
+Murmurant does NOT guarantee:
+- Response field ordering (JSON objects are unordered)
+- Exact error message wording (only structure)
+- Performance characteristics
+
+---
+
+## 10. Explicit Non-Goals
 
 The following are intentionally NOT guaranteed:
 
