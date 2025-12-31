@@ -75,6 +75,7 @@ const KNOWN_GAPS: Set<string> = new Set([
   // GAP-015 through GAP-020 fixed: support cases routes (Issue #229)
   // GAP-021 fixed: v1/officer/governance/minutes/[id]/route.ts:256 (Issue #231)
   // GAP-022 fixed: v1/officer/governance/meetings/[id]/route.ts:99 (Issue #231)
+  // Committee routes already fixed (Issue #237)
   // Demo endpoints - test/dev only
   "admin/demo/lifecycle-members/route.ts:81",
   "admin/demo/member-list/route.ts:98",
@@ -83,12 +84,6 @@ const KNOWN_GAPS: Set<string> = new Set([
   "admin/demo/scenarios/route.ts:596",
   // OpenAPI endpoint - read-only spec generation
   "openapi/route.ts:57",
-  // Committee management - admin operations
-  "v1/committees/route.ts:54",
-  "v1/committees/[id]/route.ts:34",
-  "v1/committees/[id]/route.ts:71",
-  "v1/committees/[id]/members/route.ts:32",
-  "v1/committees/[id]/members/route.ts:68",
 ]);
 
 // Routes that are explicitly allowed to use requireCapability (read-only operations)
