@@ -1,287 +1,330 @@
 # Suggestion Review Workflow
 
-**Status:** Specification
-**Last Updated:** 2025-12-24
-**Related Principles:** P3 (State Machines), P4 (No Hidden Rules), P5 (Reversibility), P7 (Observability)
-**Related Anti-Patterns:** N5 (No Silent Automation)
+This document defines the human-in-the-loop workflow for reviewing and accepting migration suggestions.
+
+**Related:** Epic #306 (Assisted Organizational Representation Reconstruction)
 
 ---
 
 ## Overview
 
-This document defines how Murmurant proposes, reviews, accepts, or rejects presentation suggestions. Suggestions are a mechanism for surfacing recommendations without overstepping human authority.
+When the system generates suggestions from an Intent Manifest, those suggestions must go through a review workflow before affecting production. This ensures:
 
-**A suggestion is not an action.** It is a proposal awaiting human decision.
-
----
-
-## Why Suggestions Exist
-
-Murmurant may observe patterns, detect inconsistencies, or identify opportunities for improvement in organizational presentation (content, structure, branding, member-facing language). Rather than silently correcting or auto-applying changes, Murmurant surfaces these observations as suggestions.
-
-### Suggestions vs. Automation
-
-| Automation | Suggestions |
-|------------|-------------|
-| Acts without asking | Proposes and waits |
-| Assumes correctness | Acknowledges uncertainty |
-| Difficult to reverse | Never applied until accepted |
-| Authority resides in system | Authority remains with humans |
-
-### Core Invariant
-
-> **A suggestion must never mutate production state until explicitly accepted by a human with appropriate authority.**
-
-This invariant aligns with:
-
-- **P5**: Every important action must be undoable or safely reversible
-- **N5**: Never let automation mutate data without explicit authorization
+- No silent automation (Charter principle)
+- Abort is always possible
+- Every change is traceable to a human decision
 
 ---
 
-## Suggestion States
+## Suggestion Data Model
 
-Suggestions follow an explicit state machine. There are no implicit transitions.
+```typescript
+/**
+ * A suggestion is a proposed action derived from observed intent
+ */
+interface Suggestion {
+  suggestionId: string;           // UUID
+  manifestId: string;             // Source manifest
+  createdAt: string;              // ISO timestamp
 
-```
-┌──────────┐     ┌──────────┐     ┌──────────┐
-│ Proposed │────>│ Reviewed │────>│ Accepted │
-└──────────┘     └──────────┘     └──────────┘
-      │                │
-      │                │           ┌──────────┐
-      │                └──────────>│ Rejected │
-      │                            └──────────┘
-      │
-      │          ┌──────────┐
-      └─────────>│ Revised  │────> (back to Proposed)
-                 └──────────┘
-```
+  // What we're suggesting
+  suggestionType: SuggestionType;
+  targetEntity: EntityReference;
+  proposedAction: ProposedAction;
 
-### State Definitions
+  // Traceability
+  derivedFrom: SourceReference[];  // What observations led to this
+  confidence: number;              // 0-100, how confident we are
+  explanation: string;             // Human-readable reasoning
 
-| State | Definition | Who Can Transition |
-|-------|------------|-------------------|
-| **Proposed** | Suggestion created and awaiting review. Not visible to end users. | System (creation only) |
-| **Reviewed** | A human has examined the suggestion and formed an opinion. | Authorized reviewer |
-| **Accepted** | Suggestion approved for application. Becomes actionable. | Authorized approver |
-| **Rejected** | Suggestion declined. No action taken. Preserved for audit. | Authorized reviewer |
-| **Revised** | Original suggestion modified before re-proposal. | Authorized editor |
+  // Review state
+  status: SuggestionStatus;
+  reviewedBy?: string;             // Who reviewed
+  reviewedAt?: string;             // When reviewed
+  reviewNotes?: string;            // Reviewer comments
+  modifications?: Modification[];  // Changes made during review
+}
 
-### State Transition Rules
+type SuggestionType =
+  | "create_page"         // Create new page
+  | "create_navigation"   // Add navigation item
+  | "set_branding"        // Set colors, logo, etc.
+  | "upload_asset"        // Import asset
+  | "create_section"      // Add section to page
+  | "map_content"         // Map WA widget to Murmurant component
+  | "set_metadata";       // Set page metadata
 
-1. **Proposed → Reviewed**: Reviewer marks they have examined the suggestion
-2. **Reviewed → Accepted**: Approver confirms the suggestion should be applied
-3. **Reviewed → Rejected**: Reviewer declines with reason
-4. **Proposed → Revised**: Editor modifies the suggestion content
-5. **Revised → Proposed**: Modified suggestion re-enters review queue
-6. **Rejected → (terminal)**: Rejected suggestions do not re-enter the queue automatically
+interface EntityReference {
+  entityType: "page" | "navigation" | "asset" | "organization" | "section";
+  entityId?: string;      // ID if existing entity
+  entityPath?: string;    // Path for new entities
+}
 
-A rejected suggestion may be manually resubmitted as a new suggestion if circumstances change.
+interface ProposedAction {
+  operation: "create" | "update" | "delete";
+  payload: Record<string, unknown>;  // Entity-specific data
+}
 
----
+interface SourceReference {
+  manifestElementType: "page" | "navigation" | "asset" | "style" | "identity";
+  elementId: string;
+  fieldPath?: string;     // Specific field if relevant
+}
 
-## Who Can Act at Each State
+type SuggestionStatus =
+  | "pending"             // Awaiting review
+  | "accepted"            // Approved, ready to apply
+  | "rejected"            // Declined
+  | "modified"            // Accepted with changes
+  | "applied"             // Successfully applied
+  | "failed";             // Apply failed
 
-Authority is scoped to the suggestion's domain (content area, committee, or system-wide).
-
-| Action | Required Capability | Scope |
-|--------|--------------------:|-------|
-| Create suggestion | `suggestion:create` | Domain-scoped |
-| View suggestion | `suggestion:view` | Domain-scoped |
-| Mark as reviewed | `suggestion:review` | Domain-scoped |
-| Accept suggestion | `suggestion:approve` | Domain-scoped |
-| Reject suggestion | `suggestion:review` | Domain-scoped |
-| Revise suggestion | `suggestion:edit` | Domain-scoped |
-| Apply accepted suggestion | `content:edit` + domain | Object-scoped |
-
-### Separation of Concerns
-
-- **Reviewers** evaluate whether a suggestion is appropriate
-- **Approvers** authorize application (may be same as reviewer for simple domains)
-- **Editors** apply the accepted change to the actual content
-
-This separation ensures no single action both approves and applies a change.
-
----
-
-## What Is Logged and Why
-
-Every state transition is logged. Logs serve three purposes:
-
-1. **Auditability**: Answer "who decided what, when, and why"
-2. **Debuggability**: Trace unexpected outcomes back to their source
-3. **Accountability**: Ensure decisions are attributable to real identities
-
-### Log Entry Structure
-
-Each log entry includes:
-
-| Field | Description |
-|-------|-------------|
-| `suggestionId` | Unique identifier for the suggestion |
-| `previousState` | State before transition |
-| `newState` | State after transition |
-| `actor` | Identity of the person who acted |
-| `timestamp` | When the action occurred |
-| `reason` | Human-provided rationale (required for Reject, optional otherwise) |
-| `metadata` | Additional context (diff summary, affected scope) |
-
-### Logged Events
-
-- Suggestion created
-- Suggestion viewed (first view by reviewer)
-- Suggestion reviewed (opinion formed)
-- Suggestion accepted
-- Suggestion rejected (with reason)
-- Suggestion revised (with diff)
-- Accepted suggestion applied
-- Accepted suggestion application failed
-
----
-
-## What Is Previewable vs. Committed
-
-Suggestions support preview at every stage. Nothing is committed until explicitly applied.
-
-### Preview Capabilities
-
-| Stage | Preview Available | Commit Possible |
-|-------|-------------------|-----------------|
-| Proposed | Yes (side-by-side diff) | No |
-| Reviewed | Yes | No |
-| Accepted | Yes (final confirmation) | Yes (requires explicit action) |
-| Rejected | Yes (historical view) | No |
-| Revised | Yes (comparison to original) | No |
-
-### Preview Guarantees
-
-1. **Read-only**: Preview does not modify any data
-2. **Accurate**: Preview shows exactly what will change if applied
-3. **Scoped**: Preview identifies all affected areas
-4. **Reversible indication**: Preview indicates whether the change is reversible
-
-### Commit Requirements
-
-Committing an accepted suggestion requires:
-
-1. Suggestion is in `Accepted` state
-2. Actor has `content:edit` capability for the affected scope
-3. Actor explicitly confirms the apply action
-4. System records the application in audit log
-5. System creates rollback artifact (if applicable)
-
----
-
-## Abort Semantics
-
-At any point before commit, a suggestion can be abandoned without side effects.
-
-### Abort Mechanisms
-
-| Action | Effect | Logged |
-|--------|--------|--------|
-| **Reject** | Suggestion moves to Rejected state. Preserved for audit. | Yes |
-| **Discard** | Suggestion deleted entirely (if never reviewed). | Yes (deletion event) |
-| **Expire** | Suggestion transitions to Expired after operator-configured period if no human acts. This is a staleness safeguard, not a system decision. Operators set the expiration policy; the system enforces it. | Yes (policy-driven) |
-
-### Post-Commit Rollback
-
-If a suggestion has been applied (committed), rollback requires **explicit human initiation**:
-
-1. A human with `content:rollback` capability decides to initiate rollback
-2. Rollback artifact exists (created at commit time)
-3. The human confirms the rollback action
-4. Rollback is logged as a distinct action with the initiating actor recorded
-5. Original suggestion retains "Applied then Rolled Back" status
-
-> **The system never auto-rolls back.** Rollback is always a deliberate human decision.
-
-This aligns with **P5**: reversibility must be supported, not assumed.
-
----
-
-## Failure Modes and Visibility Guarantees
-
-Murmurant must fail visibly. Silent failures are not acceptable.
-
-### Failure Modes
-
-| Failure | Visibility | Resolution |
-|---------|------------|------------|
-| Suggestion creation fails | Error shown to creator | Retry or report |
-| Review transition fails | Error shown to reviewer | Retry or escalate |
-| Approval fails | Error shown to approver | Retry or escalate |
-| Application fails | Error shown to applicant + logged | Investigate, retry, or reject |
-| Rollback fails | Error shown to actor + alert to admin | Manual intervention required |
-
-### Visibility Guarantees
-
-1. **No silent state changes**: Every transition is logged and visible in the suggestion history
-2. **No orphaned suggestions**: Suggestions cannot exist in undefined states
-3. **No phantom applications**: Applied changes are always traceable to an accepted suggestion
-4. **No hidden rejections**: Rejected suggestions and their reasons are visible to authorized reviewers
-5. **No mystery failures**: Failed operations include structured error information
-
-### Error Structure
-
-Failed operations return:
-
-```
-{
-  "error": true,
-  "code": "SUGGESTION_APPLICATION_FAILED",
-  "message": "Unable to apply suggestion: target content was modified since review",
-  "suggestionId": "sug_abc123",
-  "failedAt": "2025-12-24T12:00:00Z",
-  "resolution": "Review the current content and re-evaluate the suggestion"
+interface Modification {
+  fieldPath: string;
+  originalValue: unknown;
+  modifiedValue: unknown;
+  modifiedBy: string;
+  modifiedAt: string;
 }
 ```
 
 ---
 
-## Relation to Intent Manifest
+## Review States
 
-Suggestions and the Intent Manifest share a common principle: **nothing happens without explicit human authorization**. During migration and cutover rehearsal, accepted suggestions produce Intent Manifest entries.
+```
+                    ┌─────────────┐
+                    │   pending   │
+                    └──────┬──────┘
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+              ▼            ▼            ▼
+        ┌──────────┐ ┌──────────┐ ┌──────────┐
+        │ rejected │ │ accepted │ │ modified │
+        └──────────┘ └────┬─────┘ └────┬─────┘
+                          │            │
+                          └─────┬──────┘
+                                │
+                                ▼
+                          ┌──────────┐
+                          │ applied  │
+                          └──────────┘
+                                │
+                                ▼ (on error)
+                          ┌──────────┐
+                          │  failed  │
+                          └──────────┘
+```
 
-> **Note**: The [Intent Manifest](./INTENT_MANIFEST_SCHEMA.md) is a conceptual component for tracking intended changes during cutover rehearsal. This section describes alignment, not dependency.
+### State Definitions
 
-Suggestions operate similarly to Intent Manifest entries:
-
-| Concept | Suggestions | Intent Manifest |
-|---------|-------------|-----------------|
-| Purpose | Surface recommendations | Record intended changes |
-| Mutability | Proposals can be revised | Intents are append-only |
-| Authority | Human accepts/rejects | Human commits/aborts session |
-| Application | Individual suggestion applied | Entire manifest replayed |
-
-See [Intent Manifest Schema](./INTENT_MANIFEST_SCHEMA.md) for the full specification.
+| State | Description | Allowed Transitions |
+|-------|-------------|---------------------|
+| pending | Awaiting human review | accepted, rejected, modified |
+| accepted | Approved as-is | applied, failed |
+| rejected | Declined, will not apply | (terminal) |
+| modified | Approved with changes | applied, failed |
+| applied | Successfully applied to Murmurant | (terminal) |
+| failed | Apply operation failed | pending (retry) |
 
 ---
 
-## Summary of Invariants
+## Review Workflow
 
-1. Suggestions never auto-apply
-2. Every state transition is logged
-3. Preview is always available before commit
-4. Abort is always possible before commit
-5. Post-commit rollback requires explicit artifact and capability
-6. Failures are visible and structured
-7. Authority remains with humans at every decision point
+### Phase 1: Suggestion Generation
+
+```typescript
+// After manifest is reviewed, generate suggestions
+async function generateSuggestions(manifest: IntentManifest): Promise<Suggestion[]> {
+  const suggestions: Suggestion[] = [];
+
+  // Generate page suggestions
+  for (const page of manifest.pages) {
+    suggestions.push(createPageSuggestion(page, manifest));
+  }
+
+  // Generate navigation suggestions
+  for (const nav of manifest.navigation) {
+    suggestions.push(createNavSuggestion(nav, manifest));
+  }
+
+  // Generate branding suggestions
+  if (manifest.identity || manifest.styles) {
+    suggestions.push(createBrandingSuggestion(manifest));
+  }
+
+  return suggestions;
+}
+```
+
+### Phase 2: Review Interface
+
+The operator reviews suggestions through a dedicated UI:
+
+1. **List View**: All suggestions grouped by type
+2. **Detail View**: Individual suggestion with:
+   - What is proposed
+   - Why (linked observations from manifest)
+   - Preview of result
+   - Accept / Reject / Modify actions
+
+### Phase 3: Batch Operations
+
+Operators can perform batch operations:
+
+```typescript
+// Accept all suggestions of a type
+async function acceptAllOfType(sessionId: string, type: SuggestionType): Promise<void>;
+
+// Reject all low-confidence suggestions
+async function rejectLowConfidence(sessionId: string, threshold: number): Promise<void>;
+```
+
+### Phase 4: Apply
+
+Once review is complete:
+
+```typescript
+// Apply all accepted/modified suggestions
+async function applySuggestions(sessionId: string): Promise<ApplyResult> {
+  const suggestions = await getAcceptedSuggestions(sessionId);
+
+  for (const suggestion of suggestions) {
+    try {
+      await applySuggestion(suggestion);
+      suggestion.status = "applied";
+    } catch (error) {
+      suggestion.status = "failed";
+      suggestion.reviewNotes = error.message;
+    }
+    await saveSuggestion(suggestion);
+  }
+
+  return summarizeResults(suggestions);
+}
+```
 
 ---
 
-## References
+## Audit Trail
 
-- [Architectural Charter](../ARCHITECTURAL_CHARTER.md) — Governing principles
-- [Intent Manifest Schema](./INTENT_MANIFEST_SCHEMA.md) — Manifest structure and guarantees
-- [Preview Surface Contract](./PREVIEW_SURFACE_CONTRACT.md) — Preview guarantees and fidelity bounds
-- [Migration Invariants](./MIGRATION_INVARIANTS.md) — Validation patterns
-- [Importer Runbook](../IMPORTING/IMPORTER_RUNBOOK.md) — Migration procedures
+Every state transition is logged:
+
+```typescript
+interface SuggestionAuditEntry {
+  suggestionId: string;
+  timestamp: string;
+  actor: string;                    // User or system ID
+  action: "created" | "reviewed" | "modified" | "applied" | "failed";
+  previousStatus?: SuggestionStatus;
+  newStatus: SuggestionStatus;
+  details?: Record<string, unknown>;
+}
+```
 
 ---
 
-## Revision History
+## Granularity Options
 
-| Date | Author | Change |
-|------|--------|--------|
-| 2025-12-24 | System | Initial specification |
+Operators can choose review granularity:
+
+| Mode | Description | Use Case |
+|------|-------------|----------|
+| **Individual** | Review each suggestion one by one | High-stakes migrations, complex content |
+| **Grouped** | Review by suggestion type | Standard migrations |
+| **Bulk** | Accept all above threshold, review exceptions | Simple migrations, trusted extraction |
+
+---
+
+## Abort Mechanics
+
+At any point before `applied` status:
+
+1. **Soft Abort (Pause)**: Stop reviewing, preserve state for later
+2. **Hard Abort (Discard)**: Mark all pending as rejected, log reason
+
+```typescript
+async function abortSession(
+  sessionId: string,
+  mode: "pause" | "discard",
+  reason: string
+): Promise<void> {
+  const session = await getSession(sessionId);
+
+  if (mode === "discard") {
+    // Mark all non-applied suggestions as rejected
+    for (const suggestion of session.suggestions) {
+      if (suggestion.status === "pending" || suggestion.status === "accepted") {
+        suggestion.status = "rejected";
+        suggestion.reviewNotes = `Aborted: ${reason}`;
+      }
+    }
+  }
+
+  session.status = mode === "pause" ? "paused" : "aborted";
+  session.abortReason = reason;
+  await saveSession(session);
+
+  // Log audit entry
+  await logAudit({
+    sessionId,
+    action: mode === "pause" ? "session_paused" : "session_aborted",
+    reason,
+  });
+}
+```
+
+---
+
+## Commit Gate
+
+Suggestions can only be applied when:
+
+1. All suggestions are in terminal state (accepted, rejected, modified, or already applied)
+2. Manifest status is "reviewed"
+3. Operator explicitly triggers apply
+4. (Optional) Customer approval for customer-visible changes
+
+```typescript
+function canCommit(session: ReviewSession): CommitEligibility {
+  const pending = session.suggestions.filter(s => s.status === "pending");
+
+  if (pending.length > 0) {
+    return {
+      eligible: false,
+      reason: `${pending.length} suggestions still pending review`,
+    };
+  }
+
+  if (session.manifest.status !== "reviewed") {
+    return {
+      eligible: false,
+      reason: "Manifest must be reviewed before commit",
+    };
+  }
+
+  return { eligible: true };
+}
+```
+
+---
+
+## Integration with Cutover Mode (#301)
+
+When operating in Cutover Rehearsal Mode:
+
+1. Suggestions are applied to a **preview environment**, not production
+2. Customer can review results before final commit
+3. Abort discards preview, WA remains authoritative
+4. Commit promotes preview to production
+
+See Epic #301 for cutover-specific mechanics.
+
+---
+
+## Related Documents
+
+- [INTENT_MANIFEST_SCHEMA.md](./INTENT_MANIFEST_SCHEMA.md) - Source data model
+- Epic #306 - Parent epic
+- Epic #301 - Cutover Rehearsal Mode
