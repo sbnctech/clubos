@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireCapability } from "@/lib/auth";
+import { requireCapability, requireCapabilitySafe } from "@/lib/auth";
 import { errors } from "@/lib/api";
 import { auditMutation } from "@/lib/audit";
 import {
@@ -52,7 +52,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
  * - effectiveAt: ISO date (optional)
  */
 export async function PATCH(req: NextRequest, { params }: RouteParams) {
-  const auth = await requireCapability(req, "users:manage");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #234)
+  const auth = await requireCapabilitySafe(req, "users:manage");
   if (!auth.ok) return auth.response;
 
   const { id } = await params;
@@ -102,7 +103,8 @@ export async function PATCH(req: NextRequest, { params }: RouteParams) {
  * Requires users:manage capability.
  */
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
-  const auth = await requireCapability(req, "users:manage");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #234)
+  const auth = await requireCapabilitySafe(req, "users:manage");
   if (!auth.ok) return auth.response;
 
   const { id } = await params;

@@ -56,27 +56,9 @@ const DANGEROUS_CAPABILITIES = [
 // These are tracked for remediation. New violations will cause CI to fail.
 // Format: "relative/path/to/route.ts:LINE" for specific line tracking
 const KNOWN_GAPS: Set<string> = new Set([
-  // users:manage endpoints - documented in docs/CI/INVARIANTS.md
-  "v1/admin/users/[id]/passkeys/route.ts:48",
-  "v1/admin/users/[id]/passkeys/route.ts:98",
-  "v1/admin/service-history/route.ts:86",
-  "v1/admin/service-history/[id]/close/route.ts:21",
-  "v1/admin/transitions/route.ts:72",
-  "v1/admin/transitions/[id]/detect-outgoing/route.ts:21",
-  "v1/admin/transitions/[id]/cancel/route.ts:21",
-  "v1/admin/transitions/[id]/apply/route.ts:24",
-  "v1/admin/transitions/[id]/assignments/[aid]/route.ts:18",
-  "v1/admin/transitions/[id]/assignments/route.ts:32",
-  "v1/admin/transitions/[id]/submit/route.ts:21",
-  "v1/admin/transitions/[id]/route.ts:55",
-  "v1/admin/transitions/[id]/route.ts:105",
-  // admin:full endpoints - read/diagnostic operations, lower priority for safety
-  // GAP-014 fixed: v1/admin/import/status/route.ts:37 (Issue #233)
-  // GAP-015 through GAP-020 fixed: support cases routes (Issue #229)
-  // GAP-021 fixed: v1/officer/governance/minutes/[id]/route.ts:256 (Issue #231)
-  // GAP-022 fixed: v1/officer/governance/meetings/[id]/route.ts:99 (Issue #231)
-  // Committee routes already fixed (Issue #237)
-  // Demo endpoints - test/dev only
+  // Phase 1 (users:manage) fixed in Issue #234
+  // Phase 2 (admin:full) fixed in Issues #233, #229, #231, #237
+  // Demo endpoints - test/dev only (Phase 3, deferred)
   "admin/demo/lifecycle-members/route.ts:81",
   "admin/demo/member-list/route.ts:98",
   "admin/demo/status/route.ts:21",

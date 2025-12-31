@@ -25,7 +25,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireCapability, AuthContext } from "@/lib/auth";
+import { requireCapabilitySafe, AuthContext } from "@/lib/auth";
 import { listPasskeys, adminRevokePasskey } from "@/lib/passkey";
 import { errors } from "@/lib/api";
 import { auditMutation } from "@/lib/audit";
@@ -44,8 +44,8 @@ const DeleteSchema = z.object({
 export async function GET(req: NextRequest, { params }: RouteParams) {
   const { id: userAccountId } = await params;
 
-  // Require users:manage capability
-  const auth = await requireCapability(req, "users:manage");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #234)
+  const auth = await requireCapabilitySafe(req, "users:manage");
   if (!auth.ok) return auth.response;
 
   try {
@@ -94,8 +94,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
 export async function DELETE(req: NextRequest, { params }: RouteParams) {
   const { id: userAccountId } = await params;
 
-  // Require users:manage capability
-  const auth = await requireCapability(req, "users:manage");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #234)
+  const auth = await requireCapabilitySafe(req, "users:manage");
   if (!auth.ok) return auth.response;
 
   const context = auth.context as AuthContext;

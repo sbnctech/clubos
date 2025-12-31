@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireCapability } from "@/lib/auth";
+import { requireCapabilitySafe } from "@/lib/auth";
 import { errors } from "@/lib/api";
 import { detectOutgoingAssignments } from "@/lib/serviceHistory";
 
@@ -18,7 +18,8 @@ interface RouteParams {
  * Only works on DRAFT plans.
  */
 export async function POST(req: NextRequest, { params }: RouteParams) {
-  const auth = await requireCapability(req, "users:manage");
+  // Uses requireCapabilitySafe to block during impersonation (Issue #234)
+  const auth = await requireCapabilitySafe(req, "users:manage");
   if (!auth.ok) return auth.response;
 
   const { id: planId } = await params;
