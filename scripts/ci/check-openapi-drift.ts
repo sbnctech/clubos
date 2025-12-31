@@ -46,6 +46,10 @@ const EXCLUDED_ROUTES = new Set([
   "/api/admin/demo",
   // Auth routes handled specially
   "/api/auth",
+  // Internal/test routes
+  "/api/email/test",
+  "/api/email/log",
+  "/api/cron/transitions",
 ]);
 
 // Patterns for route directories to exclude
@@ -53,6 +57,8 @@ const EXCLUDED_PATTERNS = [
   /\/demo\//,
   /\/test\//,
   /\/_/,  // Next.js special routes
+  /\/fake\//,  // Fake/mock routes for testing
+  /\/cron\//,  // Internal cron routes
 ];
 
 interface RouteInfo {
@@ -88,6 +94,10 @@ function getOpenAPIRoutes(specPath: string): Map<string, Set<string>> {
     // Convert OpenAPI path to normalized form
     // /api/v1/members/{id} -> /api/v1/members/[id]
     const normalizedPath = apiPath.replace(/{([^}]+)}/g, "[$1]");
+
+    // Skip excluded routes (apply same filters as code scan)
+    if (EXCLUDED_ROUTES.has(normalizedPath)) continue;
+    if (EXCLUDED_PATTERNS.some((p) => p.test(normalizedPath))) continue;
 
     const methodSet = new Set<string>();
     for (const method of Object.keys(methods as object)) {
