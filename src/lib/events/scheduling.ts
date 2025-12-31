@@ -19,28 +19,34 @@
 
 import { EventStatus } from "@prisma/client";
 import { makeDateFormatter } from "@/lib/timezone";
+import { getPolicyDefault } from "@/lib/policy/getPolicy";
+
 // ============================================================================
-// CONSTANTS
+// POLICY-DERIVED CONSTANTS
 // ============================================================================
 //
-// Future Work: These constants will be replaced with policy lookups.
-// See: src/lib/scheduling/policyKeys.ts for policy key accessors
-// See: Issue #263 (Policy Configuration Layer)
-//
-// Mapping:
-// - SBNC_TIMEZONE → getPolicy(getSchedulingTimezonePolicyKey(), orgContext)
-// - DEFAULT_REGISTRATION_OPEN_HOUR → getPolicy(getRegistrationOpenHourPolicyKey(), orgContext)
-// - ARCHIVE_DAYS_AFTER_END → getPolicy(getEventArchiveDaysPolicyKey(), orgContext)
+// These values come from the policy layer and are configurable per-organization.
+// See: docs/ARCH/POLICY_KEY_CATALOG.md
+// Related: Issue #240 (Event Scheduling Policy Configuration)
 // ============================================================================
 
-/** SBNC operates in Pacific Time */
-export const SBNC_TIMEZONE = "America/Los_Angeles";
+/**
+ * Organization timezone for scheduling operations.
+ * Default: America/Los_Angeles (SBNC operates in Pacific Time)
+ */
+export const SBNC_TIMEZONE = getPolicyDefault("scheduling.timezone");
 
-/** Default time for registration to open (8:00 AM Pacific) */
-export const DEFAULT_REGISTRATION_OPEN_HOUR = 8;
+/**
+ * Default hour for registration to open (24-hour format).
+ * Default: 8 (8:00 AM)
+ */
+export const DEFAULT_REGISTRATION_OPEN_HOUR = getPolicyDefault("scheduling.registrationOpenHour");
 
-/** Days after event end before it's considered archived */
-export const ARCHIVE_DAYS_AFTER_END = 30;
+/**
+ * Days after event end before it's considered archived.
+ * Default: 30 days
+ */
+export const ARCHIVE_DAYS_AFTER_END = getPolicyDefault("scheduling.eventArchiveDays");
 
 // ============================================================================
 // TYPES
